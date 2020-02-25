@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="mufasa", # Replace with your own username
-    version="0.1.1",
+    version="0.1.2",
     author="Michael Chun-Yuan Chen",
     author_email="mcychen@uvic.ca",
     description="MUlti-component Fitter for Astrophysical Spectral Applications",
