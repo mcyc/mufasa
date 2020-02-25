@@ -216,9 +216,12 @@ class UCubePlus(UltraCube):
 
         for nc in ncomp:
             if not str(nc) in self.paraPaths:
+                # if a file path does not exist for a given component ID, add the path to the object
                 self.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(self.paraDir, self.paraNameRoot, nc)
 
             if update or (not os.path.isfile(self.paraPaths[str(nc)])):
+                # if update is requested, or if a fitted parameter map does not already existed, fit the cube and save
+                # the model
                 self.fit_cube(ncomp=[nc], **kwargs)
                 self.save_model_fit(self.paraPaths[str(nc)], nc)
 
