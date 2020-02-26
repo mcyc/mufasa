@@ -238,12 +238,16 @@ def save_best_2comp_fit(reg, rebuild_mod=False):
                 # copy the pcube to avoid needing to reloading the model
                 reg_final.ucube.pcubes[str(nc)] = reg.ucube.pcubes[str(nc)].copy('deep')
 
+        # update master model mask
+        mod_mask = reg_final.ucube.pcubes[str(nc)].get_modelcube(multicore=reg_final.ucube.n_cores) > 0
+        reg_final.ucube.include_model_mask(mod_mask)
+
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
 
     # make the 2-comp para maps with the best fit model
     lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
-    print("2comp pix: {}".format(np.sum(mask)))
+    print("total number of pixels better fitted with 2comp: {}".format(np.sum(mask)))
     pcube_final.parcube[:4, ~mask] = reg_final.ucube.pcubes['1'].parcube[:4, ~mask].copy()
     pcube_final.errcube[:4, ~mask] = reg_final.ucube.pcubes['1'].errcube[:4, ~mask].copy()
     pcube_final.parcube[4:8, ~mask] = np.nan
