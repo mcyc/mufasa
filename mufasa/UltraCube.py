@@ -112,8 +112,15 @@ class UltraCube(object):
         save_model_fit(self.pcubes[str(ncomp)], savename, ncomp)
 
 
-    def load_model_fit(self, filename, ncomp):
-        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
+    def load_model_fit(self, filename, ncomp, reload_pcube = False):
+        if reload_pcube or not str(ncomp) in self.pcubes:
+            # if pcube reload is requested or if pcubes[str(ncomp)] does not already exist
+            self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
+
+        elif not isinstance(self.pcubes[str(ncomp)], pyspeckit.Cube):
+            #else if pcubes[str(ncomp)] is not the right type for whatever reason
+            self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
+
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube() > 0
         self.include_model_mask(mod_mask)
