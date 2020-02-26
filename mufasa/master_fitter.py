@@ -210,7 +210,7 @@ def refit_2comp_wide(reg, snr_min=3):
     #save_model_fit(pcube, savename, ncomp)
 
 
-def save_best_2comp_fit(reg):
+def save_best_2comp_fit(reg, rebuild_mod=False):
     # should be renamed to determine_best_2comp_fit or something along that line
     # currently use np.nan for pixels with no models
 
@@ -228,8 +228,14 @@ def save_best_2comp_fit(reg):
             reg_final.load_fits(ncomp=[nc])
         else:
             # load files using paths from reg if they exist
-            print("loading: {}".format(reg.ucube.paraPaths[str(nc)]))
-            reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc)
+
+            if rebuild_mod:
+                print("loading: {}".format(reg.ucube.paraPaths[str(nc)]))
+                print("reconstructing model")
+                reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc)
+            else:
+                # copy the pcube to avoid needing to reloading the model
+                reg_final.ucube.pcubes[str(nc)] = reg.ucube.pcubes[str(nc)].copy()
 
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
 
