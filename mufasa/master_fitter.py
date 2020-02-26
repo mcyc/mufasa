@@ -236,7 +236,7 @@ def save_best_2comp_fit(reg, rebuild_mod=False):
                 reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc)
             else:
                 # copy the pcube to avoid needing to reloading the model
-                reg_final.ucube.pcubes[str(nc)] = reg.ucube.pcubes[str(nc)].copy()
+                reg_final.ucube.pcubes[str(nc)] = reg.ucube.pcubes[str(nc)].copy('deep')
 
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
 
