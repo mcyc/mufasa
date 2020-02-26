@@ -202,8 +202,11 @@ def refit_2comp_wide(reg, snr_min=3):
     # mask over where one comp fit is more robust
     good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
 
-    # replace the values
+    # replace the parameter values
     replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+
+    # replace model values as well
+    replace_model(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
     # save the final fit model
     #UCube.save_model_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
@@ -216,9 +219,8 @@ def save_best_2comp_fit(reg, rebuild_mod=False):
 
     ncomp = [1, 2]
 
-    # ideally, a copy function should be in place of reloading
-
     # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
+    # ideally, a copy function should be in place of reloading
     reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir)
 
     # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
@@ -228,7 +230,6 @@ def save_best_2comp_fit(reg, rebuild_mod=False):
             reg_final.load_fits(ncomp=[nc])
         else:
             # load files using paths from reg if they exist
-
             if rebuild_mod:
                 print("loading: {}".format(reg.ucube.paraPaths[str(nc)]))
                 print("reconstructing model")
@@ -417,6 +418,11 @@ def replace_para(pcube, pcube_ref, mask):
     pcube_ref = pcube_ref.copy('deep')
     pcube.parcube[:,mask] = pcube_ref.parcube[:,mask]
     pcube.errcube[:,mask] = pcube_ref.errcube[:,mask]
+
+
+def replace_model(pcube, pcube_ref, mask):
+    # replace model in masked pixels with the reference model
+    pcube._modelcube[:,mask] = pcube_ref._modelcube[:,mask]
 
 
 
