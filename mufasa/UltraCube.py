@@ -37,6 +37,7 @@ class UltraCube(object):
         self.master_model_mask = None
         self.snr_min = None
         self.cnv_factor = cnv_factor
+        self.n_cores = multiprocessing.cpu_count()
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -95,7 +96,7 @@ class UltraCube(object):
         for nc in ncomp:
             self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
             # update model mask
-            mod_mask = self.pcubes[str(nc)].get_modelcube() > 0
+            mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
             self.include_model_mask(mod_mask)
 
 
@@ -122,13 +123,13 @@ class UltraCube(object):
             self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
 
         # update model mask
-        mod_mask = self.pcubes[str(ncomp)].get_modelcube() > 0
+        mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
         self.include_model_mask(mod_mask)
 
 
     def get_residual(self, ncomp):
         compID = str(ncomp)
-        model = self.pcubes[compID].get_modelcube()
+        model = self.pcubes[compID].get_modelcube(multicore=self.n_cores)
         self.residual_cubes[compID] = get_residual(self.cube, model)
         return self.residual_cubes[compID]
 
@@ -144,7 +145,7 @@ class UltraCube(object):
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
-        model = self.pcubes[compID].get_modelcube()
+        model = self.pcubes[compID].get_modelcube(multicore=self.n_cores)
         self.Tpeak_maps[compID] = get_Tpeak(model)
         return self.Tpeak_maps[compID]
 
@@ -285,7 +286,7 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        modcube = ucube.pcubes[compID].get_modelcube()
+        modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
 
     return get_chisq(cube, modcube, expand=20, reduced=reduced, usemask=usemask, mask=mask)
 
