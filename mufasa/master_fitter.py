@@ -238,9 +238,9 @@ def save_best_2comp_fit(reg, rebuild_mod=False):
                 # copy the pcube to avoid needing to reloading the model
                 reg_final.ucube.pcubes[str(nc)] = reg.ucube.pcubes[str(nc)].copy('deep')
 
-        # update master model mask
-        mod_mask = reg_final.ucube.pcubes[str(nc)].get_modelcube(multicore=reg_final.ucube.n_cores) > 0
-        reg_final.ucube.include_model_mask(mod_mask)
+                # update master model mask
+                mod_mask = reg_final.ucube.pcubes[str(nc)].get_modelcube(multicore=reg_final.ucube.n_cores) > 0
+                reg_final.ucube.include_model_mask(mod_mask)
 
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
 
