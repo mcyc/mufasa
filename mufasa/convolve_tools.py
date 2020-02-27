@@ -12,6 +12,7 @@ from astropy.stats import mad_std
 from FITS_tools.hcongrid import get_pixel_mapping
 from scipy.interpolate import griddata
 import scipy.ndimage as nd
+import gc
 
 
 #=======================================================================================================================
@@ -79,14 +80,22 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
 
     maskcube = cube.with_mask(mask.astype(bool))
 
+
+    # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
+    maskcube.allow_huge_operations = True
     cnv_cube = maskcube.convolve_to(beam)
+    maskcube.allow_huge_operations = False
+    gc.collect()
 
     if iterrefine:
         # use the convolved cube for new masking
         planemask = snr_mask(cnv_cube, snr_min)
         mask = np.isfinite(cube._data) * planemask
         maskcube = cube.with_mask(mask.astype(bool))
+        maskcube.allow_huge_operations = True
         cnv_cube = maskcube.convolve_to(beam)
+        maskcube.allow_huge_operations = False
+        gc.collect()
 
     return cnv_cube
 
