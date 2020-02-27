@@ -171,6 +171,9 @@ def refit_2comp_wide(reg, snr_min=3):
     # load the fitted parameters
     for nc in ncomp:
         if not str(nc) in reg.ucube.pcubes:
+            if not str(nc) in reg.ucube.paraPaths:
+                reg.ucube.paraPaths[str(nc)]= '{}/{}_{}vcomp.fits'.format(reg.ucube.paraDir, reg.ucube.paraNameRoot, nc)
+
             if nc==2 and not ('2_noWideDelV' in reg.ucube.paraPaths):
                 reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc)
                 reg.ucube.pcubes['2_noWideDelV'] =\
