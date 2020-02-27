@@ -356,7 +356,18 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
         vmap = reg.ucube.pcubes['1'].parcube[0]
         # make want to double check that masked cube always masks out nan values
         res_main_hf = mmg.vmask_cube(res_cube, vmap, window_hwidth=window_hwidth)
-        res_main_hf_snr = res_main_hf.max(axis=0).value / best_rms
+
+        if res_main_hf.size > 1e7:
+            # to avoid loading entire cube and stress the memory
+            how = 'slice'
+        else:
+            # note: 'auto' currently returns slice for n > 1e8
+            how = 'auto'
+
+        # enable huge operations (note: not needed when "how" is chosen wisely, which it should be)
+        res_main_hf.allow_huge_operations = True
+        res_main_hf_snr = res_main_hf.max(axis=0, how=how).value / best_rms
+        res_main_hf.allow_huge_operations = False
 
         # mask out residual with SNR values over the cut threshold
         mask_res = res_main_hf_snr > res_snr_cut
