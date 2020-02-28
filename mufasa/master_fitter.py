@@ -321,7 +321,15 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     ncomp = 1
 
     # note: no further masking is applied to vmap, as we assume only pixels with good vlsr will be used
-    vmap = reg.ucube_cnv.pcubes['1'].parcube[0]
+    if not hasattr(reg, 'ucube_cnv'):
+        # if convolved cube was not used to produce initial guesses, use the full resolution 1-comp fit as the reference
+        from scipy.ndimage.filters import median_filter
+        pcube1 = reg.ucube.pcubes['1']
+        vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        vmap = cnvtool.regrid(vmap, header1=pcube1.header, header2=cube_res_cnv.header)
+    else:
+        vmap = reg.ucube_cnv.pcubes['1'].parcube[0]
+
     moms_res_cnv = mmg.vmask_moments(cube_res_cnv, vmap=vmap, window_hwidth=window_hwidth)
 
     gg = mmg.moment_guesses(moms_res_cnv[1], moms_res_cnv[2], ncomp, moment0=moms_res_cnv[0])
