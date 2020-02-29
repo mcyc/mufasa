@@ -326,7 +326,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
         from scipy.ndimage.filters import median_filter
         pcube1 = reg.ucube.pcubes['1']
         vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
-        vmap = cnvtool.regrid(vmap, header1=pcube1.header, header2=cube_res_cnv.header)
+        vmap = cnvtool.regrid(vmap, header1=get_skyheader(pcube1.header), header2=get_skyheader(cube_res_cnv.header))
     else:
         vmap = reg.ucube_cnv.pcubes['1'].parcube[0]
 
@@ -433,6 +433,17 @@ def replace_para(pcube, pcube_ref, mask):
     pcube_ref = pcube_ref.copy('deep')
     pcube.parcube[:,mask] = pcube_ref.parcube[:,mask]
     pcube.errcube[:,mask] = pcube_ref.errcube[:,mask]
+
+
+def get_skyheader(cube_header):
+    # a quick method to convert 3D header to 2D
+    from astropy import wcs
+    hdr = cube_header
+    hdr2D = wcs.WCS(hdr).celestial.to_header()
+    hdr2D['NAXIS'] = hdr2D['WCSAXES']
+    hdr2D['NAXIS1'] = hdr['NAXIS1']
+    hdr2D['NAXIS2'] = hdr['NAXIS2']
+    return hdr2D
 
 
 
