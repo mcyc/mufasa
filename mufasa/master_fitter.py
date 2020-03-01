@@ -7,11 +7,13 @@ from spectral_cube import SpectralCube
 from astropy import units as u
 from skimage.morphology import dilation
 import astropy.io.fits as fits
+import gc
 
 import UltraCube as UCube
 import moment_guess as mmg
 import convolve_tools as cnvtool
 import guess_refine as gss_rf
+
 
 #=======================================================================================================================
 
@@ -141,6 +143,8 @@ def refit_swap_2comp(reg, snr_min=3):
     lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
 
+    gc.collect()
+
     # swap the parameter of the two slabs and use it as the initial guesses
     guesses = reg.ucube.pcubes['2'].parcube.copy()
 
@@ -150,8 +154,12 @@ def refit_swap_2comp(reg, snr_min=3):
     ucube_new = UCube.UltraCube(reg.ucube.cubefile)
     ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
 
+    gc.collect()
+
     # do a model comparison between the new two component fit verses the original one
     lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=reg.ucube)
+
+    gc.collect()
 
     # adopt the better fit parameters into the final map
     good_mask = lnk_NvsO > 0

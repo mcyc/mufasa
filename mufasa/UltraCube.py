@@ -7,6 +7,7 @@ import numpy as np
 from spectral_cube import SpectralCube
 import pyspeckit
 import multiprocessing
+import gc
 
 import aic
 import multi_v_fit as mvf
@@ -98,6 +99,7 @@ class UltraCube(object):
             # update model mask
             mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
             self.include_model_mask(mod_mask)
+            gc.collect()
 
 
     def include_model_mask(self, mask):
@@ -117,6 +119,7 @@ class UltraCube(object):
         self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
+        gc.collect()
         self.include_model_mask(mod_mask)
 
 
@@ -124,6 +127,7 @@ class UltraCube(object):
         compID = str(ncomp)
         model = self.pcubes[compID].get_modelcube(multicore=self.n_cores)
         self.residual_cubes[compID] = get_residual(self.cube, model)
+        gc.collect()
         return self.residual_cubes[compID]
 
 
@@ -253,7 +257,7 @@ def load_model_fit(cube, filename, ncomp):
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
 
     pcube.load_model_fit(filename, npars=fitter.npars, fittype='nh3_multi_v')
-
+    gc.collect()
     return pcube
 
 
