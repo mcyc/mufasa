@@ -239,7 +239,7 @@ def save_best_2comp_fit(reg):
             reg_final.load_fits(ncomp=[nc])
         else:
             # load files using paths from reg if they exist
-            print("loading: {}".format(reg.ucube.paraPaths[str(nc)]))
+            print("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
             reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc)
 
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
