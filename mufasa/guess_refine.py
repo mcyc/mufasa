@@ -225,3 +225,29 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     zi = C(X*mask,Y*mask)
 
     return zi
+
+
+
+def save_guesses(paracube, header, savename, ncomp=2):
+    # a method to save the fitted parameter cube with relavent header information
+    import copy
+    from astropy.io import fits
+
+    npara = 4
+
+    hdr_new = copy.deepcopy(header)
+
+    # write the header information for each plane (i.e., map)
+    for i in range (0, ncomp):
+        hdr_new['PLANE{0}'.format(i*npara+0)] = 'VELOCITY_{0}'.format(i+1)
+        hdr_new['PLANE{0}'.format(i*npara+1)] = 'SIGMA_{0}'.format(i+1)
+        hdr_new['PLANE{0}'.format(i*npara+2)] = 'TEX_{0}'.format(i+1)
+        hdr_new['PLANE{0}'.format(i*npara+3)] = 'TAU_{0}'.format(i+1)
+
+    hdr_new['CDELT3']= 1
+    hdr_new['CTYPE3']= 'FITPAR'
+    hdr_new['CRVAL3']= 0
+    hdr_new['CRPIX3']= 1
+
+    fitcubefile = fits.PrimaryHDU(data=paracube, header=hdr_new)
+    fitcubefile.writeto(savename ,overwrite=True)

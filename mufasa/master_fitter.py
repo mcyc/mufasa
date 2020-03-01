@@ -301,7 +301,7 @@ def get_2comp_wide_guesses(reg):
     preguess[:, ~aic1v0_mask] = np.nan
 
     # use the dialated mask as a footprint to interpolate the guesses
-    guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_cnv.cube.header, reg.ucube.cube.header,
+    guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
                                               mask=dilation(aic1v0_mask))
 
     return guesses_final

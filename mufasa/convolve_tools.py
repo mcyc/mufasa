@@ -82,6 +82,8 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
 
 
     # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
+    if maskcube.size > 1e8:
+        print("WARNING: maskcube is large ({} pixels)".format(maskcube.size))
     maskcube.allow_huge_operations = True
     cnv_cube = maskcube.convolve_to(beam)
     maskcube.allow_huge_operations = False
