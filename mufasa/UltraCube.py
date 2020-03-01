@@ -225,7 +225,9 @@ class UCubePlus(UltraCube):
 
             if update or (not os.path.isfile(self.paraPaths[str(nc)])):
                 self.fit_cube(ncomp=[nc], **kwargs)
+                gc.collect()
                 self.save_model_fit(self.paraPaths[str(nc)], nc)
+                gc.collect()
 
         for nc in ncomp:
             path = self.paraPaths[str(nc)]
@@ -281,6 +283,7 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
     else:
         modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
 
+    gc.collect()
     return get_chisq(cube, modcube, expand=20, reduced=reduced, usemask=usemask, mask=mask)
 
 
@@ -308,6 +311,7 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
+    gc.collect()
     return aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
 
 
@@ -367,6 +371,8 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     rms = get_rms(residual)
     chisq /= rms**2
 
+    gc.collect()
+
     if reduced:
         # return the reduce chi-squares values
         return chisq
@@ -388,12 +394,14 @@ def get_rms(residual):
     # get robust estimate of the rms from the fit residual
     diff = residual - np.roll(residual, 2, axis=0)
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
+    gc.collect()
     return rms
 
 
 def get_residual(cube, model):
     # calculate the residual of the fit to the cube
     residual = cube.filled_data[:].value - model
+    gc.collect()
     return residual
 
 
