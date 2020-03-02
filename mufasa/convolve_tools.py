@@ -53,7 +53,8 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, **kwarg
     nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1'] / factor))
     nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2'] / factor))
 
-    newcube = cnv_cube.reproject(nhdr, order='bilinear')
+    #newcube = cnv_cube.reproject(nhdr, order='bilinear')
+    newcube = cnv_cube.reproject(nhdr, order='bicubic')
 
     if savename is not None:
         newcube.write(savename, overwrite=True)
