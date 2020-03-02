@@ -18,7 +18,7 @@ import gc
 #=======================================================================================================================
 # utility tools for convolve cubes
 
-def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, **kwargs):
+def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True, **kwargs):
 
     factor = factor * 1.0
 
@@ -45,19 +45,20 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, **kwarg
     # convolve
     cnv_cube = convolve_sky(cube, beam, **kwargs)
 
-    #if cnv_cube.fill_value is not np.nan:
-    #    cnv_cube = cnv_cube.with_fill_value(np.nan)
+    if cnv_cube.fill_value is not np.nan:
+        cnv_cube = cnv_cube.with_fill_value(np.nan)
+    #cnv_cube = cnv_cube.with_fill_value(0.0)
 
-    cnv_cube = cnv_cube.with_fill_value(0.0)
-
-    # regrid the convolved cube
-    nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
-    nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
-    nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1'] / factor))
-    nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2'] / factor))
-
-    newcube = cnv_cube.reproject(nhdr, order='bilinear')
-    #newcube = cnv_cube.reproject(nhdr, order='bicubic')
+    if downsample:
+        # regrid the convolved cube
+        nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
+        nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
+        nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
+        nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
+        newcube = cnv_cube.reproject(nhdr, order='bilinear')
+        # newcube = cnv_cube.reproject(nhdr, order='bicubic')
+    else:
+        newcube = cnv_cube
 
     if savename is not None:
         newcube.write(savename, overwrite=True)
