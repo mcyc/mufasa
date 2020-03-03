@@ -11,10 +11,10 @@ import gc
 
 from pyspeckit.parallel_map import parallel_map
 
-import tqdm
+#import tqdm
 from multiprocessing import Pool, cpu_count
-import itertools
-from itertools import repeat as rp
+#import itertools
+#from itertools import repeat as rp
 
 # import from this directory
 #import ammonia_hf_multiv as amhf
