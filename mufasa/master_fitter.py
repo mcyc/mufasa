@@ -167,8 +167,8 @@ def refit_swap_2comp(reg, snr_min=3):
     replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
     # save the final fit model
-    #UCube.save_model_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
-    #save_model_fit(pcube, savename, ncomp)
+    #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
+    #save_fit(pcube, savename, ncomp)
 
 
 
@@ -217,8 +217,8 @@ def refit_2comp_wide(reg, snr_min=3):
     replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
     # save the final fit model
-    #UCube.save_model_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
-    #save_model_fit(pcube, savename, ncomp)
+    #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
+    #save_fit(pcube, savename, ncomp)
 
 
 def save_best_2comp_fit(reg):
@@ -264,7 +264,7 @@ def save_best_2comp_fit(reg):
         reg_final.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot, nc)
 
     savename = "{}_final.fits".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
-    UCube.save_model_fit(pcube_final, savename=savename, ncomp=2)
+    UCube.save_fit(pcube_final, savename=savename, ncomp=2)
 
     hdr2D =reg.ucube.cube.wcs.celestial.to_header()
 
@@ -350,7 +350,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     if savefit:
         oriParaPath = reg.ucube.paraPaths[str(ncomp)]
         savename = "{}_onBestResidual.fits".format(os.path.splitext(oriParaPath)[0])
-        reg.ucube_res_cnv.save_model_fit(savename, ncomp)
+        reg.ucube_res_cnv.save_fit(savename, ncomp)
 
 
 
