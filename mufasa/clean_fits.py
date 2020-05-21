@@ -77,8 +77,28 @@ def clean_2comp_maps(fit_results, savename=None, vErrThresh=None, removeExtremeV
 #=======================================================================================================================
 
 
+def exclusive_2comp_maps(clean_maps):#, hdr1, hdr2, path_1c, path_2c):
+    # take the clean map and save them into files that exclusively only have the best fitted one comp or two comp maps
+
+    # create empty arrays
+    pmaps_2cx = np.empty(clean_maps.shape)
+    pmaps_2cx[:] = np.nan
+    pmaps_1cx = pmaps_2cx[0:8].copy()
+
+    mask_2c = np.all(np.isfinite(clean_maps), axis=0)
+
+    pmaps_1cx[0:4, ~mask_2c] = clean_maps[0:4, ~mask_2c]  # fitted parameters
+    pmaps_1cx[4:8, ~mask_2c] = clean_maps[4:8, ~mask_2c]  # fitted errors
+
+    pmaps_2cx[:, mask_2c] = clean_maps[:, mask_2c]  # fitted errors
+    return pmaps_1cx, pmaps_2cx
+
+
 def remove_zeros(pmaps):
     pmaps[pmaps==0] = np.nan
+
+#=======================================================================================================================
+# masking functions
 
 
 def extremeV_mask(pmaps):
