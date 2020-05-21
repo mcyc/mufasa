@@ -2,13 +2,6 @@ __author__ = 'mcychen'
 
 import numpy as np
 from astropy.io import fits
-from matplotlib import pyplot as plt
-
-from reproject import reproject_interp
-from astropy.wcs import WCS
-
-from mufasa import slab_sort as sb
-from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
 #=======================================================================================================================
 
@@ -49,7 +42,6 @@ def clean_2comp_maps(fit_results, savename=None, vErrThresh=None, removeExtremeV
     # remove pixels better modeled by noise
     mask = lnk10 < 5
     pmaps_1c[:, mask] = np.nan
-    #pmaps_2c[:, mask] = np.nan
 
     # remove pixels best modeled by one component
     mask = lnk21 < 5
@@ -71,12 +63,7 @@ def clean_2comp_maps(fit_results, savename=None, vErrThresh=None, removeExtremeV
         pmaps_1c[:, mask_thr_1c] = np.nan
         pmaps_2c[:, mask_thr_2c] = np.nan
 
-    # replace two comp fit with 1 comp fit over where lnk21 < 5 and where the cleaned 1 comp map is finite
-    #mmask = np.all(np.isfinite(pmaps_1c), axis=0)
-    #mmask = np.logical_or(mmask, np.all(np.isfinite(pmaps_2c), axis=0))
-    #mmask = np.logical_and(mmask, lnk21 < 5)
-    #return mmask
-
+    # replace two comp fit with 1 comp fit over where 2 comp pixels are empty
     mmask = ~np.all(np.isfinite(pmaps_2c), axis=0)
     pmaps_2c[0:4, mmask] = pmaps_1c[0:4, mmask]  # fitted parameters
     pmaps_2c[8:12, mmask] = pmaps_1c[4:8, mmask]  # fitted errors
@@ -86,6 +73,8 @@ def clean_2comp_maps(fit_results, savename=None, vErrThresh=None, removeExtremeV
         fits.writeto(savename, data=pmaps_2c, header=fr.headers['2c'], overwrite=True)
 
     return pmaps_2c
+
+#=======================================================================================================================
 
 
 def remove_zeros(pmaps):
