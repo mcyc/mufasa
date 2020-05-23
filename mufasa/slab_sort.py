@@ -60,9 +60,42 @@ def quick_2comp_sort(data, filtsize=2):
     return data
 
 
+#=======================================================================================================================
+
 def mask_swap_2comp(data, swapmask):
     # swap data over the mask
     data= data.copy()
     data[0:4,swapmask], data[4:8,swapmask] = data[4:8,swapmask], data[0:4,swapmask]
     data[8:12,swapmask], data[12:16,swapmask] = data[12:16,swapmask], data[8:12,swapmask]
     return data
+
+
+#=======================================================================================================================
+
+def refmap_2c_mask(pmaps, refmaps, method="v_n_sig"):
+    # return masks where 1st component is further from the ref maps than the 2nd by the distance metric
+
+    del_vlsr = distance_metric(pmaps[0], pmaps[4], refmaps[0])
+    del_sigv = distance_metric(pmaps[1], pmaps[5], refmaps[1])
+
+    if method == 'vlsr':
+        return del_vlsr[0] > del_vlsr[1]
+
+    elif method == 'sigv':
+        return del_sigv[0] > del_sigv[1]
+
+    elif method == "v_n_sig":
+        return np.hypot(del_vlsr[0], del_sigv[0]) > np.hypot(del_vlsr[1], del_sigv[1])
+
+    else:
+        print("[Error]: the method provided is not valid! Returns nothing.")
+        return None
+
+
+def distance_metric(p1, p2, p_refa):
+    # distance of 1st component to the reference
+    del_pa = np.abs(p1 - p_refa)
+    # distance of 2st component to the reference
+    del_pb = np.abs(p2 - p_refa)
+
+    return del_pa, del_pb
