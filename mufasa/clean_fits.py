@@ -88,7 +88,7 @@ def exclusive_2comp_maps(clean_maps):#, hdr1, hdr2, path_1c, path_2c):
     mask_2c = np.all(np.isfinite(clean_maps), axis=0)
 
     pmaps_1cx[0:4, ~mask_2c] = clean_maps[0:4, ~mask_2c]  # fitted parameters
-    pmaps_1cx[4:8, ~mask_2c] = clean_maps[4:8, ~mask_2c]  # fitted errors
+    pmaps_1cx[4:8, ~mask_2c] = clean_maps[8:12, ~mask_2c]  # fitted errors
 
     pmaps_2cx[:, mask_2c] = clean_maps[:, mask_2c]  # fitted errors
     return pmaps_1cx, pmaps_2cx
