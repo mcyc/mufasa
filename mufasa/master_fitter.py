@@ -276,6 +276,11 @@ def save_best_2comp_fit(reg):
     savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk10"))
     save_map(lnk10, hdr2D, savename)
 
+    # create and save the lnk20 map for reference:
+    lnk20 = reg_final.ucube.get_AICc_likelihood(2, 0)
+    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk20"))
+    save_map(lnk20, hdr2D, savename)
+
     # save the SNR map
     snr_map = get_best_2comp_snr_mod(reg_final)
     savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","SNR"))
