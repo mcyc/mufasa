@@ -110,9 +110,9 @@ class UltraCube(object):
         else:
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
 
-    def save_model_fit(self, savename, ncomp):
+    def save_fit(self, savename, ncomp):
         # note, this implementation currently relies on
-        save_model_fit(self.pcubes[str(ncomp)], savename, ncomp)
+        save_fit(self.pcubes[str(ncomp)], savename, ncomp)
 
 
     def load_model_fit(self, filename, ncomp):
@@ -226,7 +226,7 @@ class UCubePlus(UltraCube):
             if update or (not os.path.isfile(self.paraPaths[str(nc)])):
                 self.fit_cube(ncomp=[nc], **kwargs)
                 gc.collect()
-                self.save_model_fit(self.paraPaths[str(nc)], nc)
+                self.save_fit(self.paraPaths[str(nc)], nc)
                 gc.collect()
 
         for nc in ncomp:
@@ -242,7 +242,7 @@ def fit_cube(cube, **kwargs):
     return mvf.cubefit_gen(cube, **kwargs)
 
 
-def save_model_fit(pcube, savename, ncomp):
+def save_fit(pcube, savename, ncomp):
     # specifically save ammonia multi-component model with the right fits header
     mvf.save_pcube(pcube, savename, ncomp)
 
