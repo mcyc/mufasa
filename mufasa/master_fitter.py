@@ -286,8 +286,21 @@ def save_best_2comp_fit(reg):
     savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","SNR"))
     save_map(snr_map, hdr2D, savename)
 
+    # create moment0 map
+    modbest = get_best_2comp_model(reg_final)
+    cube_mod = SpectralCube(data=modbest, wcs=reg_final.ucube.pcubes['2'].wcs.copy(),
+                            header=reg_final.ucube.pcubes['2'].header.copy())
+    mom0_mod = cube_mod.moment0()
+    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0_final"))
+    mom0_mod.write(savename)
+
     # save reduced chi-squred maps
     # would be useful to check if 3rd component is needed
+    savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
+                                   reg_final.ucube.paraNameRoot.replace("para", "chi2red_final"))
+    chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=cube_mod, expand=20, reduced=True, usemask=True,
+                              mask=None)
+    save_map(chi_map, hdr2D, savename)
 
 
 def save_map(map, header, savename, overwrite=True):
