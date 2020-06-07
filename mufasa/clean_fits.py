@@ -18,11 +18,13 @@ class fit_results(object):
         self.ncompList = [1]
 
 
-    def add_results(self, path_para, path_lnk, ncomp):
+    def add_results(self, path_para, path_lnk, ncomp, path_lnkn0=None):
         if ncomp > 1:
             self.paraCubes['{}c'.format(ncomp)] = fits.getdata(path_para)
             self.headers['{}c'.format(ncomp)] = fits.getheader(path_para)
             self.lnkMaps['{}{}'.format(ncomp, ncomp-1)] = fits.getdata(path_lnk)
+            if path_lnkn0 is not None:
+                self.lnkMaps['{}{}'.format(ncomp, 0)] = fits.getdata(path_lnkn0)
             self.ncompList.append(ncomp)
         else:
             print("[ERROR]: ncomp must be >1. The provide value is {}. No action taken.".format(ncomp))
@@ -43,9 +45,12 @@ def clean_2comp_maps(fit_results, savename=None, vErrThresh=None, removeExtremeV
     mask = lnk10 < 5
     pmaps_1c[:, mask] = np.nan
 
-    # remove pixels best modeled by one component
+    # remove pixels best modeled by one component (or noise if lnk20 is provided)
     mask = lnk21 < 5
+    if "20" in fr.lnkMaps:
+        mask = np.logical_or(mask, fr.lnkMaps['20'] < 5)
     pmaps_2c[:, mask] = np.nan
+
 
     if removeExtremeV:
         # remove pixels with fitted vlsr & sigma that are 'stuck' at the extreme values
