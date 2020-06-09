@@ -292,7 +292,7 @@ def save_best_2comp_fit(reg):
                             header=reg_final.ucube.pcubes['2'].header.copy())
     mom0_mod = cube_mod.moment0()
     savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0_final"))
-    mom0_mod.write(savename)
+    mom0_mod.write(savename, overwrite=True)
 
     # save reduced chi-squred maps
     # would be useful to check if 3rd component is needed
