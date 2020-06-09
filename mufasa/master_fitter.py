@@ -298,7 +298,7 @@ def save_best_2comp_fit(reg):
     # would be useful to check if 3rd component is needed
     savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
                                    reg_final.ucube.paraNameRoot.replace("para", "chi2red_final"))
-    chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=cube_mod, expand=20, reduced=True, usemask=True,
+    chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=modbest, expand=20, reduced=True, usemask=True,
                               mask=None)
     save_map(chi_map, hdr2D, savename)
 
