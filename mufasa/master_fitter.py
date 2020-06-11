@@ -458,11 +458,11 @@ def get_best_2comp_model(reg):
     modbest = mod1.copy()
     modbest[:] = 0.0
 
-    mask = np.logical_and(lnk21 > 5, lnk20 > 0)
-    modbest[:, mask] = mod2[:, mask]
-
     mask = lnk10 > 5
     modbest[:, mask] = mod1[:, mask]
+
+    mask = np.logical_and(lnk21 > 5, lnk20 > 5)
+    modbest[:, mask] = mod2[:, mask]
 
     return modbest
 
