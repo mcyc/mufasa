@@ -448,19 +448,21 @@ def get_best_2comp_snr_mod(reg):
 def get_best_2comp_model(reg):
     # get the log-likelihood between the fits
     lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
+    lnk20 = reg.ucube.get_AICc_likelihood(2, 0)
+    lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
 
     mod1 = reg.ucube.pcubes['1'].get_modelcube()
     mod2 = reg.ucube.pcubes['2'].get_modelcube()
 
     # get the best model based on the calculated likelihood
-    mask = lnk21 > 5
     modbest = mod1.copy()
+    modbest[:] = 0.0
+
+    mask = np.logical_and(lnk21 > 5, lnk20 > 0)
     modbest[:, mask] = mod2[:, mask]
 
-    lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
-    mask = lnk10 < 5
-    modbest[:, mask] = 0
-    modbest[np.isnan(modbest)] = 0
+    mask = lnk10 > 5
+    modbest[:, mask] = mod1[:, mask]
 
     return modbest
 
