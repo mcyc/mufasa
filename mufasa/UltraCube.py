@@ -156,10 +156,10 @@ class UltraCube(object):
 
 
     def get_reduced_chisq(self, ncomp):
-        # no mask is used, and thus is not meant for model comparision
+        # no mask is passed in, and thus is not meant for model comparision
         compID = str(ncomp)
         self.rchisq_maps[compID]= \
-            calc_chisq(self, ncomp, reduced=True, usemask=False, mask=None)
+            calc_chisq(self, ncomp, reduced=True, usemask=True, mask=None)
         return self.rchisq_maps[compID]
 
 
