@@ -302,6 +302,17 @@ def save_best_2comp_fit(reg):
                               mask=None)
     save_map(chi_map, hdr2D, savename)
 
+    # save reduced chi-squred maps for 1 comp and 2 comp individually
+    chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
+    chiRed_2c = reg_final.ucube.get_reduced_chisq(2)
+
+    savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
+                                   reg_final.ucube.paraNameRoot.replace("para", "chi2red_1c"))
+    save_map(chiRed_1c, hdr2D, savename)
+    savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
+                                   reg_final.ucube.paraNameRoot.replace("para", "chi2red_2c"))
+    save_map(chiRed_2c, hdr2D, savename)
+
 
 def save_map(map, header, savename, overwrite=True):
     fits_map = fits.PrimaryHDU(data=map, header=header)
