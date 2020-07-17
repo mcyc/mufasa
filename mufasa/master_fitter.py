@@ -290,6 +290,8 @@ def save_best_2comp_fit(reg):
     modbest = get_best_2comp_model(reg_final)
     cube_mod = SpectralCube(data=modbest, wcs=reg_final.ucube.pcubes['2'].wcs.copy(),
                             header=reg_final.ucube.pcubes['2'].header.copy())
+    # make sure the spectral unit is in km/s before making moment maps
+    cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
     mom0_mod = cube_mod.moment0()
     savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0_final"))
     mom0_mod.write(savename, overwrite=True)
