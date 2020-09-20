@@ -471,7 +471,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         errmap11 = fits.getdata(errmap11name)
     else:
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
-        errmap11 = mad_std(np.finite(cube._data), axis=0)
+        mask_finite = np.isfinite(cube._data)
+        errmap11 = mad_std(cube._data[mask_finite], axis=0)
         print "median rms: {0}".format(np.nanmedian(errmap11))
 
     snr = cube.filled_data[:].value/errmap11
