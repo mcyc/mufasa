@@ -81,7 +81,12 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
 
     if snrmasked:
         planemask = snr_mask(cube, snr_min)
-        mask = mask * planemask
+        plane_mask_size = np.sum(planemask)
+        if plane_mask_size > 25:
+            mask = mask * planemask
+            print("snr plane mask size = {})".format(plane_mask_size))
+        else:
+            print("[WARNING] snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
 
     maskcube = cube.with_mask(mask.astype(bool))
 
@@ -96,8 +101,15 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
 
     if iterrefine:
         # use the convolved cube for new masking
+        print("--- second iteration refinement ---")
+        mask = np.isfinite(cube._data)
         planemask = snr_mask(cnv_cube, snr_min)
-        mask = np.isfinite(cube._data) * planemask
+        plane_mask_size = np.sum(planemask)
+        if np.sum(planemask) > 25:
+             mask = mask*planemask
+             print("snr plane mask size = {})".format(plane_mask_size))
+        else:
+            print("[WARNING] snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
         maskcube = cube.with_mask(mask.astype(bool))
         maskcube.allow_huge_operations = True
         cnv_cube = maskcube.convolve_to(beam)
@@ -115,14 +127,16 @@ def snr_mask(cube, snr_min=3.0, errmappath=None):
 
     else:
         # make a quick RMS estimate using median absolute deviation (MAD)
-        errmap = mad_std(cube._data, axis=0)
-        print "median rms: {0}".format(np.nanmedian(errmap))
+        mask_gg = np.isfinite(cube._data)
+        errmap = mad_std(cube._data[mask_gg], axis=0)
+        print("median rms: {0}".format(np.nanmedian(errmap)))
 
     snr = cube.filled_data[:].value / errmap
     peaksnr = np.max(snr, axis=0)
 
     def default_masking(snr, snr_min=5.0):
         planemask = (snr > snr_min)
+
         if planemask.size > 100:
             # attempt to remove noisy features
             planemask = erosion(planemask, disk(1))
