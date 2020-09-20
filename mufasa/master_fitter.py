@@ -88,7 +88,7 @@ def get_convolved_fits(reg, ncomp, **kwargs):
     if not hasattr(reg, 'ucube_cnv'):
         reg.get_convolved_cube(update=True)
     elif 'update' in kwargs:
-            reg.get_convolved_cube(update=kwargs['update'])
+        reg.get_convolved_cube(update=kwargs['update'])
     reg.ucube_cnv.get_model_fit(ncomp, **kwargs)
 
 
@@ -113,7 +113,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True):
     ncomp = [1,2]
 
     # convolve the cube and fit it
-    get_convolved_cube(reg, update=updateCnvFits)
+    # get_convolved_cube(reg, update=updateCnvFits)
     get_convolved_fits(reg, ncomp, update=updateCnvFits, snr_min=snr_min)
 
     # use the result from the convolved cube as guesses for the full resolution fits
