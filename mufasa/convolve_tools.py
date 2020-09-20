@@ -9,6 +9,7 @@ from spectral_cube import SpectralCube
 from radio_beam import Beam
 from astropy.wcs import WCS
 from astropy.stats import mad_std
+from astropy.convolution import Gaussian2DKernel, convolve
 from FITS_tools.hcongrid import get_pixel_mapping
 from scipy.interpolate import griddata
 import scipy.ndimage as nd
@@ -133,19 +134,26 @@ def snr_mask(cube, snr_min=1.0, errmappath=None):
     snr = cube.filled_data[:].value / errmap
     peaksnr = np.nanmax(snr, axis=0)
 
-    def default_masking(snr, snr_min=5.0):
+    #the snr map will inetiabley be noisy, so a little smoothing
+    kernel = Gaussian2DKernel(1)
+    peaksnr = convolve(peaksnr, kernel)
+
+    def default_masking(snr, snr_min):
         planemask = (snr > snr_min)
 
         if planemask.size > 100:
             # attempt to remove noisy features
             planemask = erosion(planemask, disk(1))
-            planemask = remove_small_objects(planemask, min_size=12)
+            planemask_im = remove_small_objects(planemask, min_size=9)
+            if np.sum(planemask_im) > 9:
+                # only adopt the erroded mask if there are objects left in it
+                planemask = planemask_im
             # note, dialation is larger than erosion so the foot print is a bit more extended
-            planemask = dilation(planemask, disk(2))
+            planemask = dilation(planemask, disk(3))
 
         return (planemask)
 
-    planemask = default_masking(peaksnr, snr_min=snr_min)
+    planemask = default_masking(peaksnr, snr_min)
 
     return planemask
 
