@@ -84,12 +84,11 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
         plane_mask_size = np.sum(planemask)
         if plane_mask_size > 25:
             mask = mask * planemask
-            print("snr plane mask size = {})".format(plane_mask_size))
+            print("snr plane mask size = {}".format(plane_mask_size))
         else:
             print("[WARNING] snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
 
     maskcube = cube.with_mask(mask.astype(bool))
-
 
     # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
     if maskcube.size > 1e8:
@@ -107,7 +106,7 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
         plane_mask_size = np.sum(planemask)
         if np.sum(planemask) > 25:
              mask = mask*planemask
-             print("snr plane mask size = {})".format(plane_mask_size))
+             print("snr plane mask size = {}".format(plane_mask_size))
         else:
             print("[WARNING] snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
         maskcube = cube.with_mask(mask.astype(bool))
@@ -119,7 +118,7 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
     return cnv_cube
 
 
-def snr_mask(cube, snr_min=3.0, errmappath=None):
+def snr_mask(cube, snr_min=1.0, errmappath=None):
     # create a mask around the cube with a snr cut
 
     if errmappath is not None:
@@ -132,7 +131,7 @@ def snr_mask(cube, snr_min=3.0, errmappath=None):
         print("median rms: {0}".format(np.nanmedian(errmap)))
 
     snr = cube.filled_data[:].value / errmap
-    peaksnr = np.max(snr, axis=0)
+    peaksnr = np.nanmax(snr, axis=0)
 
     def default_masking(snr, snr_min=5.0):
         planemask = (snr > snr_min)
