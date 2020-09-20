@@ -17,6 +17,7 @@ import scipy.ndimage as nd
 from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from skimage.morphology import remove_small_objects,disk,opening,binary_erosion #, closing
+from astropy.convolution import Gaussian2DKernel, convolve
 
 import ammonia_multiv as ammv
 import moment_guess as momgue
@@ -474,7 +475,11 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         print "median rms: {0}".format(np.nanmedian(errmap11))
 
     snr = cube.filled_data[:].value/errmap11
-    peaksnr = np.max(snr,axis=0)
+    peaksnr = np.nanmax(snr,axis=0)
+
+    #the snr map will inetiabley be noisy, so a little smoothing
+    kernel = Gaussian2DKernel(1)
+    peaksnr = convolve(peaksnr, kernel)
 
     # trim the edges by 3 pixels to guess the location of the peak emission
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
