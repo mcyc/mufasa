@@ -204,21 +204,26 @@ def refit_2comp_wide(reg, snr_min=3):
     lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
     mask = np.logical_and(mask, lnk10 > 5)
 
-    ucube_new = UCube.UltraCube(reg.ucube.cubefile)
-    ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=final_guess)
+    mask_size = np.sum(mask)
+    print("refit mask size: {}".format(mask_size))
+    if mask_size > 25:
+        ucube_new = UCube.UltraCube(reg.ucube.cubefile)
+        ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=final_guess)
 
-    # do a model comparison between the new two component fit verses the original one
-    lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=reg.ucube)
+        # do a model comparison between the new two component fit verses the original one
+        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=reg.ucube)
 
-    # mask over where one comp fit is more robust
-    good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
+        # mask over where one comp fit is more robust
+        good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
 
-    # replace the values
-    replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+        # replace the values
+        replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
-    # save the final fit model
-    #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
-    #save_fit(pcube, savename, ncomp)
+        # save the final fit model
+        #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
+        #save_fit(pcube, savename, ncomp)
+    else:
+        print("not enough pixels to refit, no-refit is done")
 
 
 def save_best_2comp_fit(reg):
