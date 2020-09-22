@@ -206,7 +206,7 @@ def refit_2comp_wide(reg, snr_min=3):
 
     mask_size = np.sum(mask)
     print("refit mask size: {}".format(mask_size))
-    if mask_size > 25:
+    if mask_size > 1:
         ucube_new = UCube.UltraCube(reg.ucube.cubefile)
         ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=final_guess)
 
