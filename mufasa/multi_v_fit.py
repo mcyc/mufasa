@@ -633,6 +633,13 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         print "mask mask!"
         kwargs['maskmap'] = planemask * footprint_mask
 
+    if np.sum(kwargs['maskmap']) < 1:
+        print("[WARNING]: maskmap has no pixel, no fitting will be performed")
+        return pcube
+    elif np.sum(np.isfinite(guesses)) < 1:
+        print("[WARNING]: guesses has no pixel, no fitting will be performed")
+        return pcube
+
     pcube.fiteach(fittype='nh3_multi_v', guesses=guesses,
                   start_from_point=(xmax,ymax),
                   use_neighbor_as_guess=False,
