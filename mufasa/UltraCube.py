@@ -364,10 +364,11 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     mask = expand_mask(mask, expand)
     mask = mask.astype(np.float)
 
-    chisq = np.sum((residual * mask)**2, axis=0)
+    # note: using nan-sum may walk over some potential bad pixel cases
+    chisq = np.nansum((residual * mask)**2, axis=0)
 
     if reduced:
-        chisq /= np.sum(mask, axis=0)
+        chisq /= np.nansum(mask, axis=0)
 
     rms = get_rms(residual)
     chisq /= rms**2
@@ -379,7 +380,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         return chisq
     else:
         # return the ch-squared values and the number of data points used
-        return chisq, np.sum(mask, axis=0)
+        return chisq, np.nansum(mask, axis=0)
 
 
 def expand_mask(mask, expand):
@@ -396,7 +397,7 @@ def get_rms(residual):
     diff = residual - np.roll(residual, 2, axis=0)
     print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
-    print("finite rms map size: {}".format(rms))
+    print("finite rms map size: {}".format(np.sum(np.isfinite(rms))))
     gc.collect()
     return rms
 
