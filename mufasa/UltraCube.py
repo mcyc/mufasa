@@ -119,6 +119,7 @@ class UltraCube(object):
         self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
+        print("{}comp model mask size: {}".format(ncomp, mod_mask) )
         gc.collect()
         self.include_model_mask(mod_mask)
 
