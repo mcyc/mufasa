@@ -396,7 +396,7 @@ def get_rms(residual):
     diff = residual - np.roll(residual, 2, axis=0)
     print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
-    print("rms value: {}".format(rms))
+    print("finite rms map size: {}".format(rms))
     gc.collect()
     return rms
 
