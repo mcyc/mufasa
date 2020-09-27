@@ -320,6 +320,8 @@ def save_best_2comp_fit(reg):
                                    reg_final.ucube.paraNameRoot.replace("para", "chi2red_2c"))
     save_map(chiRed_2c, hdr2D, savename)
 
+    return reg
+
 
 def save_map(map, header, savename, overwrite=True):
     fits_map = fits.PrimaryHDU(data=map, header=header)
