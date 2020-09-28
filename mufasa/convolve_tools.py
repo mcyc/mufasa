@@ -67,7 +67,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
     return newcube
 
 
-def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
+def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0):
     # return the convolved cube in the same gridding as the input
     # note: iterrefine masks data as well
 
@@ -99,7 +99,7 @@ def convolve_sky(cube, beam, snrmasked=True, iterrefine=True, snr_min=3.0):
     maskcube.allow_huge_operations = False
     gc.collect()
 
-    if iterrefine:
+    if snrmasked and iterrefine:
         # use the convolved cube for new masking
         print("--- second iteration refinement ---")
         mask = np.isfinite(cube._data)
