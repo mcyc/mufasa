@@ -402,6 +402,15 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     else:
         mask = np.logical_and(mask, np.isfinite(model))
 
+    # number of finite pixels
+    n_fin = np.sum(np.any(np.isfinite(model), axis=0))
+
+    # get mask over where signal are detected to 1% on average
+    spec_tot = np.nanmax(model, axis=(1,2))
+    specmask = spec_tot > np.nanmax(spec_tot)/n_fin/100.0
+
+    mask[specmask, :] = True
+
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
     mask = expand_mask(mask, expand)
