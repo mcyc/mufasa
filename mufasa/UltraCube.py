@@ -421,8 +421,16 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     mask = mask.astype(np.float)
     '''
     # expand in all directions instead
-    selem = np.ones(shape=(expand, expand, expand), dtype=np.bool)
-    mask = nd.binary_dilation(mask, selem)
+    #selem = np.ones(shape=(expand, expand, expand), dtype=np.bool)
+    #mask = nd.binary_dilation(mask, selem)
+    mask = nd.binary_dilation(mask, iterations=expand)
+
+    # pixels with less than expand number of spectral chanels
+    mask_s = np.zeros(mask.shape, dtype=np.bool)
+    mask_s[:, np.sum(mask, axis=0) < expand] = True
+    mask_s = expand_mask(mask_s, expand)
+    
+    mask = np.logical_and(mask, mask_s)
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
