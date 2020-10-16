@@ -298,8 +298,13 @@ def save_best_2comp_fit(reg):
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
     mom0_mod = cube_mod.moment0()
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0_final"))
+    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "model_mom0"))
     mom0_mod.write(savename, overwrite=True)
+
+    # created masked mom0 map with model as the mask
+    mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=10, mask=None)
+    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0"))
+    mom0.write(savename, overwrite=True)
 
     # save reduced chi-squred maps
     # would be useful to check if 3rd component is needed

@@ -8,6 +8,7 @@ from spectral_cube import SpectralCube
 import pyspeckit
 import multiprocessing
 import gc
+from astropy import units as u
 
 import aic
 import multi_v_fit as mvf
@@ -381,6 +382,35 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     else:
         # return the ch-squared values and the number of data points used
         return chisq, np.nansum(mask, axis=0)
+
+
+def get_masked_moment(cube, model, order=0, expand=10, mask=None):
+    '''
+    create masked moment using either the model
+    :param cube: SpectralCube
+    :param model: numpy array
+    :param order:
+    :param expand : int
+        Expands the region where the residual is evaluated by this many channels in the spectral dimension
+    :param boolean array
+        A mask stating which array elements the chi-squared values are calculated from
+    :return:
+    '''
+
+    if mask is None:
+        mask = model > 0
+    else:
+        mask = np.logical_and(mask, np.isfinite(model))
+
+    # creating mask over region where the model is non-zero,
+    # plus a buffer of size set by the expand keyword.
+    mask = expand_mask(mask, expand)
+    mask = mask.astype(np.float)
+
+    maskcube = cube.with_mask(mask.astype(bool))
+    maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+    mom = maskcube.moment(order=order)
+    return mom
 
 
 def expand_mask(mask, expand):
