@@ -405,10 +405,11 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     # number of finite pixels
     n_fin = np.sum(np.any(np.isfinite(model), axis=0))
 
-    # get mask over where signal are detected to 0.1% on average
+    # get mask over where signal are detected to 10% on average
     spec_tot = np.nanmax(model, axis=(1,2))
-    specmask = spec_tot > np.nanmax(spec_tot)/n_fin/1e6
+    specmask = spec_tot > np.nanmax(spec_tot)/n_fin/10
 
+    mask[:] = False
     mask[specmask, :] = True
 
     # creating mask over region where the model is non-zero,
