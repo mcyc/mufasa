@@ -409,7 +409,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     spec_tot = np.nanmax(model, axis=(1,2))
     specmask = spec_tot > np.nanmax(spec_tot)/n_fin
 
-    mask[specmask, ~np.any(np.isfinite(model),axis=0)] = True
+    mask[specmask][~np.any(np.isfinite(model),axis=0)] = True
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
