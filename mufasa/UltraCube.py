@@ -429,8 +429,8 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     mask_s = np.zeros(mask.shape, dtype=np.bool)
     mask_s[:, np.sum(mask, axis=0) < expand] = True
     mask_s = expand_mask(mask_s, expand)
-    
-    mask = np.logical_and(mask, mask_s)
+
+    mask = np.logical_or(mask, mask_s)
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
