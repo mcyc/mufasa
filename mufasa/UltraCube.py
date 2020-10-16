@@ -407,7 +407,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
     # get mask over where signal are detected to 0.1% on average
     spec_tot = np.nanmax(model, axis=(1,2))
-    specmask = spec_tot > np.nanmax(spec_tot)/n_fin/1e3
+    specmask = spec_tot > np.nanmax(spec_tot)/n_fin/1e6
 
     mask[specmask, :] = True
 
