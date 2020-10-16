@@ -9,6 +9,7 @@ import pyspeckit
 import multiprocessing
 import gc
 from astropy import units as u
+import scipy.ndimage as nd
 
 import aic
 import multi_v_fit as mvf
@@ -402,6 +403,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     else:
         mask = np.logical_and(mask, np.isfinite(model))
 
+    '''
     # number of finite pixels
     n_fin = np.sum(np.any(np.isfinite(model), axis=0))
 
@@ -410,11 +412,17 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     specmask = spec_tot > np.nanmax(spec_tot)/n_fin
 
     mask[specmask, :] = True
+    '''
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
+    '''
     mask = expand_mask(mask, expand)
     mask = mask.astype(np.float)
+    '''
+    # expand in all directions instead
+    selem = np.ones(shape=(expand, expand, expand), dtype=np.bool)
+    mask = nd.binary_dilation(mask, selem)
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -423,7 +431,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
 
 def expand_mask(mask, expand):
-    import scipy.ndimage as nd
+
     # adds a buffer of size set by the expand keyword to a 2D mask,
     selem = np.ones(expand,dtype=np.bool)
     selem.shape += (1,1,)
