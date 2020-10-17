@@ -417,7 +417,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
     # adopte those spectral channles for low signal regions
     mask_lowT[specmask, :] = True
-    mask[:, mask_highT_2d] = mask_lowT[:, mask_highT_2d]
+    mask[:, ~mask_highT_2d] = mask_lowT[:, ~mask_highT_2d]
 
     # get pixels that aren't modeled
     #mask_s = np.zeros(mask.shape, dtype=np.bool)
