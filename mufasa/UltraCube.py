@@ -413,7 +413,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
     # get all the spectral channels greater than 10% of the median peak
     specmask = model > med_peak_T*0.1
-    specmask = specmask.sum(axis=(1,2))
+    specmask = specmask.logical_or(axis=(1,2))
 
     # adopte those spectral channles for low signal regions
     mask_lowT[specmask, :] = True
