@@ -302,7 +302,7 @@ def save_best_2comp_fit(reg):
     mom0_mod.write(savename, overwrite=True)
 
     # created masked mom0 map with model as the mask
-    mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=10, mask=None)
+    mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=20, mask=None)
     savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0"))
     mom0.write(savename, overwrite=True)
 
