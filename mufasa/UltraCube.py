@@ -403,22 +403,32 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     else:
         mask = np.logical_and(mask, np.isfinite(model))
 
-    '''
-    # number of finite pixels
-    n_fin = np.sum(np.any(np.isfinite(model), axis=0))
+    # get mask over where signal is stronger than the median
+    peak_T = np.nanmax(model, axis=0)
+    med_peak_T = np.nanmedian(peak_T)
+    mask_highT_2d = peak_T > med_peak_T
 
-    # get mask over where signal are detected to 10% on average
-    spec_tot = np.nanmax(model, axis=(1,2))
-    specmask = spec_tot > np.nanmax(spec_tot)/n_fin
+    mask_lowT = mask.copy()
+    mask_lowT[:, mask_highT_2d] = False
 
-    mask[specmask, :] = True
-    '''
+    # get all the spectral channels greater than 10% of the median peak
+    specmask = model > med_peak_T*0.1
+    specmask = specmask.sum(axis=(1,2))
+
+    # adopte those spectral channles for low signal regions
+    mask_lowT[specmask, :] = True
+    mask[:, mask_highT_2d] = mask_lowT[:, mask_highT_2d]
+
+    # get pixels that aren't modeled
+    #mask_s = np.zeros(mask.shape, dtype=np.bool)
+    #mask_s[: ~np.all(mask, axis=0)] =
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-    '''
     mask = expand_mask(mask, expand)
     mask = mask.astype(np.float)
+
+
     '''
     # expand in all directions instead
     #selem = np.ones(shape=(expand, expand, expand), dtype=np.bool)
@@ -431,6 +441,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     mask_s = expand_mask(mask_s, expand)
 
     mask = np.logical_or(mask, mask_s)
+    '''
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
