@@ -51,8 +51,8 @@ class Region(object):
         get_fits(self, ncomp, update=False)
 
 
-    def master_2comp_fit(self, snr_min=3):
-        master_2comp_fit(self, snr_min=snr_min)
+    def master_2comp_fit(self, snr_min=3, **kwargs):
+        master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
 
 
