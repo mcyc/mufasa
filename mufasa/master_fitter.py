@@ -100,11 +100,11 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-comonent fits
 
 
-def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None):
+def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCnvFits=True):
     # note, planemask superseeds snr-based maask
-    iter_2comp_fit(reg, snr_min=snr_min, planemask=planemask)
+    iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask)
     if recover_wide:
-        refit_2comp_wide(reg, snr_min=snr_min, planemask=planemask)
+        refit_2comp_wide(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask)
     save_best_2comp_fit(reg)
     return reg
 
