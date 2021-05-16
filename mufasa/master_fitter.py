@@ -108,7 +108,7 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True):
     return reg
 
 
-def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True):
+def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
     # ensure this is a two compnent fitting method
     ncomp = [1,2]
 
@@ -125,7 +125,10 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True):
 
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header)
         # update is set to True to save the fits
-        reg.ucube.get_model_fit([nc], update=True, guesses=guesses)
+        kwargs = {'update':True, 'guesses':guesses}
+        if planemask is not None:
+            kwargs['maskmap'] = planemask
+        reg.ucube.get_model_fit([nc], **kwargs)
 
 
 def refit_swap_2comp(reg, snr_min=3):
