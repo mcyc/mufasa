@@ -123,7 +123,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True):
         if nc == 2:
             para_cnv = gss_rf.quick_2comp_sort(para_cnv, filtsize=3)
 
-        guesses= gss_rf.guess_from_cnvpara(para_cnv, reg.ucube.cube.header, reg.ucube.cube.header)
+        guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header)
         # update is set to True to save the fits
         reg.ucube.get_model_fit([nc], update=True, guesses=guesses)
 
