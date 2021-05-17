@@ -54,6 +54,9 @@ class Region(object):
     def master_2comp_fit(self, snr_min=3, **kwargs):
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
+    def standard_2comp_fit(self, planemask=None):
+        standard_2comp_fit(self, planemask=planemask)
+
 
 
 #=======================================================================================================================
@@ -228,6 +231,21 @@ def refit_2comp_wide(reg, snr_min=3):
         #save_fit(pcube, savename, ncomp)
     else:
         print("not enough pixels to refit, no-refit is done")
+
+
+
+def standard_2comp_fit(reg, planemask=None):
+    # two compnent fitting method using the moment map guesses method
+    ncomp = [1,2]
+
+    # only use the moment maps for the fits
+    for nc in ncomp:
+        # update is set to True to save the fits
+        kwargs = {'update':True}
+        if planemask is not None:
+            kwargs['maskmap'] = planemask
+        reg.ucube.get_model_fit([nc], **kwargs)
+
 
 
 def save_best_2comp_fit(reg):
