@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 __author__ = 'mcychen'
 
 #=======================================================================================================================
@@ -9,10 +11,10 @@ from skimage.morphology import dilation
 import astropy.io.fits as fits
 import gc
 
-import UltraCube as UCube
-import moment_guess as mmg
-import convolve_tools as cnvtool
-import guess_refine as gss_rf
+from . import UltraCube as UCube
+from . import moment_guess as mmg
+from . import convolve_tools as cnvtool
+from . import guess_refine as gss_rf
 
 
 #=======================================================================================================================

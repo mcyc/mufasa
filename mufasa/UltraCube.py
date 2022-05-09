@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 __author__ = 'mcychen'
 
 #======================================================================================================================#
@@ -11,9 +13,9 @@ import gc
 from astropy import units as u
 import scipy.ndimage as nd
 
-import aic
-import multi_v_fit as mvf
-import convolve_tools as cnvtool
+from . import aic
+from . import multi_v_fit as mvf
+from . import convolve_tools as cnvtool
 
 #======================================================================================================================#
 
@@ -79,7 +81,7 @@ class UltraCube(object):
         elif os.path.exists(filename):
             self.cube_cnv = SpectralCube.read(fitsfile)
         else:
-            print "[WARNING]: the specified file does not exist."
+            print("[WARNING]: the specified file does not exist.")
 
 
     def fit_cube(self, ncomp, **kwargs):
@@ -256,7 +258,7 @@ def load_model_fit(cube, filename, ncomp):
 
     # reigster fitter
     linename = 'oneone'
-    import ammonia_multiv as ammv
+    from . import ammonia_multiv as ammv
 
     fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)

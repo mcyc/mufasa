@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 __author__ = 'mcychen'
 
 import numpy as np
@@ -19,8 +21,8 @@ from astropy.utils.console import ProgressBar
 from skimage.morphology import remove_small_objects,disk,opening,binary_erosion #, closing
 from astropy.convolution import Gaussian2DKernel, convolve
 
-import ammonia_multiv as ammv
-import moment_guess as momgue
+from . import ammonia_multiv as ammv
+from . import moment_guess as momgue
 
 #=======================================================================================================================
 # the current implementation only fits the 1-1 lines
@@ -70,7 +72,7 @@ def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrnam
         cubes[:,:,y,x] = models
 
     for xy in ProgressBar(list(valid_pixels)):
-        print int(xy[0]), int(xy[1])
+        print(int(xy[0]), int(xy[1]))
         model_a_pixel(xy)
 
     if savename != None:
@@ -90,8 +92,8 @@ def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrnam
             if rmsdata.shape == Tpeak[0].shape:
                 rms = rmsdata
             else:
-                print "[WARNING]: The shape of the rms map ({0}) does not match the shape of the emission map {1}." \
-                      " An uniform rms value of: {2} has been adopted instead".format(rmsdata.shape, Tpeak[0].shape, rms)
+                print("[WARNING]: The shape of the rms map ({0}) does not match the shape of the emission map {1}." \
+                      " An uniform rms value of: {2} has been adopted instead".format(rmsdata.shape, Tpeak[0].shape, rms))
 
         snr = Tpeak/rms
         snrfile = fits.PrimaryHDU(data=snr, header=pcube.header)
@@ -155,7 +157,7 @@ def get_SNR(paraname, savename = None, rms = 0.15, n_comp = 2, linename='oneone'
         peakT[:,y,x] = np.nanmax(models, axis = 1)
 
     for xy in ProgressBar(list(valid_pixels)):
-        print int(xy[0]), int(xy[1])
+        print(int(xy[0]), int(xy[1]))
         model_a_pixel(xy)
 
     if savename != None:
@@ -351,7 +353,7 @@ def make_guesses(sigv_para_name, n_comp = 2, tex_guess =10.0, tau_guess = 0.5):
         guesses[7,has_col] = tau11[has_col]*0.75             # v1 tau
 
     if n_comp > 2:
-        print "guesses for > 2 components have not been implemented!"
+        print("guesses for > 2 components have not been implemented!")
         return None
 
     return guesses
@@ -460,8 +462,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # always register the fitter just in case different lines are used
     fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
-    print "number of parameters is {0}".format(fitter.npars)
-    print "the line to fit is {0}".format(linename)
+    print("number of parameters is {0}".format(fitter.npars))
+    print("the line to fit is {0}".format(linename))
 
     # Specify a width for the expected velocity range in the data
     #v_peak_hwidth = 3.0 # km/s (should be sufficient for GAS Orion, but may not be enough for KEYSTONE)
@@ -473,7 +475,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
         mask_finite = np.isfinite(cube._data)
         errmap11 = mad_std(cube._data[mask_finite], axis=0)
-        print "median rms: {0}".format(np.nanmedian(errmap11))
+        print("median rms: {0}".format(np.nanmedian(errmap11)))
 
     snr = cube.filled_data[:].value/errmap11
     peaksnr = np.nanmax(snr,axis=0)
@@ -486,7 +488,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
 
     if np.logical_and(footprint_mask.size > 1000, momedgetrim):
-        print "triming the edges to make moment maps"
+        print("triming the edges to make moment maps")
         footprint_mask = binary_erosion(footprint_mask, disk(3))
 
     # the following function is copied directly from GAS
@@ -504,12 +506,12 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     else:
         planemask = mask_function(peaksnr,snr_min = snr_min)
 
-    print "planemask size: {0}, shape: {1}".format(planemask[planemask].size, planemask.shape)
+    print("planemask size: {0}, shape: {1}".format(planemask[planemask].size, planemask.shape))
 
     # masking
     mask = np.isfinite(cube._data) * planemask * footprint_mask
 
-    print "mask size: {0}, shape: {1}".format(mask[mask].size, mask.shape)
+    print("mask size: {0}, shape: {1}".format(mask[mask].size, mask.shape))
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km/u.s,velocity_convention='radio')
@@ -523,12 +525,12 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     if np.isfinite(v_guess).sum() > 0:
         v_guess = v_guess[np.isfinite(v_guess)]
         v_median = np.median(v_guess)
-        print "The median of the user provided velocities is: {0}".format(v_median)
+        print("The median of the user provided velocities is: {0}".format(v_median))
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
     else:
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
         v_median = np.median(m1[np.isfinite(m1)])
-        print "median velocity: {0}".format(v_median)
+        print("median velocity: {0}".format(v_median))
 
         if False:
             # save the moment maps for diagnostic purposes
@@ -579,7 +581,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         gmask = guesses[1::4] < sigmin
         guesses[1::4][gmask] = gg[1::4][gmask]
 
-        print "user provided guesses accepted"
+        print("user provided guesses accepted")
 
     # The guesses should be fine in the first case, but just in case, make sure the guesses are confined within the
     # appropriate limits
@@ -630,7 +632,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     # use SNR masking if not provided
     if not 'maskmap' in kwargs:
-        print "mask mask!"
+        print("mask mask!")
         kwargs['maskmap'] = planemask * footprint_mask
 
     if np.sum(kwargs['maskmap']) < 1:
@@ -690,7 +692,7 @@ def save_pcube(pcube, savename, ncomp=2):
     hdr_new['CRVAL3']= 0
     hdr_new['CRPIX3']= 1
 
-    print "parameter cube saved!"
+    print("parameter cube saved!")
 
     fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube,pcube.errcube]), header=hdr_new)
     fitcubefile.writeto(savename ,overwrite=True)
