@@ -10,6 +10,7 @@ from astropy import units as u
 from skimage.morphology import dilation
 import astropy.io.fits as fits
 import gc
+from scipy.ndimage.filters import median_filter
 
 from . import UltraCube as UCube
 from . import moment_guess as mmg
@@ -366,20 +367,36 @@ def get_2comp_wide_guesses(reg):
         # fit the residual with the one component model if this has not already been done.
         fit_best_2comp_residual_cnv(reg)
 
-    # mask over where one component model is better than a no-signal (i.e., noise) model
-    aic1v0_mask = reg.ucube_res_cnv.get_AICc_likelihood(1, 0) > 5
+    if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
+        # if there were no successful fit to the convolved cube
 
-    data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
-    preguess = data_cnv.copy()
+        # get moment map from no masking
+        cube_res = get_best_2comp_residual_SpectralCube(reg, masked=False, window_hwidth=3.5)
 
-    # set pixels that are better modelled as noise to nan
-    preguess[:, ~aic1v0_mask] = np.nan
+        # find moment around where one component has been fitted
+        pcube1 = reg.ucube.pcubes['1']
+        vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        moms_res = mmg.vmask_moments(cube_res, vmap=vmap, window_hwidth=3.5)
 
-    # use the dialated mask as a footprint to interpolate the guesses
-    guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
-                                              mask=dilation(aic1v0_mask))
+        ncomp = 1
+        gg = mmg.moment_guesses(moms_res[1], moms_res[2], ncomp, moment0=moms_res[0])
+        return gg
 
-    return guesses_final
+    else:
+        # mask over where one component model is better than a no-signal (i.e., noise) model
+        aic1v0_mask = reg.ucube_res_cnv.get_AICc_likelihood(1, 0) > 5
+
+        data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
+        preguess = data_cnv.copy()
+
+        # set pixels that are better modelled as noise to nan
+        preguess[:, ~aic1v0_mask] = np.nan
+
+        # use the dialated mask as a footprint to interpolate the guesses
+        guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
+                                                  mask=dilation(aic1v0_mask))
+
+        return guesses_final
 
 
 
@@ -390,7 +407,6 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     # the default window_hwidth = 3.5 is about half-way between the main hyperfine and the satellite
 
     # need a mechanism to make sure reg.ucube.pcubes['1'], reg.ucube.pcubes['2'] exists
-
     cube_res_cnv = get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=window_hwidth, res_snr_cut=res_snr_cut)
 
     ncomp = 1
@@ -398,7 +414,6 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     # note: no further masking is applied to vmap, as we assume only pixels with good vlsr will be used
     if not hasattr(reg, 'ucube_cnv'):
         # if convolved cube was not used to produce initial guesses, use the full resolution 1-comp fit as the reference
-        from scipy.ndimage.filters import median_filter
         pcube1 = reg.ucube.pcubes['1']
         vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
         vmap = cnvtool.regrid(vmap, header1=get_skyheader(pcube1.header), header2=get_skyheader(cube_res_cnv.header))
@@ -422,9 +437,20 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
 
 
 def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut=5):
-    # return convolved residual cube. If masked is True, only convolve over where 'excessive' residual
+    #convolved residual cube.If masked is True, only convolve over where 'excessive' residual is
     # above a peak SNR value of res_snr_cut masked
 
+    cube_res_masked = get_best_2comp_residual_SpectralCube(reg, masked=masked, window_hwidth=window_hwidth, res_snr_cut=res_snr_cut)
+
+    cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
+                                                 snrmasked=False, iterrefine=False)
+
+    #cube_res_cnv = cube_res_cnv.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+    return cube_res_cnv
+
+
+def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, res_snr_cut=5):
+    # return residual cube as SpectralCube oobject
     # need a mechanism to make sure reg.ucube.pcubes['1'], reg.ucube.pcubes['2'] exists
 
     res_cube = get_best_2comp_residual(reg)
@@ -458,13 +484,13 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
 
         cube_res_masked = cube_res.with_mask(~mask_res)
     else:
+        # no masking
         cube_res_masked = cube_res
 
-    cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
-                                                 snrmasked=False, iterrefine=False)
+    cube_res_masked = cube_res_masked.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
-    cube_res_cnv = cube_res_cnv.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-    return cube_res_cnv
+    return cube_res_masked
+
 
 
 
