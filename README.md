@@ -35,4 +35,19 @@ pip install mufasa
 - ```FITS_tools > v0.2```
 
 
+## Getting Started
+
+### Minimum Working Example
+
+To perform a two-component NH<sub>3</sub> (1,1) fit automatically, simply run the following: 
+
+```
+from mufasa import master_fitter as mf
+uReg = mf.Region(cubePath, paraNameRoot, paraDir)
+uReg.master_2comp_fit(snr_min=0)
+```
+
+In the example above, ```cubePath``` is the path to the FITS data cube, ```paraNameRoot``` is the commmon 'root' name to all the outputfiles, and ```paraDir``` is the directory of all the outputfiles. If one wishes to fit pixels only above a certain signal-to-noise-ratio (SNR) threshold, use ```snr_min``` to set such a threshold.
+
+
 
