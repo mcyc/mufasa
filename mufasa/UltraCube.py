@@ -118,7 +118,10 @@ class UltraCube(object):
 
     def save_fit(self, savename, ncomp):
         # note, this implementation currently relies on
-        save_fit(self.pcubes[str(ncomp)], savename, ncomp)
+        if hasattr(self.pcubes[str(ncomp)], 'parcube'):
+            save_fit(self.pcubes[str(ncomp)], savename, ncomp)
+        else:
+            print("[WARNING]: no fit was performed and thus no file will saved")
 
 
     def load_model_fit(self, filename, ncomp):
