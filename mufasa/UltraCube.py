@@ -100,9 +100,11 @@ class UltraCube(object):
 
         for nc in ncomp:
             self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
-            # update model mask
-            mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
-            self.include_model_mask(mod_mask)
+
+            if hasattr(self.pcubes[str(nc)],'parcube'):
+                # update model mask if any fit has been performed
+                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
+                self.include_model_mask(mod_mask)
             gc.collect()
 
 
