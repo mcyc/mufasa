@@ -493,7 +493,10 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     # the following function is copied directly from GAS
     def default_masking(snr,snr_min=5.0):
-        planemask = (snr>snr_min)
+        if snr_min is None:
+            planemask = np.isfinite(snr)
+        else:
+            planemask = (snr>snr_min)
         if planemask.size > 100:
             planemask = remove_small_objects(planemask,min_size=40)
             planemask = opening(planemask,disk(1))
