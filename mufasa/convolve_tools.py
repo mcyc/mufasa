@@ -1,3 +1,4 @@
+from __future__ import print_function
 __author__ = 'mcychen'
 
 import numpy as np
@@ -33,7 +34,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
 
     # sanity check
     if hdr['CUNIT1'] != hdr['CUNIT2']:
-        print "[ERROR]: the axis units for the do not match each other!"
+        print("[ERROR]: the axis units for the do not match each other!")
         return None
 
     beamunit = getattr(u, hdr['CUNIT1'])

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 import copy
 
@@ -60,9 +61,9 @@ def get_window_slab(maskcube, window_hwidth=3.0, v_atpeak=None):
         # find the peak of the integrated spectrum if v_atpeak isn't provided
         tot_spec = np.nansum(maskcube._data[:,]*maskcube.get_mask_array(), axis=(1,2))
         idx_peak = np.nanargmax(tot_spec)
-        print "peak T_B: {0}".format(np.nanmax(tot_spec))
+        print("peak T_B: {0}".format(np.nanmax(tot_spec)))
         v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
-        print "v_atpeak: {0}".format(v_atpeak)
+        print("v_atpeak: {0}".format(v_atpeak))
 
     vmax = v_atpeak + window_hwidth
     vmin = v_atpeak - window_hwidth
@@ -103,7 +104,7 @@ def window_moments(spec, window_hwidth=3.0, v_atpeak=None):
         return window_window_moments_spcube(spec, window_hwidth, v_atpeak)
 
     else:
-        print "[ERROR] the input is invalid"
+        print("[ERROR] the input is invalid")
         return None
 
 
@@ -153,9 +154,9 @@ def window_window_moments_spcube(maskcube, window_hwidth, v_atpeak=None):
         # find the peak of the integrated spectrum if v_atpeak isn't provided
         tot_spec = np.nansum(maskcube._data[:,]*maskcube.get_mask_array(), axis=(1,2))
         idx_peak = np.nanargmax(tot_spec)
-        print "peak T_B: {0}".format(np.nanmax(tot_spec))
+        print("peak T_B: {0}".format(np.nanmax(tot_spec)))
         v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
-        print "v_atpeak: {0}".format(v_atpeak)
+        print("v_atpeak: {0}".format(v_atpeak))
 
     vmax = v_atpeak + window_hwidth
     vmin = v_atpeak - window_hwidth

@@ -62,7 +62,7 @@ def mask_swap_2comp(data_cnv, swapmask):
 def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     # a wrapper to make guesses based on the parameters fitted to the convolved data
     npara = 4
-    ncomp = int(data_cnv.shape[0]/npara)/2
+    ncomp = int(data_cnv.shape[0]/npara/2)
 
     data_cnv = data_cnv.copy()
     # clean up the maps based on vlsr errors

@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 __author__ = 'mcychen'
 
 #======================================================================================================================#
@@ -11,9 +13,9 @@ import gc
 from astropy import units as u
 import scipy.ndimage as nd
 
-import aic
-import multi_v_fit as mvf
-import convolve_tools as cnvtool
+from . import aic
+from . import multi_v_fit as mvf
+from . import convolve_tools as cnvtool
 
 #======================================================================================================================#
 
@@ -79,7 +81,7 @@ class UltraCube(object):
         elif os.path.exists(filename):
             self.cube_cnv = SpectralCube.read(fitsfile)
         else:
-            print "[WARNING]: the specified file does not exist."
+            print("[WARNING]: the specified file does not exist.")
 
 
     def fit_cube(self, ncomp, **kwargs):
@@ -98,9 +100,11 @@ class UltraCube(object):
 
         for nc in ncomp:
             self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
-            # update model mask
-            mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
-            self.include_model_mask(mod_mask)
+
+            if hasattr(self.pcubes[str(nc)],'parcube'):
+                # update model mask if any fit has been performed
+                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
+                self.include_model_mask(mod_mask)
             gc.collect()
 
 
@@ -114,7 +118,10 @@ class UltraCube(object):
 
     def save_fit(self, savename, ncomp):
         # note, this implementation currently relies on
-        save_fit(self.pcubes[str(ncomp)], savename, ncomp)
+        if hasattr(self.pcubes[str(ncomp)], 'parcube'):
+            save_fit(self.pcubes[str(ncomp)], savename, ncomp)
+        else:
+            print("[WARNING]: no fit was performed and thus no file will saved")
 
 
     def load_model_fit(self, filename, ncomp):
@@ -256,7 +263,7 @@ def load_model_fit(cube, filename, ncomp):
 
     # reigster fitter
     linename = 'oneone'
-    import ammonia_multiv as ammv
+    from . import ammonia_multiv as ammv
 
     fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
@@ -280,7 +287,7 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
 
     cube = ucube.cube
 
-    if compID is '0':
+    if compID == '0':
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:

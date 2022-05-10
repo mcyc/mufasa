@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 __author__ = 'mcychen'
 
 #=======================================================================================================================
@@ -18,7 +20,7 @@ from multiprocessing import Pool, cpu_count
 
 # import from this directory
 #import ammonia_hf_multiv as amhf
-from spec_models import nh3_deblended
+from .spec_models import nh3_deblended
 
 #=======================================================================================================================
 

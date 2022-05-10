@@ -1,10 +1,11 @@
+from __future__ import absolute_import
 __author__ = 'mcychen'
 
 import numpy as np
 import astropy.io.fits as fits
 from spectral_cube import SpectralCube
 
-import multi_v_fit as mvf
+from . import multi_v_fit as mvf
 
 # a place to calculate AIC values
 
