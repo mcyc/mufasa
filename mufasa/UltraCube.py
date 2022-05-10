@@ -282,7 +282,7 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
 
     cube = ucube.cube
 
-    if compID is '0':
+    if compID == '0':
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
