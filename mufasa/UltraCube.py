@@ -93,8 +93,7 @@ class UltraCube(object):
         if not 'snr_min' in kwargs:
             kwargs['snr_min'] = self.snr_min
 
-
-        from collections import Iterable
+        from collections.abc import Iterable
         if not isinstance(ncomp, Iterable):
             ncomp = [ncomp]
 
