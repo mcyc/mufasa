@@ -298,22 +298,41 @@ def save_best_2comp_fit(reg):
 
     hdr2D =reg.ucube.cube.wcs.celestial.to_header()
 
+    paraDir = reg_final.ucube.paraDir
+    paraRoot = reg_final.ucube.paraNameRoot
+
+    def make_save_name(paraRoot, paraDir, key):
+        # replace "parameters" related names in the save names
+        if "parameters" in paraRoot:
+            return "{}/{}.fits".format(paraDir, paraRoot.replace("parameters", key))
+        elif "parameter":
+            return "{}/{}.fits".format(paraDir, paraRoot.replace("parameter", key))
+        elif "para":
+            return "{}/{}.fits".format(paraDir, paraRoot.replace("para", key))
+        else:
+            return "{}/{}_{}.fits".format(paraDir, paraRoot, key)
+
+
     # save the lnk21 map
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk21"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk21"))
+    savename = make_save_name(paraRoot, paraDir, "lnk21")
     save_map(lnk21, hdr2D, savename)
 
     # save the lnk10 map
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk10"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk10"))
+    savename = make_save_name(paraRoot, paraDir, "lnk10")
     save_map(lnk10, hdr2D, savename)
 
     # create and save the lnk20 map for reference:
     lnk20 = reg_final.ucube.get_AICc_likelihood(2, 0)
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk20"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","lnk20"))
+    savename = make_save_name(paraRoot, paraDir, "lnk20")
     save_map(lnk20, hdr2D, savename)
 
     # save the SNR map
     snr_map = get_best_2comp_snr_mod(reg_final)
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","SNR"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para","SNR"))
+    savename = make_save_name(paraRoot, paraDir, "SNR")
     save_map(snr_map, hdr2D, savename)
 
     # create moment0 map
@@ -323,18 +342,21 @@ def save_best_2comp_fit(reg):
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
     mom0_mod = cube_mod.moment0()
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "model_mom0"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "model_mom0"))
+    savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)
 
     # created masked mom0 map with model as the mask
     mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=20, mask=None)
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot.replace("para", "mom0"))
+    savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
 
     # save reduced chi-squred maps
     # would be useful to check if 3rd component is needed
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
-                                   reg_final.ucube.paraNameRoot.replace("para", "chi2red_final"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
+    #                               reg_final.ucube.paraNameRoot.replace("para", "chi2red_final"))
+    savename = make_save_name(paraRoot, paraDir, "chi2red_final")
     chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=modbest, expand=20, reduced=True, usemask=True,
                               mask=None)
     save_map(chi_map, hdr2D, savename)
@@ -343,11 +365,14 @@ def save_best_2comp_fit(reg):
     chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
     chiRed_2c = reg_final.ucube.get_reduced_chisq(2)
 
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
-                                   reg_final.ucube.paraNameRoot.replace("para", "chi2red_1c"))
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
+    #                               reg_final.ucube.paraNameRoot.replace("para", "chi2red_1c"))
+    savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
     save_map(chiRed_1c, hdr2D, savename)
-    savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
-                                   reg_final.ucube.paraNameRoot.replace("para", "chi2red_2c"))
+
+    #savename = "{}/{}.fits".format(reg_final.ucube.paraDir,
+    #                               reg_final.ucube.paraNameRoot.replace("para", "chi2red_2c"))
+    savename = make_save_name(paraRoot, paraDir, "chi2red_2c")
     save_map(chiRed_2c, hdr2D, savename)
 
     return reg
