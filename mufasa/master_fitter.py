@@ -305,9 +305,9 @@ def save_best_2comp_fit(reg):
         # replace "parameters" related names in the save names
         if "parameters" in paraRoot:
             return "{}/{}.fits".format(paraDir, paraRoot.replace("parameters", key))
-        elif "parameter":
+        elif "parameter" in paraRoot:
             return "{}/{}.fits".format(paraDir, paraRoot.replace("parameter", key))
-        elif "para":
+        elif "para" in paraRoot:
             return "{}/{}.fits".format(paraDir, paraRoot.replace("para", key))
         else:
             return "{}/{}_{}.fits".format(paraDir, paraRoot, key)
