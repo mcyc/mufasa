@@ -232,7 +232,10 @@ class UCubePlus(UltraCube):
             if not str(nc) in self.paraPaths:
                 self.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(self.paraDir, self.paraNameRoot, nc)
 
-            if update or (not os.path.isfile(self.paraPaths[str(nc)])):
+        if update:
+            # re-fit the cube
+            for nc in ncomp:
+                #if update or (not os.path.isfile(self.paraPaths[str(nc)])):
                 self.fit_cube(ncomp=[nc], **kwargs)
                 gc.collect()
                 self.save_fit(self.paraPaths[str(nc)], nc)
