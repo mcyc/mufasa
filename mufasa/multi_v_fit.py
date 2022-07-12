@@ -473,14 +473,18 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         errmap11 = fits.getdata(errmap11name)
     else:
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
-        mask_finite = np.isfinite(cube._data)
-        errmap11 = mad_std(cube._data[mask_finite], axis=0)
-        print("median rms: {0}".format(np.nanmedian(errmap11)))
+        errmap11 = mad_std(cube._data, ignore_nan=True, axis=0)
 
-    snr = cube.filled_data[:].value/errmap11
-    peaksnr = np.nanmax(snr,axis=0)
+    err_med = np.nanmedian(errmap11)
+    print("median rms: {0}".format(err_med))
 
-    #the snr map will inetiabley be noisy, so a little smoothing
+    # mask out pixels that are too noisy (in this case, 3 times the median rms in the cube)
+    err_mask = errmap11 < err_med * 3.0
+
+    snr = cube.filled_data[:].value / errmap11
+    peaksnr = np.nanmax(snr, axis=0)
+
+    # the snr map will inetiabley be noisy, so a little smoothing
     kernel = Gaussian2DKernel(1)
     peaksnr = convolve(peaksnr, kernel)
 
@@ -492,32 +496,32 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         footprint_mask = binary_erosion(footprint_mask, disk(3))
 
     # the following function is copied directly from GAS
-    def default_masking(snr,snr_min=5.0):
+    def default_masking(snr, snr_min=5.0):
         if snr_min is None:
             planemask = np.isfinite(snr)
         else:
-            planemask = (snr>snr_min)
+            planemask = (snr > snr_min)
         if planemask.size > 100:
-            planemask = remove_small_objects(planemask,min_size=40)
-            planemask = opening(planemask,disk(1))
-        return(planemask)
+            planemask = remove_small_objects(planemask, min_size=40)
+            planemask = opening(planemask, disk(1))
+        return (planemask)
 
     if 'maskmap' in kwargs:
         planemask = kwargs['maskmap']
     elif mask_function is None:
-        planemask = default_masking(peaksnr,snr_min = snr_min)
+        planemask = default_masking(peaksnr, snr_min=snr_min)
     else:
-        planemask = mask_function(peaksnr,snr_min = snr_min)
+        planemask = mask_function(peaksnr, snr_min=snr_min)
 
     print("planemask size: {0}, shape: {1}".format(planemask[planemask].size, planemask.shape))
 
-    # masking
-    mask = np.isfinite(cube._data) * planemask * footprint_mask
+    # masking for moment guesses (note that this isn't used for the actual fit)
+    mask = np.isfinite(cube._data) * planemask * footprint_mask * err_mask
 
     print("mask size: {0}, shape: {1}".format(mask[mask].size, mask.shape))
 
     maskcube = cube.with_mask(mask.astype(bool))
-    maskcube = maskcube.with_spectral_unit(u.km/u.s,velocity_convention='radio')
+    maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
     if guesses is not None:
         v_guess = guesses[::4]
