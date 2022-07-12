@@ -8,6 +8,7 @@ import astropy.io.fits as fits
 import copy
 import os, errno
 from os import path
+import multiprocessing
 
 from astropy import units as u
 from astropy.stats import mad_std
@@ -655,7 +656,14 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         print("[WARNING]: guesses has no pixel, no fitting will be performed")
         return pcube
 
-    pcube.fiteach(fittype='nh3_multi_v', guesses=guesses,
+    if multicore is None:
+        # use n-1 cores on the computer
+        multicore= multiprocessing.cpu_count() - 1
+
+        if multicore < 1:
+            multicore = 1
+
+    pcube.fiteach (fittype='nh3_multi_v', guesses=guesses,
                   start_from_point=(xmax,ymax),
                   use_neighbor_as_guess=False,
                   limitedmax=[True,True,True,True]*ncomp,
