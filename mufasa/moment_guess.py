@@ -20,9 +20,10 @@ tau_min = 0.3
 
 #=======================================================================================================================
 
-def master_guess(spectrum, ncomp, sigmin=0.07, v_peak_hwidth=3.0, v_atpeak=None, widewVSep=False, snr_cut=3):
+def master_guess(spectrum, ncomp, sigmin=0.07, v_peak_hwidth=3.0, v_atpeak=None, widewVSep=False, snr_cut=3,
+                 signal_mask=None):
 
-    m0, m1, m2 = window_moments(spectrum, window_hwidth=v_peak_hwidth, v_atpeak=v_atpeak)
+    m0, m1, m2 = window_moments(spectrum, window_hwidth=v_peak_hwidth, v_atpeak=v_atpeak, signal_mask=signal_mask)
 
     # estimate the rms level, and pass to the spectrum (probably should've been performed in another function)
     rms = get_rms_prefit(spectrum, window_hwidth=v_peak_hwidth, v_atpeak=m1)
@@ -95,13 +96,13 @@ def vmask_cube(cube, vmap, window_hwidth=3.0):
 
 
 
-def window_moments(spec, window_hwidth=3.0, v_atpeak=None):
+def window_moments(spec, window_hwidth=3.0, v_atpeak=None, signal_mask=None):
     # wrapper
     if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         return window_moments_spc(spec, window_hwidth, v_atpeak)
 
     elif isinstance(spec, SpectralCube):
-        return window_window_moments_spcube(spec, window_hwidth, v_atpeak)
+        return window_window_moments_spcube(spec, window_hwidth, v_atpeak, signal_mask)
 
     else:
         print("[ERROR] the input is invalid")
@@ -149,10 +150,14 @@ def window_moments_spc(spectrum, window_hwidth=3.0, v_atpeak=None, iter_refine=F
     return moments[1], moments[2], moments[3]
 
 
-def window_window_moments_spcube(maskcube, window_hwidth, v_atpeak=None):
+def window_window_moments_spcube(maskcube, window_hwidth, v_atpeak=None, signal_mask=None):
+    # signal_mask is to provide additional masking specifically and only for v_atpeak estimate
     if v_atpeak is None:
         # find the peak of the integrated spectrum if v_atpeak isn't provided
-        tot_spec = np.nansum(maskcube._data[:,]*maskcube.get_mask_array(), axis=(1,2))
+        mask = maskcube.get_mask_array()
+        if signal_mask is not None:
+            mask = mask*signal_mask
+        tot_spec = np.nansum(maskcube._data[:,]*mask, axis=(1,2))
         idx_peak = np.nanargmax(tot_spec)
         print("peak T_B: {0}".format(np.nanmax(tot_spec)))
         v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value

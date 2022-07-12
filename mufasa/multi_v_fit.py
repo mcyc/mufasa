@@ -238,7 +238,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
 
 
-def main_hf_moments(maskcube, window_hwidth, v_atpeak=None):
+def main_hf_moments(maskcube, window_hwidth, v_atpeak=None, signal_mask=None):
     '''
     # find moments for the main hyperfine lines
     # (moments, especially moment 2, computed with the satellite lines are less useful in terms of the kinematics)
@@ -249,16 +249,15 @@ def main_hf_moments(maskcube, window_hwidth, v_atpeak=None):
     :param window_hwidth: float
         half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
 
-    :param snr_thresh: float
-        The peak signal-to-noise ratio threshold for a pixel to be included in the integrated spectrum. The noise level
-        is estimated using median absolute deviation (MAD)
+    :param signal_mask: boolean ndarray
+        the mask indicating which pixels to include in the initial search for the spectral signal in sum of all spectra
 
     -------
     :return: m0
     :return: m1
     :return: m2
     '''
-    return momgue.window_moments(maskcube, window_hwidth, v_atpeak=None)
+    return momgue.window_moments(maskcube, window_hwidth, v_atpeak=v_atpeak, signal_mask=signal_mask)
 
 
 def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None):
@@ -535,7 +534,14 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         print("The median of the user provided velocities is: {0}".format(v_median))
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
     else:
-        m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
+        signal_mask = default_masking(peaksnr, snr_min=5.0)
+        print("signal_mask size: {}".format(signal_mask.size))
+
+        if signal_mask.size > 9:
+            # if the signal mask used to find the peak of the main hyperfines is large enough:
+            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=signal_mask)
+        else:
+            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
         v_median = np.median(m1[np.isfinite(m1)])
         print("median velocity: {0}".format(v_median))
 
