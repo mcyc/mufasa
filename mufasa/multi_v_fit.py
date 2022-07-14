@@ -8,6 +8,7 @@ import astropy.io.fits as fits
 import copy
 import os, errno
 from os import path
+import multiprocessing
 
 from astropy import units as u
 from astropy.stats import mad_std
@@ -238,7 +239,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
 
 
-def main_hf_moments(maskcube, window_hwidth, v_atpeak=None):
+def main_hf_moments(maskcube, window_hwidth, v_atpeak=None, signal_mask=None):
     '''
     # find moments for the main hyperfine lines
     # (moments, especially moment 2, computed with the satellite lines are less useful in terms of the kinematics)
@@ -249,16 +250,15 @@ def main_hf_moments(maskcube, window_hwidth, v_atpeak=None):
     :param window_hwidth: float
         half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
 
-    :param snr_thresh: float
-        The peak signal-to-noise ratio threshold for a pixel to be included in the integrated spectrum. The noise level
-        is estimated using median absolute deviation (MAD)
+    :param signal_mask: boolean ndarray
+        the mask indicating which pixels to include in the initial search for the spectral signal in sum of all spectra
 
     -------
     :return: m0
     :return: m1
     :return: m2
     '''
-    return momgue.window_moments(maskcube, window_hwidth, v_atpeak=None)
+    return momgue.window_moments(maskcube, window_hwidth, v_atpeak=v_atpeak, signal_mask=signal_mask)
 
 
 def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None):
@@ -473,14 +473,18 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         errmap11 = fits.getdata(errmap11name)
     else:
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
-        mask_finite = np.isfinite(cube._data)
-        errmap11 = mad_std(cube._data[mask_finite], axis=0)
-        print("median rms: {0}".format(np.nanmedian(errmap11)))
+        errmap11 = mad_std(cube._data, ignore_nan=True, axis=0)
 
-    snr = cube.filled_data[:].value/errmap11
-    peaksnr = np.nanmax(snr,axis=0)
+    err_med = np.nanmedian(errmap11)
+    print("median rms: {0}".format(err_med))
 
-    #the snr map will inetiabley be noisy, so a little smoothing
+    # mask out pixels that are too noisy (in this case, 3 times the median rms in the cube)
+    err_mask = errmap11 < err_med * 3.0
+
+    snr = cube.filled_data[:].value / errmap11
+    peaksnr = np.nanmax(snr, axis=0)
+
+    # the snr map will inetiabley be noisy, so a little smoothing
     kernel = Gaussian2DKernel(1)
     peaksnr = convolve(peaksnr, kernel)
 
@@ -492,32 +496,32 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         footprint_mask = binary_erosion(footprint_mask, disk(3))
 
     # the following function is copied directly from GAS
-    def default_masking(snr,snr_min=5.0):
+    def default_masking(snr, snr_min=5.0):
         if snr_min is None:
             planemask = np.isfinite(snr)
         else:
-            planemask = (snr>snr_min)
+            planemask = (snr > snr_min)
         if planemask.size > 100:
-            planemask = remove_small_objects(planemask,min_size=40)
-            planemask = opening(planemask,disk(1))
-        return(planemask)
+            planemask = remove_small_objects(planemask, min_size=40)
+            planemask = opening(planemask, disk(1))
+        return (planemask)
 
     if 'maskmap' in kwargs:
         planemask = kwargs['maskmap']
     elif mask_function is None:
-        planemask = default_masking(peaksnr,snr_min = snr_min)
+        planemask = default_masking(peaksnr, snr_min=snr_min)
     else:
-        planemask = mask_function(peaksnr,snr_min = snr_min)
+        planemask = mask_function(peaksnr, snr_min=snr_min)
 
     print("planemask size: {0}, shape: {1}".format(planemask[planemask].size, planemask.shape))
 
-    # masking
-    mask = np.isfinite(cube._data) * planemask * footprint_mask
+    # masking for moment guesses (note that this isn't used for the actual fit)
+    mask = np.isfinite(cube._data) * planemask * footprint_mask * err_mask
 
     print("mask size: {0}, shape: {1}".format(mask[mask].size, mask.shape))
 
     maskcube = cube.with_mask(mask.astype(bool))
-    maskcube = maskcube.with_spectral_unit(u.km/u.s,velocity_convention='radio')
+    maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
     if guesses is not None:
         v_guess = guesses[::4]
@@ -531,7 +535,14 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         print("The median of the user provided velocities is: {0}".format(v_median))
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
     else:
-        m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
+        signal_mask = default_masking(peaksnr, snr_min=5.0)
+        print("signal_mask size: {}".format(signal_mask.size))
+
+        if signal_mask.size > 9:
+            # if the signal mask used to find the peak of the main hyperfines is large enough:
+            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=signal_mask)
+        else:
+            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
         v_median = np.median(m1[np.isfinite(m1)])
         print("median velocity: {0}".format(v_median))
 
@@ -645,7 +656,14 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         print("[WARNING]: guesses has no pixel, no fitting will be performed")
         return pcube
 
-    pcube.fiteach(fittype='nh3_multi_v', guesses=guesses,
+    if multicore is None:
+        # use n-1 cores on the computer
+        multicore= multiprocessing.cpu_count() - 1
+
+        if multicore < 1:
+            multicore = 1
+
+    pcube.fiteach (fittype='nh3_multi_v', guesses=guesses,
                   start_from_point=(xmax,ymax),
                   use_neighbor_as_guess=False,
                   limitedmax=[True,True,True,True]*ncomp,
