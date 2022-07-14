@@ -102,7 +102,7 @@ def AICc(rss, p, N):
     Calculate the corrected Akaike information criterion based on the provided chi-squared values
     corrected AIC (AICc) approaches that of the AIC value when chisq >> p^2
     :param rss:
-        Residual sum of squares 
+        Residual sum of squares
     :param p:
         Number of parameters
     :param N:
