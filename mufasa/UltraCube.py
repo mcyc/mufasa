@@ -338,6 +338,47 @@ def get_aic(chisq, p, N=None):
         return aic.AICc(chisq, p, N)
 
 
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True):
+    '''
+    Calculate residual sum of squares (RSS)
+
+    cube : SpectralCube
+
+    model: numpy array
+
+    expand : int
+        Expands the region where the residual is evaluated by this many channels in the spectral dimension
+
+    reduced : boolean
+        Whether or not to return the reduced chi-squared value or not
+
+    mask: boolean array
+        A mask stating which array elements the chi-squared values are calculated from
+    '''
+
+    if usemask:
+        if mask is None:
+            mask = model > 0
+    else:
+        mask = ~np.isnan(model)
+
+    residual = get_residual(cube, model)
+
+    # creating mask over region where the model is non-zero,
+    # plus a buffer of size set by the expand keyword.
+    mask = expand_mask(mask, expand)
+    mask = mask.astype(np.float)
+
+    # note: using nan-sum may walk over some potential bad pixel cases
+    rss = np.nansum((residual * mask)**2, axis=0)
+
+    if return_size:
+        return rss, np.nansum(mask, axis=0)
+    else:
+        return rss
+
+
+
 def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None):
     '''
     cube : SpectralCube
@@ -358,10 +399,6 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         A mask stating which array elements the chi-squared values are calculated from
     '''
 
-    #model = np.zeros(cube.shape)
-
-    #cube = cube.with_spectral_unit(u.Hz, rest_value = freq_dict['oneone']*u.Hz)
-
     if usemask:
         if mask is None:
             mask = model > 0
@@ -376,13 +413,14 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     mask = mask.astype(np.float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
-    chisq = np.nansum((residual * mask)**2, axis=0)
+    chisq = np.nansum((residual * mask) ** 2, axis=0)
 
     if reduced:
+        # assuming n_size >> n_parameters
         chisq /= np.nansum(mask, axis=0)
 
     rms = get_rms(residual)
-    chisq /= rms**2
+    chisq /= rms ** 2
 
     gc.collect()
 
@@ -392,6 +430,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     else:
         # return the ch-squared values and the number of data points used
         return chisq, np.nansum(mask, axis=0)
+
 
 
 def get_masked_moment(cube, model, order=0, expand=10, mask=None):
