@@ -83,24 +83,26 @@ def get_comp_AICc(cube, model1, model2, p1, p2):
     return aicc1, aicc2
 
 
-def AIC(chisq, p):
+def AIC(rss, p, N):
     '''
     Calculate the Akaike information criterion based on the provided chi-squared values
-    :param chisq:
-        Chi-squared values
+    :param rss:
+        Residual sum of squares
     :param p:
         Number of parameters
+    :param N:
+        Number of samples
     :return:
     '''
-    return chisq + 2*p
+    return N * np.log(rss/N) + 2*p
 
 
-def AICc(chisq, p, N):
+def AICc(rss, p, N):
     '''
     Calculate the corrected Akaike information criterion based on the provided chi-squared values
     corrected AIC (AICc) approaches that of the AIC value when chisq >> p^2
-    :param chisq:
-        Chi-squared values
+    :param rss:
+        Residual sum of squares 
     :param p:
         Number of parameters
     :param N:
@@ -108,7 +110,7 @@ def AICc(chisq, p, N):
     '''
     top = 2*p*(p+1)
     bottom = N - p - 1
-    return AIC(chisq, p) + top/bottom
+    return AIC(rss, p, N) + top/bottom
 
 
 def likelihood(aiccA, aiccB):
