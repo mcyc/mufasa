@@ -415,7 +415,7 @@ def get_singv_tau11(singv_para):
 
 
 def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None, guesses = None, errmap11name = None,
-            multicore = None, mask_function = None, snr_min=3.0, linename="oneone", momedgetrim=True, saveguess=False,
+            multicore = None, mask_function = None, snr_min=0.0, linename="oneone", momedgetrim=True, saveguess=False,
             **kwargs):
     '''
     Perform n velocity component fit on the GAS ammonia 1-1 data.
@@ -491,7 +491,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
 
 
-    if np.logical_and(footprint_mask.size > 1000, momedgetrim):
+    if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
         # trim the edges by 3 pixels to guess the location of the peak emission
         print("triming the edges to make moment maps")
         footprint_mask = binary_erosion(footprint_mask, disk(3))
@@ -503,7 +503,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         else:
             planemask = (snr > snr_min)
 
-        if planemask.size > 100:
+        if planemask.sum() > 100:
             # to create a less noisy mask further
             planemask = remove_small_holes(planemask, area_threshold=9)
             planemask = remove_small_objects(planemask, min_size=25)
@@ -518,12 +518,12 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     else:
         planemask = mask_function(peaksnr, snr_min=snr_min)
 
-    print("planemask size: {0}, shape: {1}".format(planemask[planemask].size, planemask.shape))
+    print("planemask size: {0}, shape: {1}".format(planemask[planemask].sum(), planemask.shape))
 
     # masking for moment guesses (note that this isn't used for the actual fit)
     mask = np.isfinite(cube._data) * planemask * footprint_mask #* err_mask
 
-    print("mask size: {0}, shape: {1}".format(mask[mask].size, mask.shape))
+    print("mask size: {0}, shape: {1}".format(mask[mask].sum(), mask.shape))
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -540,13 +540,21 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         print("The median of the user provided velocities is: {0}".format(v_median))
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
     else:
-        signal_mask = default_masking(peaksnr, snr_min=5.0)
+        signal_mask = default_masking(peaksnr, snr_min=10.0)
         signal_mask *= err_mask
-        print("signal_mask size: {}".format(signal_mask.size))
 
-        if signal_mask.size > 9:
+        if signal_mask.sum() < 9:
+            signal_mask = default_masking(peaksnr, snr_min=5.0)
+            signal_mask *= err_mask
+
+        print("signal_mask size: {}".format(signal_mask.sum()))
+
+        if signal_mask.sum() > 9:
             # if the signal mask used to find the peak of the main hyperfines is large enough:
             m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=signal_mask)
+        elif err_mask.sum() > 9:
+            # use err_mask only if err_mask is large enough
+            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=err_mask)
         else:
             m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
         v_median = np.median(m1[np.isfinite(m1)])
@@ -564,9 +572,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             fitcubefile = fits.PrimaryHDU(data=np.array([m0,m1,m2]), header=hdr_new)
             fitcubefile.writeto(savename ,overwrite=True)
 
-        #return mask, planemask, footprint_mask, err_mask, signal_mask
-
-    #return m0, m1, m2
+    #return v_median, m0, m1, m2, maskcube, signal_mask
 
     # remove the nana values to allow np.nanargmax(m0) to operate smoothly
     m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
@@ -673,8 +679,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         if multicore < 1:
             multicore = 1
-
-    return guesses
 
     pcube.fiteach (fittype='nh3_multi_v', guesses=guesses,
                   start_from_point=(xmax,ymax),
