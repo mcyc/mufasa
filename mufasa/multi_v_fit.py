@@ -516,9 +516,10 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     print("planemask size: {0}, shape: {1}".format(planemask[planemask].size, planemask.shape))
 
     # masking for moment guesses (note that this isn't used for the actual fit)
-    mask = np.isfinite(cube._data) * planemask * footprint_mask * err_mask
+    mask = np.isfinite(cube._data) * planemask * footprint_mask #* err_mask
 
     print("mask size: {0}, shape: {1}".format(mask[mask].size, mask.shape))
+
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -536,6 +537,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
     else:
         signal_mask = default_masking(peaksnr, snr_min=5.0)
+        signal_mask *= err_mask
         print("signal_mask size: {}".format(signal_mask.size))
 
         if signal_mask.size > 9:
@@ -557,6 +559,10 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             savename = "{0}_moments.fits".format(os.path.splitext(paraname)[0], "parameter_maps")
             fitcubefile = fits.PrimaryHDU(data=np.array([m0,m1,m2]), header=hdr_new)
             fitcubefile.writeto(savename ,overwrite=True)
+
+        return mask, planemask, footprint_mask, err_mask, signal_mask
+
+    #return m0, m1, m2
 
     # remove the nana values to allow np.nanargmax(m0) to operate smoothly
     m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
@@ -581,6 +587,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
     gg = moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0)
+
 
     if guesses is None:
         guesses = gg
@@ -662,6 +669,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         if multicore < 1:
             multicore = 1
+
+    return guesses
 
     pcube.fiteach (fittype='nh3_multi_v', guesses=guesses,
                   start_from_point=(xmax,ymax),
