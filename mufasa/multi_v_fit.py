@@ -19,7 +19,7 @@ import scipy.ndimage as nd
 
 from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
-from skimage.morphology import remove_small_objects,disk,opening,binary_erosion #, closing
+from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,remove_small_holes #, closing
 from astropy.convolution import Gaussian2DKernel, convolve
 
 from . import ammonia_multiv as ammv
@@ -488,10 +488,11 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     kernel = Gaussian2DKernel(1)
     peaksnr = convolve(peaksnr, kernel)
 
-    # trim the edges by 3 pixels to guess the location of the peak emission
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
 
+
     if np.logical_and(footprint_mask.size > 1000, momedgetrim):
+        # trim the edges by 3 pixels to guess the location of the peak emission
         print("triming the edges to make moment maps")
         footprint_mask = binary_erosion(footprint_mask, disk(3))
 
@@ -501,9 +502,13 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             planemask = np.isfinite(snr)
         else:
             planemask = (snr > snr_min)
+
         if planemask.size > 100:
-            planemask = remove_small_objects(planemask, min_size=40)
+            # to create a less noisy mask further
+            planemask = remove_small_holes(planemask, area_threshold=9)
+            planemask = remove_small_objects(planemask, min_size=25)
             planemask = opening(planemask, disk(1))
+
         return (planemask)
 
     if 'maskmap' in kwargs:
@@ -519,7 +524,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     mask = np.isfinite(cube._data) * planemask * footprint_mask #* err_mask
 
     print("mask size: {0}, shape: {1}".format(mask[mask].size, mask.shape))
-
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -560,7 +564,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             fitcubefile = fits.PrimaryHDU(data=np.array([m0,m1,m2]), header=hdr_new)
             fitcubefile.writeto(savename ,overwrite=True)
 
-        return mask, planemask, footprint_mask, err_mask, signal_mask
+        #return mask, planemask, footprint_mask, err_mask, signal_mask
 
     #return m0, m1, m2
 
