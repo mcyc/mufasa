@@ -572,7 +572,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             fitcubefile = fits.PrimaryHDU(data=np.array([m0,m1,m2]), header=hdr_new)
             fitcubefile.writeto(savename ,overwrite=True)
 
-    #return v_median, m0, m1, m2, maskcube, signal_mask
 
     # remove the nana values to allow np.nanargmax(m0) to operate smoothly
     m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
@@ -597,7 +596,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
     gg = moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0)
-
 
     if guesses is None:
         guesses = gg
