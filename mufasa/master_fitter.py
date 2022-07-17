@@ -144,7 +144,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     # refit pixels where 2 component fits are substentially worse than good one components
     # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
     lnk21 = ucube.get_AICc_likelihood(2, 1)
-    lnk10 = ucube.get_AICc_likelihood(2, 1)
+    lnk10 = ucube.get_AICc_likelihood(1, 0)
 
     # where the fits are poor
     mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
