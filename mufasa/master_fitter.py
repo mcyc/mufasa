@@ -11,6 +11,8 @@ from skimage.morphology import dilation
 import astropy.io.fits as fits
 import gc
 from scipy.ndimage.filters import median_filter
+from scipy.signal import medfilt2d
+from skimage.morphology import dilation, square
 
 from . import UltraCube as UCube
 from . import moment_guess as mmg
@@ -136,6 +138,43 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
+
+
+def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
+    # refit pixels where 2 component fits are substentially worse than good one components
+    # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
+    lnk21 = ucube.get_AICc_likelihood(2, 1)
+    lnk10 = ucube.get_AICc_likelihood(2, 1)
+
+    # where the fits are poor
+    mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
+    mask = np.logical_and(mask, np.isfinite(lnk10))
+
+    mask_size = np.sum(mask)
+    print("refit mask size for bad_2comp: {}".format(mask_size))
+
+    guesses = ucube.pcubes['2'].parcube.copy()
+
+    for i, gmap in enumerate(guesses):
+        guesses[i] = medfilt2d(gmap, kernel_size=3)
+
+    gc.collect()
+
+    if mask_size > 1:
+        ucube_new = UCube.UltraCube(ucube.cubefile)
+        ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
+
+        # do a model comparison between the new two component fit verses the original one
+        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
+
+        # mask over where one comp fit is more robust
+        good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
+
+        # replace the values
+        replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+    else:
+        print("not enough pixels to refit, no-refit is done")
+
 
 
 def refit_swap_2comp(reg, snr_min=3):
