@@ -116,8 +116,7 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
         refit_bad_2comp(reg.ucube, snr_min=snr_min, lnk_thresh=-20)
         print("bad pix re-fit saved!")
 
-    #if recover_wide:
-    if False:
+    if recover_wide:
         refit_2comp_wide(reg, snr_min=snr_min)
     save_best_2comp_fit(reg)
     return reg
@@ -229,6 +228,7 @@ def refit_swap_2comp(reg, snr_min=3):
     # save the final fit model
     #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
     #save_fit(pcube, savename, ncomp)
+    save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
 
 
@@ -266,7 +266,7 @@ def refit_2comp_wide(reg, snr_min=3):
 
     mask_size = np.sum(mask)
     print("refit mask size: {}".format(mask_size))
-    if mask_size > 1:
+    if mask_size >= 1:
         ucube_new = UCube.UltraCube(reg.ucube.cubefile)
         ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=final_guess)
 
@@ -282,6 +282,7 @@ def refit_2comp_wide(reg, snr_min=3):
         # save the final fit model
         #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
         #save_fit(pcube, savename, ncomp)
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
     else:
         print("not enough pixels to refit, no-refit is done")
 
