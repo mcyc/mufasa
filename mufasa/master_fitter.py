@@ -10,7 +10,7 @@ from astropy import units as u
 from skimage.morphology import dilation
 import astropy.io.fits as fits
 import gc
-from scipy.ndimage.filters import median_filter
+#from scipy.ndimage.filters import median_filter
 from scipy.signal import medfilt2d
 from skimage.morphology import dilation, square
 
@@ -149,7 +149,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     # refit pixels where 2 component fits are substentially worse than good one components
     # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
 
-    print("begin re-fitting bad 2 component pixels")
+    print("begin re-fitting bad 2-comp pixels")
 
     lnk21 = ucube.get_AICc_likelihood(2, 1)
     lnk10 = ucube.get_AICc_likelihood(1, 0)
@@ -329,7 +329,7 @@ def save_best_2comp_fit(reg):
     # make the 2-comp para maps with the best fit model
     lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
-    print("number of pixels better fitted by 2-comp: {}".format(np.sum(mask)))
+    print("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
     pcube_final.parcube[:4, ~mask] = reg_final.ucube.pcubes['1'].parcube[:4, ~mask].copy()
     pcube_final.errcube[:4, ~mask] = reg_final.ucube.pcubes['1'].errcube[:4, ~mask].copy()
     pcube_final.parcube[4:8, ~mask] = np.nan
@@ -440,7 +440,8 @@ def get_2comp_wide_guesses(reg):
 
         # find moment around where one component has been fitted
         pcube1 = reg.ucube.pcubes['1']
-        vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        #vmap = median_filter(pcube1.parcube[0], size=3)
+        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
         moms_res = mmg.vmask_moments(cube_res, vmap=vmap, window_hwidth=3.5)
 
         ncomp = 1
@@ -480,7 +481,8 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     if not hasattr(reg, 'ucube_cnv'):
         # if convolved cube was not used to produce initial guesses, use the full resolution 1-comp fit as the reference
         pcube1 = reg.ucube.pcubes['1']
-        vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        #vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
         vmap = cnvtool.regrid(vmap, header1=get_skyheader(pcube1.header), header2=get_skyheader(cube_res_cnv.header))
     else:
         vmap = reg.ucube_cnv.pcubes['1'].parcube[0]
