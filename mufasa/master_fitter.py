@@ -108,11 +108,17 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-comonent fits
 
 
-def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCnvFits=True):
+def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True):
     # note, planemask superseeds snr-based maask
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask)
-    if recover_wide:
-        refit_2comp_wide(reg, snr_min=snr_min) #, planemask=planemask
+
+    if refit_bad_pix:
+        refit_bad_2comp(reg.ucube, snr_min=snr_min, lnk_thresh=-20)
+        print("bad pix re-fit saved!")
+
+    #if recover_wide:
+    if False:
+        refit_2comp_wide(reg, snr_min=snr_min)
     save_best_2comp_fit(reg)
     return reg
 
@@ -160,7 +166,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
 
     gc.collect()
 
-    if mask_size > 1:
+    if mask_size >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile)
         ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
 
@@ -169,11 +175,16 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
 
         # mask over where one comp fit is more robust
         good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
+        good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
 
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
     else:
         print("not enough pixels to refit, no-refit is done")
+
+    # save the updated results
+    save_updated_paramaps(ucube, ncomps=[2,1])
+    #return ucube_new, lnk_NvsO, good_mask
 
 
 
@@ -287,6 +298,15 @@ def standard_2comp_fit(reg, planemask=None):
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
+
+
+def save_updated_paramaps(ucube, ncomps):
+    # save the updated parameter cubes
+    for nc in ncomps:
+        if not str(nc) in ucube.paraPaths:
+            print("[ERROR]: the ucube does not have paraPath for '{}' components".format(nc))
+        else:
+            ucube.save_fit(ucube.paraPaths[str(nc)], nc)
 
 
 
