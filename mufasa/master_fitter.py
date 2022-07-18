@@ -148,6 +148,9 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
 def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     # refit pixels where 2 component fits are substentially worse than good one components
     # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
+
+    print("begin re-fitting bad 2 component pixels")
+
     lnk21 = ucube.get_AICc_likelihood(2, 1)
     lnk10 = ucube.get_AICc_likelihood(1, 0)
 
@@ -168,26 +171,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     replace_bad_pix(ucube, mask, snr_min, guesses, lnk21)
 
 
-def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21):
-    # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
-    if np.sum(mask) >= 1:
-        ucube_new = UCube.UltraCube(ucube.cubefile)
-        ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
 
-        # do a model comparison between the new two component fit verses the original one
-        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
-
-        # mask over where one comp fit is more robust
-        good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
-        good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
-
-        # replace the values
-        replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
-
-        # save the updated results
-        save_updated_paramaps(ucube, ncomps=[2, 1])
-    else:
-        print("not enough pixels to refit, no-refit is done")
 
 
 def refit_swap_2comp(reg, snr_min=3):
@@ -237,6 +221,8 @@ def refit_swap_2comp(reg, snr_min=3):
 
 def refit_2comp_wide(reg, snr_min=3):
 
+    print("begin wide component recovery")
+
     ncomp = [1, 2]
 
     # load the fitted parameters
@@ -269,6 +255,9 @@ def refit_2comp_wide(reg, snr_min=3):
 
     mask_size = np.sum(mask)
     print("refit mask size: {}".format(mask_size))
+
+    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21)
+    '''
     if mask_size >= 1:
         ucube_new = UCube.UltraCube(reg.ucube.cubefile)
         ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=final_guess)
@@ -286,6 +275,30 @@ def refit_2comp_wide(reg, snr_min=3):
         #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
         #save_fit(pcube, savename, ncomp)
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
+    else:
+        print("not enough pixels to refit, no-refit is done")
+    '''
+
+
+
+def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21):
+    # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+    if np.sum(mask) >= 1:
+        ucube_new = UCube.UltraCube(ucube.cubefile)
+        ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
+
+        # do a model comparison between the new two component fit verses the original one
+        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
+
+        # mask over where one comp fit is more robust
+        good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
+        good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
+
+        # replace the values
+        replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+
+        # save the updated results
+        save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         print("not enough pixels to refit, no-refit is done")
 
