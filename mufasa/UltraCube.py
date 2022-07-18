@@ -185,14 +185,11 @@ class UltraCube(object):
 
         compID = str(ncomp)
         if not compID in self.chisq_maps:
-            #self.get_chisq(ncomp, **kwargs)
             self.get_rss(ncomp, **kwargs)
 
         # note that zero component is assumed to have no free-parameter (i.e., no fitting)
         p = ncomp*4
 
-        #AICc_map = get_aic(chisq=self.chisq_maps[compID], p=p, N=self.NSamp_maps[compID])
-        print("using RSS for AICc calculation!")
         AICc_map = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
 
         if update:
@@ -542,9 +539,9 @@ def expand_mask(mask, expand):
 def get_rms(residual):
     # get robust estimate of the rms from the fit residual
     diff = residual - np.roll(residual, 2, axis=0)
-    print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
+    #print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
-    print("finite rms map size: {}".format(np.sum(np.isfinite(rms))))
+    #print("finite rms map size: {}".format(np.sum(np.isfinite(rms))))
     gc.collect()
     return rms
 
