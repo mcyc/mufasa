@@ -165,7 +165,12 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
 
     gc.collect()
 
-    if mask_size >= 1:
+    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21)
+
+
+def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21):
+    # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+    if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile)
         ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
 
@@ -178,13 +183,11 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
 
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+
+        # save the updated results
+        save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         print("not enough pixels to refit, no-refit is done")
-
-    # save the updated results
-    save_updated_paramaps(ucube, ncomps=[2,1])
-    #return ucube_new, lnk_NvsO, good_mask
-
 
 
 def refit_swap_2comp(reg, snr_min=3):
