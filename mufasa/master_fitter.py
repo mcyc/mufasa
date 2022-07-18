@@ -108,7 +108,7 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-comonent fits
 
 
-def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True):
+def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True):
     # note, planemask superseeds snr-based maask
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask)
 
@@ -139,7 +139,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
 
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header)
         # update is set to True to save the fits
-        kwargs = {'update':True, 'guesses':guesses}
+        kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min}
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
@@ -280,14 +280,14 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21):
 
 
 
-def standard_2comp_fit(reg, planemask=None):
+def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
     ncomp = [1,2]
 
     # only use the moment maps for the fits
     for nc in ncomp:
         # update is set to True to save the fits
-        kwargs = {'update':True}
+        kwargs = {'update':True, 'snr_min':snr_min}
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
