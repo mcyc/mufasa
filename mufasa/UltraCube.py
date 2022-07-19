@@ -41,7 +41,7 @@ class UltraCube(object):
         self.NSamp_maps = {}
         self.AICc_maps = {}
         self.master_model_mask = None
-        self.snr_min = None
+        self.snr_min = 0.0
         self.cnv_factor = cnv_factor
         self.n_cores = multiprocessing.cpu_count()
 
