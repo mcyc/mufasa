@@ -432,10 +432,8 @@ def get_2comp_wide_guesses(reg):
         # fit the residual with the one component model if this has not already been done.
         fit_best_2comp_residual_cnv(reg)
 
-    if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
-        # if there were no successful fit to the convolved cube
-
-        # get moment map from no masking
+    def get_mom_guesses(reg):
+        # get moment guesses from no masking
         cube_res = get_best_2comp_residual_SpectralCube(reg, masked=False, window_hwidth=3.5)
 
         # find moment around where one component has been fitted
@@ -448,19 +446,29 @@ def get_2comp_wide_guesses(reg):
         gg = mmg.moment_guesses(moms_res[1], moms_res[2], ncomp, moment0=moms_res[0])
         return gg
 
+    if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
+        # if there were no successful fit to the convolved cube, get moment map from no masking
+        return get_mom_guesses(reg)
+    
     else:
         # mask over where one component model is better than a no-signal (i.e., noise) model
         aic1v0_mask = reg.ucube_res_cnv.get_AICc_likelihood(1, 0) > 5
 
-        data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
-        preguess = data_cnv.copy()
+        if np.sum(aic1v0_mask) >= 1:
+            # if there are at least one well fitted pixel to the residual
+            data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
+            preguess = data_cnv.copy()
 
-        # set pixels that are better modelled as noise to nan
-        preguess[:, ~aic1v0_mask] = np.nan
+            # set pixels that are better modelled as noise to nan
+            preguess[:, ~aic1v0_mask] = np.nan
 
-        # use the dialated mask as a footprint to interpolate the guesses
-        guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
-                                                  mask=dilation(aic1v0_mask))
+            # use the dialated mask as a footprint to interpolate the guesses
+            gmask = dilation(aic1v0_mask)
+            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
+                                                      mask=gmask)
+        else:
+            # get moment guesses without masking instead
+            guesses_final = get_mom_guesses(reg)
 
         return guesses_final
 
