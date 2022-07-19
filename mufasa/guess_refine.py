@@ -9,6 +9,9 @@ from scipy.ndimage.filters import median_filter
 from scipy.interpolate import CloughTocher2DInterpolator as intp
 from scipy.interpolate import griddata
 from FITS_tools.hcongrid import get_pixel_mapping
+from astropy.convolution import Gaussian2DKernel, convolve
+
+from scipy.spatial.qhull import QhullError
 
 #=======================================================================================================================
 
@@ -217,15 +220,30 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
         mask = np.isfinite(map)
         mask = mask_cleaning(mask)
 
-    # interpolate over the dmask footprint
-    xline = np.arange(map.shape[1])
-    yline = np.arange(map.shape[0])
-    X,Y = np.meshgrid(xline, yline)
-    itpmask = np.isfinite(map)
-    C = intp((X[itpmask],Y[itpmask]), map[itpmask])
+    def interpolate(map, mask):
+        # interpolate over the dmask footprint
+        xline = np.arange(map.shape[1])
+        yline = np.arange(map.shape[0])
+        X,Y = np.meshgrid(xline, yline)
+        itpmask = np.isfinite(map)
+        C = intp((X[itpmask],Y[itpmask]), map[itpmask])
 
-    # interpolate over the dmask footprint
-    zi = C(X*mask,Y*mask)
+        # interpolate over the dmask footprint
+        zi = C(X*mask,Y*mask)
+        return zi
+
+    try:
+        # interpolate the mask
+        zi = interpolate(map, mask)
+    except QhullError as e:
+        print("[WARNING]: qhull input error found; astropy convolve will be used instead")
+        #print(e)
+        # use astropy convolve as a proxi for interpolation
+        kernel = Gaussian2DKernel(3)
+        zi = convolve(map, kernel, boundary='extend')
+        # retrain the original median_filtered map over its original positions
+        map_finite = np.isfinite(map)
+        zi[map_finite] = map[map_finite]
 
     return zi
 

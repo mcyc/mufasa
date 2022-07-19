@@ -20,6 +20,7 @@ from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
 
 
+
 #=======================================================================================================================
 
 class Region(object):
@@ -455,6 +456,7 @@ def get_2comp_wide_guesses(reg):
         aic1v0_mask = reg.ucube_res_cnv.get_AICc_likelihood(1, 0) > 5
 
         if np.sum(aic1v0_mask) >= 1:
+            print("number of good fit to convolved residual: {}".format(np.sum(aic1v0_mask)))
             # if there are at least one well fitted pixel to the residual
             data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
             preguess = data_cnv.copy()
