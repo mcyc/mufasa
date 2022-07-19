@@ -71,46 +71,6 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     data_cnv[data_cnv == 0] = np.nan
     data_cnv = data_cnv[0:npara*ncomp]
 
-    def tautex_renorm(taumap, texmap, tau_thresh = 0.3, tex_thresh = 10.0):
-
-        # attempt to re-normalize the tau & text values at the optically thin regime (where the two are degenerate)
-        isthin = np.logical_and(taumap < tau_thresh, np.isfinite(taumap))
-        texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
-        taumap[isthin] = tau_thresh
-
-        # optically thin gas are also unlikely to have high spatial density and thus high Tex
-        tex_thin = 3.5      # note: at Tk = 30K, n = 1e3, N = 1e13, & sig = 0.2 km.s --> Tex = 3.49 K, tau = 0.8
-        hightex = np.logical_and(texmap > tex_thresh, np.isfinite(texmap))
-        texmap[hightex] = tex_thin
-        taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
-
-        # note, tau values that are too low will be taken care of by refine_each_comp()
-        return taumap, texmap
-
-
-    def refine_each_comp(guess_comp, mask=None):
-        # refine guesses for each component, with values outside ranges specified below removed
-
-        Tex_min = 3.0
-        Tex_max = 8.0
-        Tau_min = 0.2
-        Tau_max = 8.0
-
-        disksize = 1.0
-
-        if mask is None:
-            mask = master_mask(guess_comp)
-
-        guess_comp[0] = refine_guess(guess_comp[0], min=None, max=None, mask=mask, disksize=disksize)
-        guess_comp[1] = refine_guess(guess_comp[1], min=None, max=None, mask=mask, disksize=disksize)
-
-        # re-normalize the degenerated tau & text for the purpose of estimate guesses
-        guess_comp[3], guess_comp[2] = tautex_renorm(guess_comp[3], guess_comp[2], tau_thresh = 0.1)
-
-        # place a more "strict" limits for Tex and Tau guessing than the fitting itself
-        guess_comp[2] = refine_guess(guess_comp[2], min=Tex_min, max=Tex_max, mask=mask, disksize=disksize)
-        guess_comp[3] = refine_guess(guess_comp[3], min=Tau_min, max=Tau_max, mask=mask, disksize=disksize)
-        return guess_comp
 
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask)
@@ -132,6 +92,49 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
         guesses_final.append(regrid(gss, hdr_conv, hdr_final, dmask=newmask))
 
     return np.array(guesses_final)
+
+
+
+def tautex_renorm(taumap, texmap, tau_thresh = 0.3, tex_thresh = 10.0):
+
+    # attempt to re-normalize the tau & text values at the optically thin regime (where the two are degenerate)
+    isthin = np.logical_and(taumap < tau_thresh, np.isfinite(taumap))
+    texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
+    taumap[isthin] = tau_thresh
+
+    # optically thin gas are also unlikely to have high spatial density and thus high Tex
+    tex_thin = 3.5      # note: at Tk = 30K, n = 1e3, N = 1e13, & sig = 0.2 km.s --> Tex = 3.49 K, tau = 0.8
+    hightex = np.logical_and(texmap > tex_thresh, np.isfinite(texmap))
+    texmap[hightex] = tex_thin
+    taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
+
+    # note, tau values that are too low will be taken care of by refine_each_comp()
+    return taumap, texmap
+
+
+def refine_each_comp(guess_comp, mask=None):
+    # refine guesses for each component, with values outside ranges specified below removed
+
+    Tex_min = 3.0
+    Tex_max = 8.0
+    Tau_min = 0.2
+    Tau_max = 8.0
+
+    disksize = 1.0
+
+    if mask is None:
+        mask = master_mask(guess_comp)
+
+    guess_comp[0] = refine_guess(guess_comp[0], min=None, max=None, mask=mask, disksize=disksize)
+    guess_comp[1] = refine_guess(guess_comp[1], min=None, max=None, mask=mask, disksize=disksize)
+
+    # re-normalize the degenerated tau & text for the purpose of estimate guesses
+    guess_comp[3], guess_comp[2] = tautex_renorm(guess_comp[3], guess_comp[2], tau_thresh = 0.1)
+
+    # place a more "strict" limits for Tex and Tau guessing than the fitting itself
+    guess_comp[2] = refine_guess(guess_comp[2], min=Tex_min, max=Tex_max, mask=mask, disksize=disksize)
+    guess_comp[3] = refine_guess(guess_comp[3], min=Tau_min, max=Tau_max, mask=mask, disksize=disksize)
+    return guess_comp
 
 
 
