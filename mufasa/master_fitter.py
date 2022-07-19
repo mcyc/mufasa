@@ -56,7 +56,7 @@ class Region(object):
         get_fits(self, ncomp, update=False)
 
 
-    def master_2comp_fit(self, snr_min=3, **kwargs):
+    def master_2comp_fit(self, snr_min=0.0, **kwargs):
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
     def standard_2comp_fit(self, planemask=None):
@@ -449,7 +449,7 @@ def get_2comp_wide_guesses(reg):
     if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
         # if there were no successful fit to the convolved cube, get moment map from no masking
         return get_mom_guesses(reg)
-    
+
     else:
         # mask over where one component model is better than a no-signal (i.e., noise) model
         aic1v0_mask = reg.ucube_res_cnv.get_AICc_likelihood(1, 0) > 5
