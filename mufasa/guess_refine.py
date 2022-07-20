@@ -9,6 +9,9 @@ from scipy.ndimage.filters import median_filter
 from scipy.interpolate import CloughTocher2DInterpolator as intp
 from scipy.interpolate import griddata
 from FITS_tools.hcongrid import get_pixel_mapping
+from astropy.convolution import Gaussian2DKernel, convolve
+
+from scipy.spatial.qhull import QhullError
 
 #=======================================================================================================================
 
@@ -71,46 +74,6 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     data_cnv[data_cnv == 0] = np.nan
     data_cnv = data_cnv[0:npara*ncomp]
 
-    def tautex_renorm(taumap, texmap, tau_thresh = 0.3, tex_thresh = 10.0):
-
-        # attempt to re-normalize the tau & text values at the optically thin regime (where the two are degenerate)
-        isthin = np.logical_and(taumap < tau_thresh, np.isfinite(taumap))
-        texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
-        taumap[isthin] = tau_thresh
-
-        # optically thin gas are also unlikely to have high spatial density and thus high Tex
-        tex_thin = 3.5      # note: at Tk = 30K, n = 1e3, N = 1e13, & sig = 0.2 km.s --> Tex = 3.49 K, tau = 0.8
-        hightex = np.logical_and(texmap > tex_thresh, np.isfinite(texmap))
-        texmap[hightex] = tex_thin
-        taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
-
-        # note, tau values that are too low will be taken care of by refine_each_comp()
-        return taumap, texmap
-
-
-    def refine_each_comp(guess_comp, mask=None):
-        # refine guesses for each component, with values outside ranges specified below removed
-
-        Tex_min = 3.0
-        Tex_max = 8.0
-        Tau_min = 0.2
-        Tau_max = 8.0
-
-        disksize = 1.0
-
-        if mask is None:
-            mask = master_mask(guess_comp)
-
-        guess_comp[0] = refine_guess(guess_comp[0], min=None, max=None, mask=mask, disksize=disksize)
-        guess_comp[1] = refine_guess(guess_comp[1], min=None, max=None, mask=mask, disksize=disksize)
-
-        # re-normalize the degenerated tau & text for the purpose of estimate guesses
-        guess_comp[3], guess_comp[2] = tautex_renorm(guess_comp[3], guess_comp[2], tau_thresh = 0.1)
-
-        # place a more "strict" limits for Tex and Tau guessing than the fitting itself
-        guess_comp[2] = refine_guess(guess_comp[2], min=Tex_min, max=Tex_max, mask=mask, disksize=disksize)
-        guess_comp[3] = refine_guess(guess_comp[3], min=Tau_min, max=Tau_max, mask=mask, disksize=disksize)
-        return guess_comp
 
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask)
@@ -118,20 +81,76 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     # regrid the guess back to that of the original data
     hdr_final = get_celestial_hdr(header_target)
 
+    kernel = Gaussian2DKernel(1)
+
     guesses_final = []
 
     # regrid the guesses
     for gss in data_cnv:
-
         newmask = np.isfinite(gss)
         # removal holes with areas that smaller than a 5 by 5 square
         newmask = remove_small_holes(newmask, 25)
         # create a mask to regrid over
         newmask = regrid(newmask, hdr_conv, hdr_final, dmask=None, method='nearest')
         newmask = newmask.astype('bool')
-        guesses_final.append(regrid(gss, hdr_conv, hdr_final, dmask=newmask))
+
+        new_guess = regrid(gss, hdr_conv, hdr_final, dmask=newmask)
+
+        # expand the interpolation a bit, since regridding can often miss some pixels due to aliasing
+        newmask_l = dilation(newmask)
+        newmask_l = dilation(newmask_l)
+        new_guess_cnv = convolve(new_guess, kernel, boundary='extend')
+
+        new_guess_cnv[~newmask_l] = np.nan
+        # retrain the originally interpolataed values within the original mask
+        mask_finite = np.isfinite(new_guess)
+        new_guess_cnv[mask_finite] = new_guess[mask_finite]
+        guesses_final.append(new_guess_cnv)
 
     return np.array(guesses_final)
+
+
+
+def tautex_renorm(taumap, texmap, tau_thresh = 0.3, tex_thresh = 10.0):
+
+    # attempt to re-normalize the tau & text values at the optically thin regime (where the two are degenerate)
+    isthin = np.logical_and(taumap < tau_thresh, np.isfinite(taumap))
+    texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
+    taumap[isthin] = tau_thresh
+
+    # optically thin gas are also unlikely to have high spatial density and thus high Tex
+    tex_thin = 3.5      # note: at Tk = 30K, n = 1e3, N = 1e13, & sig = 0.2 km.s --> Tex = 3.49 K, tau = 0.8
+    hightex = np.logical_and(texmap > tex_thresh, np.isfinite(texmap))
+    texmap[hightex] = tex_thin
+    taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
+
+    # note, tau values that are too low will be taken care of by refine_each_comp()
+    return taumap, texmap
+
+
+def refine_each_comp(guess_comp, mask=None):
+    # refine guesses for each component, with values outside ranges specified below removed
+
+    Tex_min = 3.0
+    Tex_max = 8.0
+    Tau_min = 0.2
+    Tau_max = 8.0
+
+    disksize = 1.0
+
+    if mask is None:
+        mask = master_mask(guess_comp)
+
+    guess_comp[0] = refine_guess(guess_comp[0], min=None, max=None, mask=mask, disksize=disksize)
+    guess_comp[1] = refine_guess(guess_comp[1], min=None, max=None, mask=mask, disksize=disksize)
+
+    # re-normalize the degenerated tau & text for the purpose of estimate guesses
+    guess_comp[3], guess_comp[2] = tautex_renorm(guess_comp[3], guess_comp[2], tau_thresh = 0.1)
+
+    # place a more "strict" limits for Tex and Tau guessing than the fitting itself
+    guess_comp[2] = refine_guess(guess_comp[2], min=Tex_min, max=Tex_max, mask=mask, disksize=disksize)
+    guess_comp[3] = refine_guess(guess_comp[3], min=Tau_min, max=Tau_max, mask=mask, disksize=disksize)
+    return guess_comp
 
 
 
@@ -214,15 +233,30 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
         mask = np.isfinite(map)
         mask = mask_cleaning(mask)
 
-    # interpolate over the dmask footprint
-    xline = np.arange(map.shape[1])
-    yline = np.arange(map.shape[0])
-    X,Y = np.meshgrid(xline, yline)
-    itpmask = np.isfinite(map)
-    C = intp((X[itpmask],Y[itpmask]), map[itpmask])
+    def interpolate(map, mask):
+        # interpolate over the dmask footprint
+        xline = np.arange(map.shape[1])
+        yline = np.arange(map.shape[0])
+        X,Y = np.meshgrid(xline, yline)
+        itpmask = np.isfinite(map)
+        C = intp((X[itpmask],Y[itpmask]), map[itpmask])
 
-    # interpolate over the dmask footprint
-    zi = C(X*mask,Y*mask)
+        # interpolate over the dmask footprint
+        zi = C(X*mask,Y*mask)
+        return zi
+
+    try:
+        # interpolate the mask
+        zi = interpolate(map, mask)
+    except QhullError as e:
+        print("[WARNING]: qhull input error found; astropy convolve will be used instead")
+        #print(e)
+        # use astropy convolve as a proxi for interpolation
+        kernel = Gaussian2DKernel(3)
+        zi = convolve(map, kernel, boundary='extend')
+        # retrain the original median_filtered map over its original positions
+        map_finite = np.isfinite(map)
+        zi[map_finite] = map[map_finite]
 
     return zi
 

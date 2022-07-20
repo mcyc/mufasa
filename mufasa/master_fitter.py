@@ -10,12 +10,15 @@ from astropy import units as u
 from skimage.morphology import dilation
 import astropy.io.fits as fits
 import gc
-from scipy.ndimage.filters import median_filter
+#from scipy.ndimage.filters import median_filter
+from scipy.signal import medfilt2d
+from skimage.morphology import dilation, square
 
 from . import UltraCube as UCube
 from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
+
 
 
 #=======================================================================================================================
@@ -54,7 +57,7 @@ class Region(object):
         get_fits(self, ncomp, update=False)
 
 
-    def master_2comp_fit(self, snr_min=3, **kwargs):
+    def master_2comp_fit(self, snr_min=0.0, **kwargs):
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
     def standard_2comp_fit(self, planemask=None):
@@ -106,12 +109,17 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-comonent fits
 
 
-def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCnvFits=True):
+def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True):
     # note, planemask superseeds snr-based maask
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask)
+
+    if refit_bad_pix:
+        refit_bad_2comp(reg.ucube, snr_min=snr_min, lnk_thresh=-20)
+
     if recover_wide:
-        refit_2comp_wide(reg, snr_min=snr_min) #, planemask=planemask
+        refit_2comp_wide(reg, snr_min=snr_min)
     save_best_2comp_fit(reg)
+
     return reg
 
 
@@ -132,10 +140,37 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
 
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header)
         # update is set to True to save the fits
-        kwargs = {'update':True, 'guesses':guesses}
+        kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min}
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
+
+
+def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
+    # refit pixels where 2 component fits are substentially worse than good one components
+    # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
+
+    print("begin re-fitting bad 2-comp pixels")
+
+    lnk21 = ucube.get_AICc_likelihood(2, 1)
+    lnk10 = ucube.get_AICc_likelihood(1, 0)
+
+    # where the fits are poor
+    mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
+    mask = np.logical_and(mask, np.isfinite(lnk10))
+
+    mask_size = np.sum(mask)
+    print("refit mask size for bad_2comp: {}".format(mask_size))
+
+    guesses = ucube.pcubes['2'].parcube.copy()
+
+    for i, gmap in enumerate(guesses):
+        guesses[i] = medfilt2d(gmap, kernel_size=3)
+
+    gc.collect()
+    # re-fit and save the updated model
+    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21)
+
 
 
 def refit_swap_2comp(reg, snr_min=3):
@@ -176,13 +211,14 @@ def refit_swap_2comp(reg, snr_min=3):
     # replace the values
     replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
-    # save the final fit model
-    #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
-    #save_fit(pcube, savename, ncomp)
+    # re-fit and save the updated model
+    save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
 
 
 def refit_2comp_wide(reg, snr_min=3):
+
+    print("begin wide component recovery")
 
     ncomp = [1, 2]
 
@@ -215,39 +251,56 @@ def refit_2comp_wide(reg, snr_min=3):
     mask = np.logical_and(mask, lnk10 > 5)
 
     mask_size = np.sum(mask)
-    print("refit mask size: {}".format(mask_size))
-    if mask_size > 1:
-        ucube_new = UCube.UltraCube(reg.ucube.cubefile)
-        ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=final_guess)
+    print("wide recovery refit mask size: {}".format(mask_size))
+
+    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21)
+
+
+
+
+def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21):
+    # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+    if np.sum(mask) >= 1:
+        ucube_new = UCube.UltraCube(ucube.cubefile)
+        ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
 
         # do a model comparison between the new two component fit verses the original one
-        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=reg.ucube)
+        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
 
         # mask over where one comp fit is more robust
         good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
+        good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
 
         # replace the values
-        replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+        replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
-        # save the final fit model
-        #UCube.save_fit(pcube_final_2, reg.ucube.paraPaths['2'], ncomp=2)
-        #save_fit(pcube, savename, ncomp)
+        # save the updated results
+        save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         print("not enough pixels to refit, no-refit is done")
 
 
 
-def standard_2comp_fit(reg, planemask=None):
+def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
     ncomp = [1,2]
 
     # only use the moment maps for the fits
     for nc in ncomp:
         # update is set to True to save the fits
-        kwargs = {'update':True}
+        kwargs = {'update':True, 'snr_min':snr_min}
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
+
+
+def save_updated_paramaps(ucube, ncomps):
+    # save the updated parameter cubes
+    for nc in ncomps:
+        if not str(nc) in ucube.paraPaths:
+            print("[ERROR]: the ucube does not have paraPath for '{}' components".format(nc))
+        else:
+            ucube.save_fit(ucube.paraPaths[str(nc)], nc)
 
 
 
@@ -277,7 +330,7 @@ def save_best_2comp_fit(reg):
     # make the 2-comp para maps with the best fit model
     lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
-    print("2comp pix: {}".format(np.sum(mask)))
+    print("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
     pcube_final.parcube[:4, ~mask] = reg_final.ucube.pcubes['1'].parcube[:4, ~mask].copy()
     pcube_final.errcube[:4, ~mask] = reg_final.ucube.pcubes['1'].errcube[:4, ~mask].copy()
     pcube_final.parcube[4:8, ~mask] = np.nan
@@ -380,34 +433,44 @@ def get_2comp_wide_guesses(reg):
         # fit the residual with the one component model if this has not already been done.
         fit_best_2comp_residual_cnv(reg)
 
-    if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
-        # if there were no successful fit to the convolved cube
-
-        # get moment map from no masking
+    def get_mom_guesses(reg):
+        # get moment guesses from no masking
         cube_res = get_best_2comp_residual_SpectralCube(reg, masked=False, window_hwidth=3.5)
 
         # find moment around where one component has been fitted
         pcube1 = reg.ucube.pcubes['1']
-        vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        #vmap = median_filter(pcube1.parcube[0], size=3)
+        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
         moms_res = mmg.vmask_moments(cube_res, vmap=vmap, window_hwidth=3.5)
 
         ncomp = 1
         gg = mmg.moment_guesses(moms_res[1], moms_res[2], ncomp, moment0=moms_res[0])
         return gg
 
+    if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
+        # if there were no successful fit to the convolved cube, get moment map from no masking
+        return get_mom_guesses(reg)
+
     else:
         # mask over where one component model is better than a no-signal (i.e., noise) model
         aic1v0_mask = reg.ucube_res_cnv.get_AICc_likelihood(1, 0) > 5
 
-        data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
-        preguess = data_cnv.copy()
+        if np.sum(aic1v0_mask) >= 1:
+            print("number of good fit to convolved residual: {}".format(np.sum(aic1v0_mask)))
+            # if there are at least one well fitted pixel to the residual
+            data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
+            preguess = data_cnv.copy()
 
-        # set pixels that are better modelled as noise to nan
-        preguess[:, ~aic1v0_mask] = np.nan
+            # set pixels that are better modelled as noise to nan
+            preguess[:, ~aic1v0_mask] = np.nan
 
-        # use the dialated mask as a footprint to interpolate the guesses
-        guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
-                                                  mask=dilation(aic1v0_mask))
+            # use the dialated mask as a footprint to interpolate the guesses
+            gmask = dilation(aic1v0_mask)
+            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
+                                                      mask=gmask)
+        else:
+            # get moment guesses without masking instead
+            guesses_final = get_mom_guesses(reg)
 
         return guesses_final
 
@@ -428,7 +491,8 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     if not hasattr(reg, 'ucube_cnv'):
         # if convolved cube was not used to produce initial guesses, use the full resolution 1-comp fit as the reference
         pcube1 = reg.ucube.pcubes['1']
-        vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        #vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
+        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
         vmap = cnvtool.regrid(vmap, header1=get_skyheader(pcube1.header), header2=get_skyheader(cube_res_cnv.header))
     else:
         vmap = reg.ucube_cnv.pcubes['1'].parcube[0]
