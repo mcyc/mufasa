@@ -81,18 +81,31 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     # regrid the guess back to that of the original data
     hdr_final = get_celestial_hdr(header_target)
 
+    kernel = Gaussian2DKernel(1)
+
     guesses_final = []
 
     # regrid the guesses
     for gss in data_cnv:
-
         newmask = np.isfinite(gss)
         # removal holes with areas that smaller than a 5 by 5 square
         newmask = remove_small_holes(newmask, 25)
         # create a mask to regrid over
         newmask = regrid(newmask, hdr_conv, hdr_final, dmask=None, method='nearest')
         newmask = newmask.astype('bool')
-        guesses_final.append(regrid(gss, hdr_conv, hdr_final, dmask=newmask))
+
+        new_guess = regrid(gss, hdr_conv, hdr_final, dmask=newmask)
+
+        # expand the interpolation a bit, since regridding can often miss some pixels due to aliasing
+        newmask_l = dilation(newmask)
+        newmask_l = dilation(newmask_l)
+        new_guess_cnv = convolve(new_guess, kernel, boundary='extend')
+
+        new_guess_cnv[~newmask_l] = np.nan
+        # retrain the originally interpolataed values within the original mask
+        mask_finite = np.isfinite(new_guess)
+        new_guess_cnv[mask_finite] = new_guess[mask_finite]
+        guesses_final.append(new_guess_cnv)
 
     return np.array(guesses_final)
 
