@@ -161,7 +161,7 @@ def refine_each_comp(guess_comp, mask=None):
 
 
 
-def simple_para_clean(pmaps, ncomp, npara=4, std_thres = 3, percent_thres=97.25, method = "robust"):
+def simple_para_clean(pmaps, ncomp, npara=4, std_thres = 3, percent_thres=97.25, method = "quick"):
     # clean parameter maps based on their error values
 
     pmaps=pmaps.copy()
@@ -185,7 +185,7 @@ def simple_para_clean(pmaps, ncomp, npara=4, std_thres = 3, percent_thres=97.25,
             pmaps[i*npara:(i+1)*npara, mask] = np.nan
             pmaps[(i+ncomp)*npara:(i+ncomp+1)*npara, mask] = np.nan
 
-    elif method == "robust":
+    elif method == "local":
         #print("robust!")
         def nan_percentile(a):
             return np.nanpercentile(a, percent_thres)
@@ -222,8 +222,8 @@ def master_mask(pcube):
 
 def mask_cleaning(mask):
     # designed to clean a noisy map, with a footprint that is likely slightly larger
-    #mask = remove_small_objects(mask, min_size=9)
-    #mask = dilation(mask, disk(1))
+    mask = remove_small_objects(mask, min_size=9)
+    mask = dilation(mask, disk(1))
     #mask = remove_small_holes(mask, 9)
     mask = remove_small_holes(mask, 25**2)
     return mask
@@ -254,13 +254,13 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     if max is not None:
         map[map>max] = np.nan
 
-    #map = median_filter(map, footprint=disk(disksize))
-    s = int(1+disksize*2)
-    map = medfilt2d(map, kernel_size=s)
+    map = median_filter(map, footprint=disk(disksize))
+    #s = int(1+disksize*2)
+    #map = medfilt2d(map, kernel_size=s)
 
     # median filter can create larger holes or erode the finite pixels when nan values are present,
     # fill in the eroded gaps with astropy interpolation with convolve
-    if False:
+    if True:
         mask_finite = np.isfinite(map)
         kernel = Gaussian2DKernel(3)
         map_cnv = convolve(map, kernel, boundary='extend')
