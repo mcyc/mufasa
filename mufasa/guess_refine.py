@@ -10,6 +10,9 @@ from scipy.interpolate import CloughTocher2DInterpolator as intp
 from scipy.interpolate import griddata
 from FITS_tools.hcongrid import get_pixel_mapping
 from astropy.convolution import Gaussian2DKernel, convolve
+from scipy.signal import medfilt2d
+
+from scipy.ndimage.filters import generic_filter
 
 from scipy.spatial.qhull import QhullError
 
@@ -70,13 +73,16 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     data_cnv = data_cnv.copy()
     # clean up the maps based on vlsr errors
     data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara)
+
+
     hdr_conv = get_celestial_hdr(header_cnv)
     data_cnv[data_cnv == 0] = np.nan
     data_cnv = data_cnv[0:npara*ncomp]
 
-
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask)
+
+    #return data_cnv
 
     # regrid the guess back to that of the original data
     hdr_final = get_celestial_hdr(header_target)
@@ -155,27 +161,46 @@ def refine_each_comp(guess_comp, mask=None):
 
 
 
-def simple_para_clean(pmaps, ncomp, npara=4):
+def simple_para_clean(pmaps, ncomp, npara=4, std_thres = 3, percent_thres=97.25, method = "robust"):
     # clean parameter maps based on their error values
 
     pmaps=pmaps.copy()
 
     # remove component with vlsrErr that is number of sigma off from the median as specified below
-    std_thres = 2
 
     pmaps[pmaps == 0] = np.nan
 
-    # loop through each component
-    for i in range (0, ncomp):
-        # get the STD and Medians of the vlsr errors
-        std_vErr = mad_std(pmaps[(i+ncomp)*npara][np.isfinite(pmaps[(i+ncomp)*npara])])
-        median_vErr = np.median(pmaps[(i+ncomp)*npara][np.isfinite(pmaps[(i+ncomp)*npara])])
 
-        # remove outlier pixels
-        mask = pmaps[(i+ncomp)*npara] > median_vErr + std_vErr*std_thres
+    if method == "quick":
+        # loop through each component
+        #print("quick!")
+        for i in range (0, ncomp):
+            # get the STD and Medians of the vlsr errors
+            std_vErr = mad_std(pmaps[(i+ncomp)*npara][np.isfinite(pmaps[(i+ncomp)*npara])])
+            median_vErr = np.median(pmaps[(i+ncomp)*npara][np.isfinite(pmaps[(i+ncomp)*npara])])
 
-        pmaps[i*npara:(i+1)*npara, mask] = np.nan
-        pmaps[(i+ncomp)*npara:(i+ncomp+1)*npara, mask] = np.nan
+            # remove outlier pixels
+            mask = pmaps[(i+ncomp)*npara] > median_vErr + std_vErr*std_thres
+
+            pmaps[i*npara:(i+1)*npara, mask] = np.nan
+            pmaps[(i+ncomp)*npara:(i+ncomp+1)*npara, mask] = np.nan
+
+    elif method == "robust":
+        #print("robust!")
+        def nan_percentile(a):
+            return np.nanpercentile(a, percent_thres)
+
+        for i in range (0, ncomp):
+            # get percentile of the vlsr errors for each component
+            idx = (i+ncomp)*npara
+            pctl_err = generic_filter(pmaps[idx] ,nan_percentile, size=5)
+            # mask out where the error is larger than the percentile value
+            mask = pmaps[idx] > pctl_err
+
+            pmaps[i*npara:(i+1)*npara, mask] = np.nan
+            pmaps[(i+ncomp)*npara:(i+ncomp+1)*npara, mask] = np.nan
+    else:
+        print("[ERROR]: {} is not a valid key; no clean is preformed".format(method))
 
     return pmaps
 
@@ -197,9 +222,10 @@ def master_mask(pcube):
 
 def mask_cleaning(mask):
     # designed to clean a noisy map, with a footprint that is likely slightly larger
-    mask = remove_small_objects(mask, min_size=9)
-    mask = dilation(mask, disk(1))
-    mask = remove_small_holes(mask, 9)
+    #mask = remove_small_objects(mask, min_size=9)
+    #mask = dilation(mask, disk(1))
+    #mask = remove_small_holes(mask, 9)
+    mask = remove_small_holes(mask, 25**2)
     return mask
 
 
@@ -228,7 +254,17 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     if max is not None:
         map[map>max] = np.nan
 
-    map = median_filter(map, footprint=disk(disksize))
+    #map = median_filter(map, footprint=disk(disksize))
+    s = int(1+disksize*2)
+    map = medfilt2d(map, kernel_size=s)
+
+    # median filter can create larger holes or erode the finite pixels when nan values are present,
+    # fill in the eroded gaps with astropy interpolation with convolve
+    if False:
+        mask_finite = np.isfinite(map)
+        kernel = Gaussian2DKernel(3)
+        map_cnv = convolve(map, kernel, boundary='extend')
+        map[~mask_finite] = map_cnv[~mask_finite]
 
     if mask is None:
         mask = np.isfinite(map)
