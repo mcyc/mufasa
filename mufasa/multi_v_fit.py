@@ -601,16 +601,36 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         guesses = gg
 
     else:
-        # fill in the blanks with moment guesses
-        guesses[guesses==0] = np.nan
+        # fill in the blanks with convolved interpolation then moment guesses
+        guesses[guesses == 0] = np.nan
         gmask = np.isfinite(guesses)
+        # gmask = binary_erosion(gmask)
+
+        mom_mask = np.isfinite(gg)
+
+        # get interpolated results
+        kernel = Gaussian2DKernel(5)  # large kernel size because regions outside the guesses are likely noisy
+        guesses_smooth = guesses.copy()
+        for i, gsm in enumerate(guesses_smooth):
+            guesses_smooth[i] = convolve(guesses[i], kernel, boundary='extend')
+
+        guesses[~gmask] = guesses_smooth[~gmask]
+        guesses[~mom_mask] = np.nan
+        gmask = np.isfinite(guesses)
+
+        # fill in the rest of the guesses with moment guesses
         guesses[~gmask] = gg[~gmask]
 
-        # fill in the failed sigma guesses with moment guesses
+        # fill in the failed sigma guesses with interpotaed guesseses
         gmask = guesses[1::4] < sigmin
-        guesses[1::4][gmask] = gg[1::4][gmask]
+        guesses[1::4][gmask] = guesses_smooth[1::4][gmask]
+
+        # then  moment guesses
+        # gmask = guesses[1::4] < sigmin
+        # guesses[1::4][gmask] = gg[1::4][gmask]
 
         print("user provided guesses accepted")
+
 
     # The guesses should be fine in the first case, but just in case, make sure the guesses are confined within the
     # appropriate limits
