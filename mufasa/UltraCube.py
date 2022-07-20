@@ -37,10 +37,11 @@ class UltraCube(object):
         self.Tpeak_maps = {}
         self.chisq_maps = {}
         self.rchisq_maps = {}
+        self.rss_maps = {}
         self.NSamp_maps = {}
         self.AICc_maps = {}
         self.master_model_mask = None
-        self.snr_min = None
+        self.snr_min = 0.0
         self.cnv_factor = cnv_factor
         self.n_cores = multiprocessing.cpu_count()
 
@@ -148,6 +149,14 @@ class UltraCube(object):
         self.rms_maps[compID] = get_rms(self.residual_cubes[compID])
         return self.rms_maps[compID]
 
+    def get_rss(self, ncomp, mask=None):
+        # residual sum of squares
+        if mask is None:
+            mask = self.master_model_mask
+        # note: a mechanism is needed to make sure NSamp is consistient across the models
+        self.rss_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
+            calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True)
+
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -176,12 +185,12 @@ class UltraCube(object):
 
         compID = str(ncomp)
         if not compID in self.chisq_maps:
-            self.get_chisq(ncomp, **kwargs)
+            self.get_rss(ncomp, **kwargs)
 
         # note that zero component is assumed to have no free-parameter (i.e., no fitting)
         p = ncomp*4
 
-        AICc_map = get_aic(chisq=self.chisq_maps[compID], p=p, N=self.NSamp_maps[compID])
+        AICc_map = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
 
         if update:
             self.AICc_maps[compID] = AICc_map
@@ -282,6 +291,25 @@ def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
 #======================================================================================================================#
 # UltraCube based methods
 
+
+def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True):
+    # calculate residual sum of squares
+
+    if isinstance(compID, int):
+        compID = str(compID)
+
+    cube = ucube.cube
+
+    if compID == '0':
+        # the zero component model is just a y = 0 baseline
+        modcube = np.zeros(cube.shape)
+    else:
+        modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
+
+    gc.collect()
+    return get_rss(cube, modcube, expand=20, usemask=usemask, mask=mask, return_size=return_size)
+
+
 def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
 
     if isinstance(compID, int):
@@ -330,12 +358,55 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
 #======================================================================================================================#
 # statistics tools
 
+'''
 def get_aic(chisq, p, N=None):
     # calculate AIC or AICc values
     if N is None:
         return aic.AIC(chisq, p)
     else:
         return aic.AICc(chisq, p, N)
+'''
+
+
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True):
+    '''
+    Calculate residual sum of squares (RSS)
+
+    cube : SpectralCube
+
+    model: numpy array
+
+    expand : int
+        Expands the region where the residual is evaluated by this many channels in the spectral dimension
+
+    reduced : boolean
+        Whether or not to return the reduced chi-squared value or not
+
+    mask: boolean array
+        A mask stating which array elements the chi-squared values are calculated from
+    '''
+
+    if usemask:
+        if mask is None:
+            mask = model > 0
+    else:
+        mask = ~np.isnan(model)
+
+    residual = get_residual(cube, model)
+
+    # creating mask over region where the model is non-zero,
+    # plus a buffer of size set by the expand keyword.
+    mask = expand_mask(mask, expand)
+    mask = mask.astype(np.float)
+
+    # note: using nan-sum may walk over some potential bad pixel cases
+    rss = np.nansum((residual * mask)**2, axis=0)
+
+    if return_size:
+        return rss, np.nansum(mask, axis=0)
+    else:
+        return rss
+
 
 
 def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None):
@@ -358,10 +429,6 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         A mask stating which array elements the chi-squared values are calculated from
     '''
 
-    #model = np.zeros(cube.shape)
-
-    #cube = cube.with_spectral_unit(u.Hz, rest_value = freq_dict['oneone']*u.Hz)
-
     if usemask:
         if mask is None:
             mask = model > 0
@@ -376,13 +443,14 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     mask = mask.astype(np.float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
-    chisq = np.nansum((residual * mask)**2, axis=0)
+    chisq = np.nansum((residual * mask) ** 2, axis=0)
 
     if reduced:
+        # assuming n_size >> n_parameters
         chisq /= np.nansum(mask, axis=0)
 
     rms = get_rms(residual)
-    chisq /= rms**2
+    chisq /= rms ** 2
 
     gc.collect()
 
@@ -392,6 +460,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     else:
         # return the ch-squared values and the number of data points used
         return chisq, np.nansum(mask, axis=0)
+
 
 
 def get_masked_moment(cube, model, order=0, expand=10, mask=None):
@@ -470,9 +539,9 @@ def expand_mask(mask, expand):
 def get_rms(residual):
     # get robust estimate of the rms from the fit residual
     diff = residual - np.roll(residual, 2, axis=0)
-    print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
+    #print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
-    print("finite rms map size: {}".format(np.sum(np.isfinite(rms))))
+    #print("finite rms map size: {}".format(np.sum(np.isfinite(rms))))
     gc.collect()
     return rms
 
