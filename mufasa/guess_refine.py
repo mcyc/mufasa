@@ -89,7 +89,8 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     for gss in data_cnv:
         newmask = np.isfinite(gss)
         # removal holes with areas that smaller than a 5 by 5 square
-        newmask = remove_small_holes(newmask, 25)
+        #newmask = remove_small_holes(newmask, 25)
+        newmask = remove_small_holes(newmask, 64)
         # create a mask to regrid over
         newmask = regrid(newmask, hdr_conv, hdr_final, dmask=None, method='nearest')
         newmask = newmask.astype('bool')

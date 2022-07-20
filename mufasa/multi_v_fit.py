@@ -486,7 +486,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     # the snr map will inetiabley be noisy, so a little smoothing
     kernel = Gaussian2DKernel(1)
-    peaksnr = convolve(peaksnr, kernel)
+    peaksnr = convolve(peaksnr, kernel, boundary='extend')
 
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
 
@@ -529,6 +529,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
     if guesses is not None:
+        guesses = guesses.copy()
         v_guess = guesses[::4]
         v_guess[v_guess == 0] = np.nan
     else:
@@ -601,14 +602,33 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         guesses = gg
 
     else:
-        # fill in the blanks with moment guesses
+        # fill in the blanks with convolved interpolation then moment guesses
         guesses[guesses==0] = np.nan
         gmask = np.isfinite(guesses)
+        #gmask = binary_erosion(gmask)
+
+        mom_mask = np.isfinite(gg)
+
+        #get interpolated results
+        kernel = Gaussian2DKernel(5) #  large kernel size because regions outside the guesses are likely noisy
+        guesses_smooth = guesses.copy()
+        for i, gsm in enumerate(guesses_smooth):
+            guesses_smooth[i] = convolve(guesses[i], kernel, boundary='extend')
+
+        guesses[~gmask] = guesses_smooth[~gmask]
+        guesses[~mom_mask] = np.nan
+        gmask = np.isfinite(guesses)
+
+        # fill in the rest of the guesses with moment guesses
         guesses[~gmask] = gg[~gmask]
 
-        # fill in the failed sigma guesses with moment guesses
+        # fill in the failed sigma guesses with interpotaed guesseses
         gmask = guesses[1::4] < sigmin
-        guesses[1::4][gmask] = gg[1::4][gmask]
+        guesses[1::4][gmask] = guesses_smooth[1::4][gmask]
+
+        # then  moment guesses
+        #gmask = guesses[1::4] < sigmin
+        #guesses[1::4][gmask] = gg[1::4][gmask]
 
         print("user provided guesses accepted")
 
@@ -661,7 +681,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     # use SNR masking if not provided
     if not 'maskmap' in kwargs:
-        print("mask mask!")
+        print("using automatically generated mask")
         kwargs['maskmap'] = planemask * footprint_mask
 
     if np.sum(kwargs['maskmap']) < 1:
@@ -677,6 +697,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         if multicore < 1:
             multicore = 1
+
+    #return guesses
 
     pcube.fiteach (fittype='nh3_multi_v', guesses=guesses,
                   start_from_point=(xmax,ymax),
