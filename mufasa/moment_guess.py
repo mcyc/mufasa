@@ -9,6 +9,8 @@ import pyspeckit
 from pyspeckit.spectrum.models.ammonia_constants import freq_dict, voff_lines_dict
 from astropy.stats import mad_std
 
+from .utils import map_divide
+
 #=======================================================================================================================
 
 # define max and min values of tex and tau to use for the test
@@ -286,3 +288,30 @@ def get_rms_prefit(spectrum, window_hwidth, v_atpeak):
     d_rms = s.data.copy()
 
     return mad_std(d_rms[mask])
+
+
+def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights=None, signal_mask=None):
+    # split the cube up into different regions and make mosaic moment maps from moments of each individual regions
+
+    labels, n_labs = map_divide.dist_divide(seeds, weights=weights, return_nmarkers=True)
+
+    m0 = np.zeros(labels.shape)
+    m0[:] = np.nan
+    m1 = m0.copy()
+    m2 = m0.copy()
+
+    moments = [m0, m1, m2]
+
+    # make moment map for each region
+    for i in range(n_labs):
+        mask = labels == i + 1
+
+        new_cube_mask = maskcube.get_mask_array()#maskcube.mask.view()
+        new_cube_mask = new_cube_mask * mask
+
+        moms = window_moments(maskcube.with_mask(new_cube_mask), window_hwidth, signal_mask=signal_mask*mask)
+
+        for m, m_p in zip(moments, moms):
+            m[mask] = m_p[mask]
+
+    return m0, m1, m2
