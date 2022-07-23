@@ -543,20 +543,44 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         signal_mask = default_masking(peaksnr, snr_min=10.0)
         signal_mask *= err_mask
 
-        if signal_mask.sum() < 9:
-            signal_mask = default_masking(peaksnr, snr_min=5.0)
-            signal_mask *= err_mask
 
         print("signal_mask size: {}".format(signal_mask.sum()))
 
-        if signal_mask.sum() > 9:
-            # if the signal mask used to find the peak of the main hyperfines is large enough:
-            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=signal_mask)
-        elif err_mask.sum() > 9:
-            # use err_mask only if err_mask is large enough
-            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=err_mask)
+        from skimage.morphology import binary_dilation
+
+        def asoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
+            # a method to divide the cube into different regions and moments in each region
+            _, n_seeds = ndi.label(seeds)
+            if n_seeds > 10:
+                # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
+                seeds = binary_dilation(seeds, disk(5))
+
+            return momgue.adoptive_moment_maps(maskcube, seeds, window_hwidth=window_hwidth,
+                                              weights=weights, signal_mask=signal_mask)
+
+
+        # find the number of structures in the signal_mask
+        from scipy import ndimage as ndi
+
+        _, n_sig_parts = ndi.label(signal_mask)
+
+        if n_sig_parts > 1:
+            # if there is more than one structure in the signal mask
+            seeds = signal_mask
+            m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                                 weights=peaksnr, signal_mask=signal_mask)
+
         else:
-            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
+            # use err_mask if it has structures
+            _, n_parts = ndi.label(~err_mask)
+            if n_parts > 1:
+                seeds = err_mask
+                m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                                     weights=peaksnr, signal_mask=signal_mask)
+            else:
+                # use the simplest main_hf_moments
+                m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
+
         v_median = np.median(m1[np.isfinite(m1)])
         print("median velocity: {0}".format(v_median))
 
@@ -624,10 +648,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # fill in the failed sigma guesses with interpotaed guesseses
         gmask = guesses[1::4] < sigmin
         guesses[1::4][gmask] = guesses_smooth[1::4][gmask]
-
-        # then  moment guesses
-        # gmask = guesses[1::4] < sigmin
-        # guesses[1::4][gmask] = gg[1::4][gmask]
 
         print("user provided guesses accepted")
 
