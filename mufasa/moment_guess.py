@@ -295,6 +295,9 @@ def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights=None, signal_ma
 
     labels, n_labs = map_divide.dist_divide(seeds, weights=weights, return_nmarkers=True)
 
+    if signal_mask is None:
+        signal_mask = seeds
+
     m0 = np.zeros(labels.shape)
     m0[:] = np.nan
     m1 = m0.copy()
