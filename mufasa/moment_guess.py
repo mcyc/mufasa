@@ -273,52 +273,87 @@ def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_gues
 # additional recipe
 
 def moment_guesses_1c(m0, m1, m2):
-    gg = np.arange(4) * 0.0
+    # make guesses based on the moment maps
+    # note: it does not impose limits on parameters such as tau and tex
 
     # m0 from pyspeckit is actually amplitube proxy, so to calculate
     gs_sig = m2 ** 0.5
     mom0 = m0 * gs_sig * np.sqrt(2 * np.pi)
-    print("mom0 = {}".format(mom0))
+    #print("mom0 = {}".format(mom0))
 
-    if mom0 > 3.0:
-        tau_guess = 2.5
-        tex_guess = get_tex(mom0, tau_guess)
+    mom0_thres = 3.0
+    tau_fx = 2.5
+    tex_fx = 6.0 # K
+
+    # divide the tau tex guess into two regimes by integrated flux
+    # if flux is greater than mom0_thres, assume a fixed tau value and caculate the corrosponding tex assume Gaussian
+    # otherwise, assume a fixed tex value and calculate tau instead
+    if m0.ndim == 2:
+        # for 2D
+        tau_guess = np.zeros(m0.shape)
+        tex_guess = np.zeros(m0.shape)
+        mask = mom0 > mom0_thres
+
+        tau_guess[mask] = tau_fx
+        tex_guess[mask] = get_tex(mom0[mask], tau_fx)
+
+        tau_guess[~mask] = get_tau(mom0[~mask], tex_fx)
+        tex_guess[~mask] = tex_fx
+
+    elif m0.ndim==0 or m0.ndim == 1:
+        # for 1D
+        if mom0 > mom0_thres:
+            tau_guess = tau_fx
+            tex_guess = get_tex(mom0, tau_fx)
+
+        else:
+            tex_guess = tex_fx
+            tau_guess = get_tau(mom0, tex_guess)
 
     else:
-        tex_guess = 6.0
-        tau_guess = get_tau(mom0, tex_guess)
+        print(m0.ndim)
+        print("[ERROR]: the moment 0 input has the wrong dimension")
 
-    gg[0] = m1
-    gg[1] = gs_sig  # v0 width
-    gg[2] = tex_guess  # v0 T_ex
-    gg[3] = tau_guess  # v0 tau
-
-    return gg
+    return np.array([m1, gs_sig, tex_guess, tau_guess])
 
 
-def mom_guess_wide_sep(cube, vpeak=None, rms=None):
+def mom_guess_wide_sep(spec, vpeak=None, rms=None):
     # for two components
 
-    sp2 = cube
     win_hwidth = 4.0
     # the window for the second component recovery (though the 1st win_hwidth should mask out the hyperfines already)
     window_hwidth2 = 10.0
 
-    if rms is None:
-        rms = mad_std(sp2.data, axis=None, ignore_nan=True)
+    if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
+        if rms is None:
+            # we only need a crude estimate
+            rms = mad_std(spec.data, axis=None, ignore_nan=True)
 
-    if vpeak is None:
-        # find the v_peak pased on smoothed spectrum
-        sp_smooth = sp2.copy()
-        sp_smooth.smooth(3)
-        idx = np.argmax(sp_smooth.data)
-        vpeak = sp_smooth.xarr[idx]
-        vpeak = vpeak.value
-        print("vpeak: {}".format(vpeak))
+        if vpeak is None:
+            # find the v_peak pased on smoothed spectrum
+            sp_smooth = spec.copy()
+            sp_smooth.smooth(3)
+            idx = np.argmax(sp_smooth.data)
+            vpeak = sp_smooth.xarr[idx]
+            vpeak = vpeak.value
+            print("vpeak: {}".format(vpeak))
+
+    elif isinstance(spec, SpectralCube):
+        if rms is None:
+            # we only need a crude estimate
+            rms = mad_std(spec.data, axis=0, ignore_nan=True)
+
+        if vpeak is None:
+            # find the v_peak pased on smoothed spectrum
+            sp_smooth = spec.copy()
+            sp_smooth.smooth(3)
+            idx = np.argmax(sp_smooth.data)
+            vpeak = sp_smooth.xarr[idx]
+            vpeak = vpeak.value
+            print("vpeak: {}".format(vpeak))
 
     # get the moments
-    #m0, m1, m2 = window_moments_spc(sp2, window_hwidth=win_hwidth, v_atpeak=vpeak, iter_refine=False)
-    m0, m1, m2 = window_moments(sp2, window_hwidth=win_hwidth, v_atpeak=vpeak)
+    m0, m1, m2 = window_moments(spec, window_hwidth=win_hwidth, v_atpeak=vpeak)
 
     # convert moment 2 to sigma
     sig = m2 ** 0.5
@@ -332,7 +367,7 @@ def mom_guess_wide_sep(cube, vpeak=None, rms=None):
     gg[0:4] = gg1[:]
 
     # mask emission found by moment masks, and try to find a secondary peak
-    sp4 = sp2.copy()
+    sp4 = spec.copy()
 
     # mask out where primary moment1 is
     mask = np.logical_and(sp4.xarr.value > m1 - sig * 2, sp4.xarr.value < m1 + sig * 2)
@@ -342,7 +377,6 @@ def mom_guess_wide_sep(cube, vpeak=None, rms=None):
     sp4.data[~mask2] = 0.0
 
     # find the second peak
-    #m0n, m1n, m2n = window_moments_spc(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak, iter_refine=False)
     m0n, m1n, m2n = window_moments(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak)
 
     if m0n > rms * 2.0:
