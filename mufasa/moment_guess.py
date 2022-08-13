@@ -296,10 +296,10 @@ def moment_guesses_1c(m0, m1, m2):
     return gg
 
 
-def mom_guess_wide_sep(sp, vpeak=None, rms=None):
+def mom_guess_wide_sep(cube, vpeak=None, rms=None):
     # for two components
 
-    sp2 = sp
+    sp2 = cube
     win_hwidth = 4.0
     # the window for the second component recovery (though the 1st win_hwidth should mask out the hyperfines already)
     window_hwidth2 = 10.0
@@ -317,7 +317,8 @@ def mom_guess_wide_sep(sp, vpeak=None, rms=None):
         print("vpeak: {}".format(vpeak))
 
     # get the moments
-    m0, m1, m2 = window_moments_spc(sp2, window_hwidth=win_hwidth, v_atpeak=vpeak, iter_refine=False)
+    #m0, m1, m2 = window_moments_spc(sp2, window_hwidth=win_hwidth, v_atpeak=vpeak, iter_refine=False)
+    m0, m1, m2 = window_moments(sp2, window_hwidth=win_hwidth, v_atpeak=vpeak)
 
     # convert moment 2 to sigma
     sig = m2 ** 0.5
@@ -341,7 +342,8 @@ def mom_guess_wide_sep(sp, vpeak=None, rms=None):
     sp4.data[~mask2] = 0.0
 
     # find the second peak
-    m0n, m1n, m2n = window_moments_spc(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak, iter_refine=False)
+    #m0n, m1n, m2n = window_moments_spc(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak, iter_refine=False)
+    m0n, m1n, m2n = window_moments(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak)
 
     if m0n > rms * 2.0:
         gg2 = moment_guesses_1c(m0n, m1n, m2n)
