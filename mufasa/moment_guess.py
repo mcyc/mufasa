@@ -7,6 +7,7 @@ from spectral_cube import SpectralCube
 
 import pyspeckit
 from pyspeckit.spectrum.models.ammonia_constants import freq_dict, voff_lines_dict
+from pyspeckit.spectrum.models.ammonia_constants import (ckms, h, kb)
 from astropy.stats import mad_std
 
 from .utils import map_divide
@@ -268,6 +269,96 @@ def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_gues
 
     return gg
 
+#=======================================================================================================================
+# additional recipe
+
+def moment_guesses_1c(m0, m1, m2):
+    gg = np.arange(4) * 0.0
+
+    # m0 from pyspeckit is actually amplitube proxy, so to calculate
+    gs_sig = m2 ** 0.5
+    mom0 = m0 * gs_sig * np.sqrt(2 * np.pi)
+    print("mom0 = {}".format(mom0))
+
+    if mom0 > 3.0:
+        tau_guess = 2.5
+        tex_guess = get_tex(mom0, tau_guess)
+
+    else:
+        tex_guess = 6.0
+        tau_guess = get_tau(mom0, tex_guess)
+
+    gg[0] = m1
+    gg[1] = gs_sig  # v0 width
+    gg[2] = tex_guess  # v0 T_ex
+    gg[3] = tau_guess  # v0 tau
+
+    return gg
+
+
+def mom_guess_wide_sep(sp, vpeak=None, rms=None):
+    # for two components
+
+    sp2 = sp
+    win_hwidth = 4.0
+    # the window for the second component recovery (though the 1st win_hwidth should mask out the hyperfines already)
+    window_hwidth2 = 10.0
+
+    if rms is None:
+        rms = mad_std(sp2.data, axis=None, ignore_nan=True)
+
+    if vpeak is None:
+        # find the v_peak pased on smoothed spectrum
+        sp_smooth = sp2.copy()
+        sp_smooth.smooth(3)
+        idx = np.argmax(sp_smooth.data)
+        vpeak = sp_smooth.xarr[idx]
+        vpeak = vpeak.value
+        print("vpeak: {}".format(vpeak))
+
+    # get the moments
+    m0, m1, m2 = window_moments_spc(sp2, window_hwidth=win_hwidth, v_atpeak=vpeak, iter_refine=False)
+
+    # convert moment 2 to sigma
+    sig = m2 ** 0.5
+
+    # make guesses
+    gg = np.arange(8) * 0.0
+
+    # assume the emission is dominated by the brighter component, and use moment maps to
+    # create guesses for the first component
+    gg1 = moment_guesses_1c(m0, m1, m2)
+    gg[0:4] = gg1[:]
+
+    # mask emission found by moment masks, and try to find a secondary peak
+    sp4 = sp2.copy()
+
+    # mask out where primary moment1 is
+    mask = np.logical_and(sp4.xarr.value > m1 - sig * 2, sp4.xarr.value < m1 + sig * 2)
+    # mask out other hyperfines
+    mask2 = np.logical_and(sp4.xarr.value > vpeak - win_hwidth, sp4.xarr.value < vpeak + win_hwidth)
+    sp4.data[mask] = 0.0
+    sp4.data[~mask2] = 0.0
+
+    # find the second peak
+    m0n, m1n, m2n = window_moments_spc(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak, iter_refine=False)
+
+    if m0n > rms * 2.0:
+        gg2 = moment_guesses_1c(m0n, m1n, m2n)
+        gg[4:8] = gg2[:]
+    else:
+        gg[4:8] = gg1[:]
+        gg[0] += sig
+        gg[4] -= sig
+        # set tau of each component to half of what the 1-component moment guess is
+        gg[3] *= 0.5
+        gg[7] *= 0.5
+
+    gg[1] *= 0.5
+    gg[5] *= 0.5
+
+    return gg
+
 
 #=======================================================================================================================
 # utility functions
@@ -318,3 +409,36 @@ def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights=None, signal_ma
             m[mask] = m_p[mask]
 
     return m0, m1, m2
+
+
+#=======================================================================================================================
+# physics functions
+
+
+def get_tex(Ta, tau=0.5, nu=23.722634):
+    # calculate the excitation temperature given tau
+
+    background_tb = 2.7315
+    T0 = (h * nu * 1e9 / kb)
+
+    term1 = Ta / T0 / (1 - np.exp(-tau))
+    term2 = 1.0 / (np.exp(T0 / background_tb) - 1)
+    term3 = 1.0 / (term1 + term2) + 1
+    term4 = T0 / np.log(term3)
+    return term4
+
+
+def get_tau(Ta, tex=6.0, nu=23.722634):
+    background_tb = 2.7315
+    T0 = (h * nu * 1e9 / kb)
+
+    term1 = 1 / (np.exp(T0 / tex) - 1) - 1 / (np.exp(T0 / background_tb) - 1)
+    term2 = -Ta / T0 / term1 + 1
+    return -np.log(term2)
+
+
+def peakT(tex, tau, nu=23.722634):
+    background_tb = 2.7315
+    tauprof = tau
+    T0 = (h * nu * 1e9 / kb)
+    return (T0 / (np.exp(T0 / tex) - 1) - T0 / (np.exp(T0 / background_tb) - 1)) * (1 - np.exp(-tauprof))
