@@ -181,7 +181,7 @@ def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine
     else:
         pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
         pcube_masked.momenteach(unit='km/s')
-        moments = pcube.momentcube
+        moments = pcube_masked.momentcube
 
     if iter_refine:
         # use the moment 1 estimated velocity to define new windows
@@ -429,8 +429,10 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
             # we only need a crude estimate
             rms = mad_std(spec._data, axis=0, ignore_nan=True)
 
-        # get the moments
-        m0, m1, m2 = window_moments(spec, window_hwidth=win_hwidth, v_atpeak=vpeak)
+        pcube = pyspeckit.Cube(cube=spec)
+
+        # get the moments using the pyspeckit method
+        m0, m1, m2 = window_moments(pcube, window_hwidth=win_hwidth, v_atpeak=vpeak)
 
         # assume the emission is dominated by the brighter component, and use moment maps to
         # create guesses for the first component
@@ -456,8 +458,8 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
         # need pyspeckit cube for the recipe to work
         #from pyspeckit.cubes.SpectralCube import Cube
         #pcube = Cube(cube=maskcube)
+
         pcube = pyspeckit.Cube(cube=maskcube)
-        return pcube
 
         #return maskcube
         #m0n, m1n, m2n = window_moments(maskcube, window_hwidth=win_hwidth2, v_atpeak=vpeak)
