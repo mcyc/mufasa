@@ -100,15 +100,19 @@ def vmask_cube(cube, vmap, window_hwidth=3.0):
 
 
 def window_moments(spec, window_hwidth=3.0, v_atpeak=None, signal_mask=None):
-    # wrapper
-    if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
+    # wrapper to find moments for different types of inputs
+
+    if isinstance(spec, pyspeckit.Cube):
+        return window_moments_pyspcube(spec, window_hwidth, v_atpeak)
+
+    elif isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         return window_moments_spc(spec, window_hwidth, v_atpeak)
 
     elif isinstance(spec, SpectralCube):
         return window_window_moments_spcube(spec, window_hwidth, v_atpeak, signal_mask)
 
     else:
-        print("[ERROR] the input is invalid")
+        print("[ERROR] the spec provided is invalid")
         return None
 
 
