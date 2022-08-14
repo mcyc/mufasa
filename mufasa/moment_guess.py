@@ -444,7 +444,6 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
         # maskout emission found by moment masks, and try to find a secondary peak
         spax = spec.spectral_axis.value
         spax_cube = np.broadcast_to(spax[:, np.newaxis, np.newaxis], (len(spax), m1.shape[0], m1.shape[1]))
-
         smask = np.logical_and(spax_cube > m1 - sig * f_sig_mask, spax_cube < m1 + sig * f_sig_mask)
         smask2 = np.logical_and(spax_cube > m1 - win_hwidth, spax_cube < m1 + win_hwidth)
         smask = np.logical_or(smask, ~smask2)
@@ -453,28 +452,20 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
         # fill value needs to be zero for moment estimates to work as expected
         maskcube = maskcube.with_fill_value(0.0)
 
-        #return maskcube
-
-        # need pyspeckit cube for the recipe to work
-        #from pyspeckit.cubes.SpectralCube import Cube
-        #pcube = Cube(cube=maskcube)
-
+        # convert it to pyspeckit to take advantage of pyspeckit's moment methods
         pcube = pyspeckit.Cube(cube=maskcube)
-
-        #return maskcube
-        #m0n, m1n, m2n = window_moments(maskcube, window_hwidth=win_hwidth2, v_atpeak=vpeak)
         pcube.momenteach(verbose=False)
         m0n, m1n, m2n = pcube.momentcube
 
         gg2 = moment_guesses_1c(m0n, m1n, m2n)
 
-        gg = np.concatenate((gg1, gg2), axis=0)
+        #gg = np.concatenate((gg1, gg2), axis=0)
 
-        '''
+
         # use "equal weight guesses" if the remaining spectrum is too faint
         mask = m0n < rms * rms_thres
 
-        gg2[:,mask] == gg1[:,mask].copy()
+        gg2[:,mask] = gg1[:,mask].copy()
         gg = np.concatenate((gg1, gg2), axis=0)
 
         #gg[4:8, mask] = gg1[:, mask]
@@ -484,7 +475,7 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
         gg[3,mask] *= f_tau
         gg[7,mask] *= f_tau
         # set the guessing linewidth to be half of the moment guesses, for both components
-        '''
+
         gg[1,:] *= f_sig
         gg[5,:] *= f_sig
 
