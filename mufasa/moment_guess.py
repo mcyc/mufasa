@@ -153,6 +153,44 @@ def window_moments_spc(spectrum, window_hwidth=3.0, v_atpeak=None, iter_refine=F
     return moments[1], moments[2], moments[3]
 
 
+
+def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine=False):
+    '''
+    find moments within a given window (e.g., around the main hyperfine lines)
+    # note: iter_refine has not proven to be very effective in our tests
+
+    :param pcube:
+        <pyspeckit.cubes.SpectralCube.Cube>
+        the cube to take the moments of
+
+    :param window_hwidth: float
+        half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
+
+    '''
+
+    # note: the current implementation may be memory intensitive
+    if v_atpeak is None:
+        # note pcube.momenteach seem to be pretty good at ignoring hyperfine structures
+        pcube.momenteach(unit='km/s')
+        moments = pcube.momentcube
+
+    else:
+        pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
+        pcube_masked.momenteach(unit='km/s')
+        moments = pcube.momentcube
+
+    if iter_refine:
+        # use the moment 1 estimated velocity to define new windows
+        # for low snr this method may not work well
+        v_atpeak = moments[1]
+        pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
+        pcube_masked.momenteach(unit='km/s')
+        moments = pcube.momentcube
+
+    return moments[0], moments[1], moments[2]
+
+
+
 def window_window_moments_spcube(maskcube, window_hwidth, v_atpeak=None, signal_mask=None):
     # signal_mask is to provide additional masking specifically and only for v_atpeak estimate
     if v_atpeak is None:
@@ -300,7 +338,7 @@ def moment_guesses_1c(m0, m1, m2):
         tau_guess[~mask] = get_tau(mom0[~mask], tex_fx)
         tex_guess[~mask] = tex_fx
 
-    elif m0.ndim==0 or m0.ndim == 1:
+    elif m0.ndim==0:
         # for 1D
         if mom0 > mom0_thres:
             tau_guess = tau_fx
@@ -311,8 +349,7 @@ def moment_guesses_1c(m0, m1, m2):
             tau_guess = get_tau(mom0, tex_guess)
 
     else:
-        print(m0.ndim)
-        print("[ERROR]: the moment 0 input has the wrong dimension")
+        print("[ERROR]: the moment 0 input has the wrong dimension ({})".format(m0.ndim))
 
     return np.array([m1, gs_sig, tex_guess, tau_guess])
 
@@ -322,7 +359,15 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
 
     win_hwidth = 4.0
     # the window for the second component recovery (though the 1st win_hwidth should mask out the hyperfines already)
-    window_hwidth2 = 10.0
+    win_hwidth2 = 10.0
+
+    # the amount of moment 2 estimated sigma to maskout for "residual moment maps"
+    f_sig_mask = 2.0
+
+    rms_thres = 2.0  # the amplitude threshold to count as the signal
+
+    f_tau = 0.5 # weight of the tau for the "equal-weight" guesses
+    f_sig = 0.5 # weight of the linewidth for all guesses
 
     if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         if rms is None:
@@ -338,61 +383,181 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
             vpeak = vpeak.value
             print("vpeak: {}".format(vpeak))
 
+        # get the moments
+        m0, m1, m2 = window_moments(spec, window_hwidth=win_hwidth, v_atpeak=vpeak)
+
+        # assume the emission is dominated by the brighter component, and use moment maps to
+        # create guesses for the first component
+        gg1 = moment_guesses_1c(m0, m1, m2)
+
+        # convert moment 2 to sigma
+        sig = m2 ** 0.5
+
+        # mask emission found by moment masks, and try to find a secondary peak using a broader window
+        sp4 = spec.copy()
+        mask = np.logical_and(sp4.xarr.value > m1 - sig * f_sig_mask, sp4.xarr.value < m1 + sig * f_sig_mask)
+        #mask2 = np.logical_and(sp4.xarr.value > vpeak - win_hwidth, sp4.xarr.value < vpeak + win_hwidth)
+        mask2 = np.logical_and(sp4.xarr.value > m1 - win_hwidth, sp4.xarr.value < m1 + win_hwidth)
+        mask = np.logical_or(mask, ~mask2)
+
+        sp4.data[mask] = 0.0
+        #sp4.data[~mask2] = 0.0
+
+        m0n, m1n, m2n = window_moments(sp4, window_hwidth=win_hwidth2, v_atpeak=vpeak)
+
+        gg2 = moment_guesses_1c(m0n, m1n, m2n)
+        gg = np.concatenate((gg1, gg2))
+
+        if m0n < rms * rms_thres:
+            gg[4:8] = gg1[:]
+            gg[0] += sig
+            gg[4] -= sig
+            # set tau of each component to half of what the 1-component moment guess is
+            gg[3] *= f_tau
+            gg[7] *= f_tau
+
+        gg[1] *= f_sig
+        gg[5] *= f_sig
+
+
     elif isinstance(spec, SpectralCube):
         if rms is None:
             # we only need a crude estimate
-            rms = mad_std(spec.data, axis=0, ignore_nan=True)
+            rms = mad_std(spec._data, axis=0, ignore_nan=True)
 
-        if vpeak is None:
-            # find the v_peak pased on smoothed spectrum
-            sp_smooth = spec.copy()
-            sp_smooth.smooth(3)
-            idx = np.argmax(sp_smooth.data)
-            vpeak = sp_smooth.xarr[idx]
-            vpeak = vpeak.value
-            print("vpeak: {}".format(vpeak))
+        # get the moments
+        m0, m1, m2 = window_moments(spec, window_hwidth=win_hwidth, v_atpeak=vpeak)
 
-    # get the moments
-    m0, m1, m2 = window_moments(spec, window_hwidth=win_hwidth, v_atpeak=vpeak)
+        # assume the emission is dominated by the brighter component, and use moment maps to
+        # create guesses for the first component
+        gg1 = moment_guesses_1c(m0, m1, m2)
 
+        # convert moment 2 to sigma
+        sig = m2 ** 0.5
+
+        # maskout emission found by moment masks, and try to find a secondary peak
+        spax = spec.spectral_axis.value
+        spax_cube = np.broadcast_to(spax[:, np.newaxis, np.newaxis], (len(spax), m1.shape[0], m1.shape[1]))
+
+        smask = np.logical_and(spax_cube > m1 - sig * f_sig_mask, spax_cube < m1 + sig * f_sig_mask)
+        smask2 = np.logical_and(spax_cube > m1 - win_hwidth, spax_cube < m1 + win_hwidth)
+        smask = np.logical_or(smask, ~smask2)
+
+        maskcube = spec.with_mask(~smask)
+        # fill value needs to be zero for moment estimates to work as expected
+        maskcube = maskcube.with_fill_value(0.0)
+
+        #return maskcube
+
+        # need pyspeckit cube for the recipe to work
+        #from pyspeckit.cubes.SpectralCube import Cube
+        #pcube = Cube(cube=maskcube)
+        pcube = pyspeckit.Cube(cube=maskcube)
+        return pcube
+
+        #return maskcube
+        #m0n, m1n, m2n = window_moments(maskcube, window_hwidth=win_hwidth2, v_atpeak=vpeak)
+        pcube.momenteach(verbose=False)
+        m0n, m1n, m2n = pcube.momentcube
+
+        gg2 = moment_guesses_1c(m0n, m1n, m2n)
+
+        gg = np.concatenate((gg1, gg2), axis=0)
+
+        '''
+        # use "equal weight guesses" if the remaining spectrum is too faint
+        mask = m0n < rms * rms_thres
+
+        gg2[:,mask] == gg1[:,mask].copy()
+        gg = np.concatenate((gg1, gg2), axis=0)
+
+        #gg[4:8, mask] = gg1[:, mask]
+        gg[0, mask] += sig[mask]
+        gg[4, mask] -= sig[mask]
+        # set tau of each component to half of what the 1-component moment guess is
+        gg[3,mask] *= f_tau
+        gg[7,mask] *= f_tau
+        # set the guessing linewidth to be half of the moment guesses, for both components
+        '''
+        gg[1,:] *= f_sig
+        gg[5,:] *= f_sig
+
+
+    '''
     # convert moment 2 to sigma
     sig = m2 ** 0.5
 
     # make guesses
-    gg = np.arange(8) * 0.0
+    #gg = np.arange(8) * 0.0
 
-    # assume the emission is dominated by the brighter component, and use moment maps to
-    # create guesses for the first component
-    gg1 = moment_guesses_1c(m0, m1, m2)
-    gg[0:4] = gg1[:]
+
+    #gg[0:4] = gg1[:]
 
     # mask emission found by moment masks, and try to find a secondary peak
     sp4 = spec.copy()
 
     # mask out where primary moment1 is
-    mask = np.logical_and(sp4.xarr.value > m1 - sig * 2, sp4.xarr.value < m1 + sig * 2)
+    mask = spec_mask(win_hwidth)
+    #mask = np.logical_and(sp4.xarr.value > m1 - sig * 2, sp4.xarr.value < m1 + sig * 2)
     # mask out other hyperfines
-    mask2 = np.logical_and(sp4.xarr.value > vpeak - win_hwidth, sp4.xarr.value < vpeak + win_hwidth)
-    sp4.data[mask] = 0.0
-    sp4.data[~mask2] = 0.0
+    # mask2 = np.logical_and(sp4.xarr.value > vpeak - win_hwidth, sp4.xarr.value < vpeak + win_hwidth)
+
+    smask = np.logical_and(cube.spectral_axis.value > 5, cube.spectral_axis.value < 10)
+    smask = np.logical_and(cube.spectral_axis.value > 5, cube.spectral_axis.value < 10)
+    maskcube = cube.mask_channels(~smask)
+
+    if sp4.data.ndim == 1:
+        sp4.data[mask] = 0.0
+        #sp4.data[~mask2] = 0.0
+    if sp4.data.ndim == 2:
+        print('yo')
+    '''
 
     # find the second peak
-    m0n, m1n, m2n = window_moments(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak)
+    #m0n, m1n, m2n = window_moments(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak)
+    #m0n, m1n, m2n = window_moments(sp4, window_hwidth=win_hwidth, v_atpeak=vpeak)
 
-    if m0n > rms * 2.0:
+    # if the amplitude of the remaining spectrum is above the threshold, use the remaining moment maps as the
+    # guesses of the second component
+
+
+    '''
+    if m0.ndim == 2:
         gg2 = moment_guesses_1c(m0n, m1n, m2n)
-        gg[4:8] = gg2[:]
-    else:
-        gg[4:8] = gg1[:]
-        gg[0] += sig
-        gg[4] -= sig
+
+        # use "equal weight guesses" if the remaining spectrum is too faint
+        mask = m0n < rms * rms_thres
+
+        gg2[:,mask] == gg1[:,mask].copy()
+        gg = np.concatenate((gg1, gg2))
+
+        #gg[4:8, mask] = gg1[:, mask]
+        gg[0, mask] += sig
+        gg[4, mask] -= sig
         # set tau of each component to half of what the 1-component moment guess is
-        gg[3] *= 0.5
-        gg[7] *= 0.5
+        gg[3,mask] *= f_tau
+        gg[7,mask] *= f_tau
+        # set the guessing linewidth to be half of the moment guesses, for both components
+        gg[1,:] *= f_sig
+        gg[5,:] *= f_sig
 
-    gg[1] *= 0.5
-    gg[5] *= 0.5
 
+    else:
+        gg2 = moment_guesses_1c(m0n, m1n, m2n)
+        gg = np.concatenate((gg1, gg2))
+
+        if m0n < rms * rms_thres:
+            gg[4:8] = gg1[:]
+            gg[0] += sig
+            gg[4] -= sig
+            # set tau of each component to half of what the 1-component moment guess is
+            gg[3] *= f_tau
+            gg[7] *= f_tau
+
+        gg[1] *= f_sig
+        gg[5] *= f_sig
+
+    '''
     return gg
 
 
@@ -446,6 +611,18 @@ def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights=None, signal_ma
 
     return m0, m1, m2
 
+
+def window_mask_pcube(pcube, vmid, win_hwidth=4.0):
+    # returns a copy of the pucbe (pyspeckit.cubes.SpectralCube.Cube) with spectra outside of the window zeroed
+    shape = pcube.cube.shape
+    spax = pcube.xarr.value
+    spax_cube = np.broadcast_to(spax[:, np.newaxis, np.newaxis], (len(spax), shape[1], shape[2]))
+
+    smask = np.logical_and(spax_cube > vmid - win_hwidth, spax_cube < vmid + win_hwidth)
+
+    pcube = pcube.copy()
+    pcube.cube[~smask] = 0.0
+    return pcube
 
 #=======================================================================================================================
 # physics functions
