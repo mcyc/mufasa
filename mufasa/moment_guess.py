@@ -99,7 +99,7 @@ def vmask_cube(cube, vmap, window_hwidth=3.0):
 
 
 
-def window_moments(spec, window_hwidth=3.0, v_atpeak=None, signal_mask=None):
+def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
     # wrapper to find moments for different types of inputs
 
     if isinstance(spec, pyspeckit.Cube):
@@ -116,7 +116,7 @@ def window_moments(spec, window_hwidth=3.0, v_atpeak=None, signal_mask=None):
         return None
 
 
-def window_moments_spc(spectrum, window_hwidth=3.0, v_atpeak=None, iter_refine=False):
+def window_moments_spc(spectrum, window_hwidth=4.0, v_atpeak=None, iter_refine=False):
     '''
     find moments within a given window (e.g., around the main hyperfine lines)
     # note: iter_refine has not proven to be very effective in our tests
@@ -171,25 +171,27 @@ def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine
         half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
 
     '''
-
-    # note: the current implementation may be memory intensitive
-    if v_atpeak is None:
-        # note pcube.momenteach seem to be pretty good at ignoring hyperfine structures
-        pcube.momenteach(unit='km/s')
-        moments = pcube.momentcube
-
-    else:
+    def get_win_moms(pcube, v_atpeak):
+        # get window moments when v_atpeak is given
         pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
         pcube_masked.momenteach(unit='km/s')
         moments = pcube_masked.momentcube
+        return moments
+
+    # note: the current implementation may be memory intensitive
+    if v_atpeak is None:
+        # note the moment 1 estimate of pcube.momenteach seem to be pretty good at ignoring hyperfine structures
+        pcube.momenteach(unit='km/s', vheight=False)
+        moments = pcube.momentcube
+        # redo again with the hyperfine lines masked out
+        moments = get_win_moms(pcube, v_atpeak=moments[1])
+    else:
+        moments = get_win_moms(pcube, v_atpeak)
 
     if iter_refine:
         # use the moment 1 estimated velocity to define new windows
         # for low snr this method may not work well
-        v_atpeak = moments[1]
-        pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
-        pcube_masked.momenteach(unit='km/s')
-        moments = pcube.momentcube
+        moments = get_win_moms(pcube, v_atpeak=moments[1])
 
     return moments[0], moments[1], moments[2]
 
@@ -321,7 +323,6 @@ def moment_guesses_1c(m0, m1, m2):
     # m0 from pyspeckit is actually amplitube proxy, so to calculate
     gs_sig = m2 ** 0.5
     mom0 = m0 * gs_sig * np.sqrt(2 * np.pi)
-    #print("mom0 = {}".format(mom0))
 
     mom0_thres = 3.0
     tau_fx = 2.5
@@ -343,7 +344,7 @@ def moment_guesses_1c(m0, m1, m2):
         tex_guess[~mask] = tex_fx
 
     elif m0.ndim==0:
-        # for 1D
+        # for 0D
         if mom0 > mom0_thres:
             tau_guess = tau_fx
             tex_guess = get_tex(mom0, tau_fx)
@@ -459,9 +460,6 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
 
         gg2 = moment_guesses_1c(m0n, m1n, m2n)
 
-        #gg = np.concatenate((gg1, gg2), axis=0)
-
-
         # use "equal weight guesses" if the remaining spectrum is too faint
         mask = m0n < rms * rms_thres
 
@@ -480,81 +478,6 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
         gg[5,:] *= f_sig
 
 
-    '''
-    # convert moment 2 to sigma
-    sig = m2 ** 0.5
-
-    # make guesses
-    #gg = np.arange(8) * 0.0
-
-
-    #gg[0:4] = gg1[:]
-
-    # mask emission found by moment masks, and try to find a secondary peak
-    sp4 = spec.copy()
-
-    # mask out where primary moment1 is
-    mask = spec_mask(win_hwidth)
-    #mask = np.logical_and(sp4.xarr.value > m1 - sig * 2, sp4.xarr.value < m1 + sig * 2)
-    # mask out other hyperfines
-    # mask2 = np.logical_and(sp4.xarr.value > vpeak - win_hwidth, sp4.xarr.value < vpeak + win_hwidth)
-
-    smask = np.logical_and(cube.spectral_axis.value > 5, cube.spectral_axis.value < 10)
-    smask = np.logical_and(cube.spectral_axis.value > 5, cube.spectral_axis.value < 10)
-    maskcube = cube.mask_channels(~smask)
-
-    if sp4.data.ndim == 1:
-        sp4.data[mask] = 0.0
-        #sp4.data[~mask2] = 0.0
-    if sp4.data.ndim == 2:
-        print('yo')
-    '''
-
-    # find the second peak
-    #m0n, m1n, m2n = window_moments(sp4, window_hwidth=window_hwidth2, v_atpeak=vpeak)
-    #m0n, m1n, m2n = window_moments(sp4, window_hwidth=win_hwidth, v_atpeak=vpeak)
-
-    # if the amplitude of the remaining spectrum is above the threshold, use the remaining moment maps as the
-    # guesses of the second component
-
-
-    '''
-    if m0.ndim == 2:
-        gg2 = moment_guesses_1c(m0n, m1n, m2n)
-
-        # use "equal weight guesses" if the remaining spectrum is too faint
-        mask = m0n < rms * rms_thres
-
-        gg2[:,mask] == gg1[:,mask].copy()
-        gg = np.concatenate((gg1, gg2))
-
-        #gg[4:8, mask] = gg1[:, mask]
-        gg[0, mask] += sig
-        gg[4, mask] -= sig
-        # set tau of each component to half of what the 1-component moment guess is
-        gg[3,mask] *= f_tau
-        gg[7,mask] *= f_tau
-        # set the guessing linewidth to be half of the moment guesses, for both components
-        gg[1,:] *= f_sig
-        gg[5,:] *= f_sig
-
-
-    else:
-        gg2 = moment_guesses_1c(m0n, m1n, m2n)
-        gg = np.concatenate((gg1, gg2))
-
-        if m0n < rms * rms_thres:
-            gg[4:8] = gg1[:]
-            gg[0] += sig
-            gg[4] -= sig
-            # set tau of each component to half of what the 1-component moment guess is
-            gg[3] *= f_tau
-            gg[7] *= f_tau
-
-        gg[1] *= f_sig
-        gg[5] *= f_sig
-
-    '''
     return gg
 
 
@@ -618,7 +541,8 @@ def window_mask_pcube(pcube, vmid, win_hwidth=4.0):
     smask = np.logical_and(spax_cube > vmid - win_hwidth, spax_cube < vmid + win_hwidth)
 
     pcube = pcube.copy()
-    pcube.cube[~smask] = 0.0
+    #pcube.cube[~smask] = 0.0
+    pcube.cube[~smask] = np.nan
     return pcube
 
 #=======================================================================================================================
