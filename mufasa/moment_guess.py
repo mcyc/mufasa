@@ -11,6 +11,7 @@ from pyspeckit.spectrum.models.ammonia_constants import (ckms, h, kb)
 from astropy.stats import mad_std
 
 from .utils import map_divide
+import multiprocessing
 
 #=======================================================================================================================
 
@@ -32,7 +33,7 @@ def master_guess(spectrum, ncomp, sigmin=0.07, v_peak_hwidth=3.0, v_atpeak=None,
     rms = get_rms_prefit(spectrum, window_hwidth=v_peak_hwidth, v_atpeak=m1)
 
     if m0 < snr_cut*rms:
-        gg = np.zeros((ncomp * 4,) + np.array([m1]).shape)
+        gg = np.zeros((ncomp * 4,) + np.array([m1], dtype=object).shape)
         gg[:] = np.nan
         return gg
 
@@ -158,7 +159,7 @@ def window_moments_spc(spectrum, window_hwidth=4.0, v_atpeak=None, iter_refine=F
 
 
 
-def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine=False):
+def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine=False, multicore=None):
     '''
     find moments within a given window (e.g., around the main hyperfine lines)
     # note: iter_refine has not proven to be very effective in our tests
@@ -171,17 +172,23 @@ def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine
         half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
 
     '''
+
+    if multicore is None:
+        # use all the cores minus one
+        multicore = multiprocessing.cpu_count() - 1
+
+
     def get_win_moms(pcube, v_atpeak):
         # get window moments when v_atpeak is given
         pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
-        pcube_masked.momenteach(unit='km/s')
+        pcube_masked.momenteach(unit='km/s', verbose=False, multicore=multicore)
         moments = pcube_masked.momentcube
         return moments
 
     # note: the current implementation may be memory intensitive
     if v_atpeak is None:
         # note the moment 1 estimate of pcube.momenteach seem to be pretty good at ignoring hyperfine structures
-        pcube.momenteach(unit='km/s', vheight=False)
+        pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=multicore)
         moments = pcube.momentcube
         # redo again with the hyperfine lines masked out
         moments = get_win_moms(pcube, v_atpeak=moments[1])
@@ -356,10 +363,10 @@ def moment_guesses_1c(m0, m1, m2):
     else:
         print("[ERROR]: the moment 0 input has the wrong dimension ({})".format(m0.ndim))
 
-    return np.array([m1, gs_sig, tex_guess, tau_guess])
+    return np.asarray([m1, gs_sig, tex_guess, tau_guess])
 
 
-def mom_guess_wide_sep(spec, vpeak=None, rms=None):
+def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=None):
     # for two components
 
     win_hwidth = 4.0
@@ -373,6 +380,10 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
 
     f_tau = 0.5 # weight of the tau for the "equal-weight" guesses
     f_sig = 0.5 # weight of the linewidth for all guesses
+
+    if multicore is None:
+        # use all the cores minus one
+        multicore = multiprocessing.cpu_count() - 1
 
     if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         if rms is None:
@@ -426,11 +437,12 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
 
 
     elif isinstance(spec, SpectralCube):
+
         if rms is None:
             # we only need a crude estimate
             rms = mad_std(spec._data, axis=0, ignore_nan=True)
 
-        pcube = pyspeckit.Cube(cube=spec)
+        pcube = pyspeckit.Cube(cube=spec, maskmap=planemask)
 
         # get the moments using the pyspeckit method
         m0, m1, m2 = window_moments(pcube, window_hwidth=win_hwidth, v_atpeak=vpeak)
@@ -454,8 +466,8 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None):
         maskcube = maskcube.with_fill_value(0.0)
 
         # convert it to pyspeckit to take advantage of pyspeckit's moment methods
-        pcube = pyspeckit.Cube(cube=maskcube)
-        pcube.momenteach(verbose=False)
+        pcube = pyspeckit.Cube(cube=maskcube, maskmap=planemask)
+        pcube.momenteach(verbose=False, multicore=multicore)
         m0n, m1n, m2n = pcube.momentcube
 
         gg2 = moment_guesses_1c(m0n, m1n, m2n)
