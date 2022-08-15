@@ -216,7 +216,7 @@ def refit_swap_2comp(reg, snr_min=3):
 
 
 
-def refit_2comp_wide(reg, snr_min=3):
+def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
 
     print("begin wide component recovery")
 
@@ -235,30 +235,41 @@ def refit_2comp_wide(reg, snr_min=3):
             else:
                 reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc)
 
-    wide_comp_guess = get_2comp_wide_guesses(reg)
+    if planemask is None:
+        # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
+        # a second componet that is found in wide seperation)
+        lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
+        mask = lnk21 < 5
+        mask = dilation(mask)
 
-    # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
-    final_guess = np.append(reg.ucube.pcubes['1'].parcube, wide_comp_guess, axis=0)
+        # combine the mask with where 1 component model is better fitted than the noise to save some computational time
+        lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
+        mask = np.logical_and(mask, lnk10 > 5)
 
-    # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
-    # a second componet that is found in wide seperation)
-    lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
-    mask = lnk21 < 5
-    mask = dilation(mask)
-
-    # combine the mask with where 1 component model is better fitted than the noise to save some computational time
-    lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
-    mask = np.logical_and(mask, lnk10 > 5)
+    else:
+        mask = planemask
+        # set lnk21 to None, so refit doesn't care about wether or not the one-componet fit is good or not
+        lnk21 = None
 
     mask_size = np.sum(mask)
     print("wide recovery refit mask size: {}".format(mask_size))
+
+    if method == 'residual':
+        wide_comp_guess = get_2comp_wide_guesses(reg)
+        # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
+        final_guess = np.append(reg.ucube.pcubes['1'].parcube, wide_comp_guess, axis=0)
+    elif method == 'moments':
+        final_guess = mmg.mom_guess_wide_sep(reg.ucube.cube, planemask=mask)
+    else:
+        print("[ERROR] the following method specified is invalid: {}".format(method))
+        return None
 
     replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21)
 
 
 
 
-def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21):
+def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None):
     # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
     if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile)
@@ -267,9 +278,12 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21):
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
 
-        # mask over where one comp fit is more robust
-        good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
-        good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
+        if lnk21 is not None:
+            # mask over where one comp fit is more robust
+            good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
+            good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
+        else:
+            good_mask = lnk_NvsO > 0
 
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
