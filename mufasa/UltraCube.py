@@ -278,6 +278,7 @@ def load_model_fit(cube, filename, ncomp):
 
     fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
+    pcube.xarr.velocity_convention = 'radio'
 
     pcube.load_model_fit(filename, npars=fitter.npars, fittype='nh3_multi_v')
     gc.collect()
