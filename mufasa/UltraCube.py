@@ -252,7 +252,6 @@ class UCubePlus(UltraCube):
 
         for nc in ncomp:
             path = self.paraPaths[str(nc)]
-            print("hey hey hey")
             self.load_model_fit(path, nc)
 
 
@@ -271,7 +270,7 @@ def save_fit(pcube, savename, ncomp):
 
 def load_model_fit(cube, filename, ncomp):
     # currently only loads ammonia multi-component model
-    pcube = pyspeckit.Cube(cube=cube, velocity_convention="radio")
+    pcube = pyspeckit.Cube(cube=cube)
 
     # reigster fitter
     linename = 'oneone'
