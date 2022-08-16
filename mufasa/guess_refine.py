@@ -227,7 +227,20 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     if max is not None:
         map[map>max] = np.nan
 
-    map = median_filter(map, footprint=disk(disksize))
+    if np.sum(np.isfinite(map)) == 0:
+        # if there are no valid pixel in the guesses, set it to one of the limits or zero
+        if min is not None:
+            map[:] = min
+        elif max is not None:
+            map[:] = max
+        else:
+            map[:] = 0.0
+        return map
+
+    map_med = median_filter(map, footprint=disk(disksize))
+    if np.sum(np.isfinite(map_med)) == 0:
+        kernel = Gaussian2DKernel(disksize)
+        map = convolve(map, kernel, boundary='extend')
 
     if mask is None:
         mask = np.isfinite(map)
@@ -245,18 +258,28 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
         zi = C(X*mask,Y*mask)
         return zi
 
-    try:
-        # interpolate the mask
-        zi = interpolate(map, mask)
-    except QhullError as e:
-        print("[WARNING]: qhull input error found; astropy convolve will be used instead")
-        #print(e)
-        # use astropy convolve as a proxi for interpolation
+    def interpolate_via_cnv(map):
         kernel = Gaussian2DKernel(3)
         zi = convolve(map, kernel, boundary='extend')
         # retrain the original median_filtered map over its original positions
         map_finite = np.isfinite(map)
         zi[map_finite] = map[map_finite]
+        return zi
+
+    if np.sum(mask) >= 2:
+        try:
+            # interpolate the mask
+            zi = interpolate(map, mask)
+        except QhullError as e:
+            print("[WARNING]: qhull input error found; astropy convolve will be used instead")
+            #print(e)
+            # use astropy convolve as a proxi for interpolation
+            zi = interpolate_via_cnv(map)
+        except ValueError as e:
+            print("[WARNING]: valueError found (no points given); astropy convolve will be used instead")
+            zi = interpolate_via_cnv(map)
+    else:
+        zi = interpolate_via_cnv(map)
 
     return zi
 
