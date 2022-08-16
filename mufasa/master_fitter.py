@@ -289,7 +289,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None):
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, lnk_NvsO)
-            print("good mask size: {}".format(good_mask.sum()))
+            print("replace bad pix mask size: {}".format(good_mask.sum()))
 
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
@@ -451,7 +451,12 @@ def get_2comp_wide_guesses(reg):
 
     if not hasattr(reg, 'ucube_res_cnv'):
         # fit the residual with the one component model if this has not already been done.
-        fit_best_2comp_residual_cnv(reg)
+        try:
+            fit_best_2comp_residual_cnv(reg)
+        except ValueError:
+            print("retry with no SNR threshold")
+            fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
+
 
     def get_mom_guesses(reg):
         # get moment guesses from no masking
@@ -463,8 +468,9 @@ def get_2comp_wide_guesses(reg):
         vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
         moms_res = mmg.vmask_moments(cube_res, vmap=vmap, window_hwidth=3.5)
 
-        ncomp = 1
-        gg = mmg.moment_guesses(moms_res[1], moms_res[2], ncomp, moment0=moms_res[0])
+        #ncomp = 1
+        #gg = mmg.moment_guesses(moms_res[1], moms_res[2], ncomp, moment0=moms_res[0])
+        gg = mmg.moment_guesses_1c(moms_res[0], moms_res[1], moms_res[2])
         return gg
 
     if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
@@ -517,15 +523,30 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     else:
         vmap = reg.ucube_cnv.pcubes['1'].parcube[0]
 
-    moms_res_cnv = mmg.vmask_moments(cube_res_cnv, vmap=vmap, window_hwidth=window_hwidth)
+    import pyspeckit
+    # use pcube moment estimate instead (it allows different windows for each pixel)
+    pcube_res_cnv = pyspeckit.Cube(cube=cube_res_cnv)
 
-    gg = mmg.moment_guesses(moms_res_cnv[1], moms_res_cnv[2], ncomp, moment0=moms_res_cnv[0])
+    #moms_res_cnv = mmg.vmask_moments(cube_res_cnv, vmap=vmap, window_hwidth=window_hwidth)
+
+    try:
+        moms_res_cnv = mmg.window_moments(pcube_res_cnv, v_atpeak=vmap, window_hwidth=window_hwidth)
+    except ValueError:
+        print("[WARNING]: There doesn't seem to be enough pixels to find the residual moments")
+        raise
+
+    #gg = mmg.moment_guesses(moms_res_cnv[1], moms_res_cnv[2], ncomp, moment0=moms_res_cnv[0])
+    nsize = np.sum(np.isfinite(moms_res_cnv[0]))
+
+    gg = mmg.moment_guesses_1c(moms_res_cnv[0], moms_res_cnv[1], moms_res_cnv[2])
+
+    mask = np.isfinite(gg[0])
+    gg = gss_rf.refine_each_comp(gg, mask=mask)
 
     # should try to use UCubePlus??? may want to avoid saving too many intermediate cube products
     reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
     #reg.ucube_res_cnv.fit_cube(ncomp=[1], snr_min=3, guesses=gg)
     reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg)
-
 
     # save the residual fit
     if savefit:
@@ -557,7 +578,7 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
     cube_res = SpectralCube(data=best_res, wcs=reg.ucube.pcubes['2'].wcs.copy(),
                             header=reg.ucube.pcubes['2'].header.copy())
 
-    if masked:
+    if masked and res_snr_cut > 0:
         best_rms = UCube.get_rms(res_cube._data)
 
         # calculate the peak SNR value of the best-fit residual over the main hyperfine components
