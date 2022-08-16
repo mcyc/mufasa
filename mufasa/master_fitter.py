@@ -253,8 +253,12 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
 
     mask_size = np.sum(mask)
     print("wide recovery refit mask size: {}".format(mask_size))
+    if mask_size ==0:
+        print("no pixel in the recovery mask, no fit is performed")
+        return None
 
     if method == 'residual':
+        print("recovery second component from residual")
         wide_comp_guess = get_2comp_wide_guesses(reg)
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
         final_guess = np.append(reg.ucube.pcubes['1'].parcube, wide_comp_guess, axis=0)
@@ -273,7 +277,8 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None):
     # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
     if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile)
-        ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
+        # fit using simpfit (and take the provided guesses as they are)
+        ucube_new.fit_cube(ncomp=[2], simpfit=True, maskmap=mask, snr_min=snr_min, guesses=guesses)
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
@@ -283,7 +288,8 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None):
             good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
-            good_mask = lnk_NvsO > 0
+            good_mask = np.logical_and(lnk_NvsO > 0, lnk_NvsO)
+            print("good mask size: {}".format(good_mask.sum()))
 
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
@@ -517,7 +523,9 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
 
     # should try to use UCubePlus??? may want to avoid saving too many intermediate cube products
     reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
-    reg.ucube_res_cnv.fit_cube(ncomp=[1], snr_min=3, guesses=gg)
+    #reg.ucube_res_cnv.fit_cube(ncomp=[1], snr_min=3, guesses=gg)
+    reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg)
+
 
     # save the residual fit
     if savefit:

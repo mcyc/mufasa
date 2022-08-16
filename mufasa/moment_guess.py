@@ -332,8 +332,8 @@ def moment_guesses_1c(m0, m1, m2):
     mom0 = m0 * gs_sig * np.sqrt(2 * np.pi)
 
     mom0_thres = 3.0
-    tau_fx = 2.5
-    tex_fx = 6.0 # K
+    tau_fx = 1.5 #2.5
+    tex_fx = 7.0 #6.0 # K
 
     # divide the tau tex guess into two regimes by integrated flux
     # if flux is greater than mom0_thres, assume a fixed tau value and caculate the corrosponding tex assume Gaussian

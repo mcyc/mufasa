@@ -21,6 +21,7 @@ from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,remove_small_holes #, closing
 from astropy.convolution import Gaussian2DKernel, convolve
+from astropy.stats import mad_std
 
 from . import ammonia_multiv as ammv
 from . import moment_guess as momgue
@@ -411,6 +412,81 @@ def get_singv_tau11(singv_para):
         model_a_pixel(xy)
 
     return tau11
+
+
+def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename="oneone", **kwargs):
+    # a simper version of cubefit_gen that assumes good user provided guesses
+
+    print("using simp fit!")
+
+    if hasattr(cube, 'spectral_axis'):
+        pcube = pyspeckit.Cube(cube=cube)
+
+    else:
+        cubename = cube
+        pcube = pyspeckit.Cube(filename=cubename)
+
+    pcube.unit="K"
+
+    # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
+    # note: this assume the data cube has the right units
+
+    if pcube.wcs.wcs.restfrq == np.nan:
+        # Specify the rest frequency not present
+        pcube.xarr.refX = freq_dict[linename]*u.Hz
+    pcube.xarr.velocity_convention = 'radio'
+
+    # always register the fitter just in case different lines are used
+    fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
+    pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
+
+    if multicore is None:
+        # use n-1 cores on the computer
+        multicore= multiprocessing.cpu_count() - 1
+
+        if multicore < 1:
+            multicore = 1
+
+    if maskmap is not None and 'start_from_point' not in kwargs:
+        indx_g = np.argwhere(maskmap)
+        print("yo yo!")
+        start_from_point = (indx_g[0,1], indx_g[0,0])
+        #start_from_point = (indx_g[0, 0], indx_g[0, 1])
+        kwargs['start_from_point'] = start_from_point
+
+    if 'signal_cut' not in kwargs:
+        kwargs['signal_cut'] = 0.0
+
+    if 'errmap' not in kwargs:
+        kwargs['errmap'] = mad_std(pcube.cube, axis=0, ignore_nan = True)
+
+    # set the fit parameter limits (consistent with GAS DR1)
+    Texmin = 3.0    # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
+    Texmax = 40    # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
+    sigmin = 0.07   # km/s
+    sigmax = 2.5    # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
+    taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
+    taumin = 1e-3#0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
+    eps = 0.001 # a small perturbation that can be used in guesses
+
+    v_peak_hwidth = 10
+    v_guess = guesses[::4]
+    v_guess[v_guess == 0] = np.nan
+    v_median = np.nanmedian(v_guess)
+
+    vmax = v_median + v_peak_hwidth
+    vmin = v_median - v_peak_hwidth
+
+    pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, use_neighbor_as_guess=False, multicore=multicore,
+                  maskmap=maskmap,
+                  limitedmax=[True, True, True, True] * ncomp,
+                  maxpars=[vmax, sigmax, Texmax, taumax] * ncomp,
+                  limitedmin=[True, True, True, True] * ncomp,
+                  minpars=[vmin, sigmin, Texmin, taumin] * ncomp,
+                  **kwargs)
+
+    return pcube
+
 
 
 

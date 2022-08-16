@@ -85,7 +85,7 @@ class UltraCube(object):
             print("[WARNING]: the specified file does not exist.")
 
 
-    def fit_cube(self, ncomp, **kwargs):
+    def fit_cube(self, ncomp, simpfit=False, **kwargs):
         # currently limited to NH3 (1,1) 2-slab fit
 
         if not 'multicore' in kwargs:
@@ -99,7 +99,8 @@ class UltraCube(object):
             ncomp = [ncomp]
 
         for nc in ncomp:
-            self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
+            #self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
+            self.pcubes[str(nc)] = fit_cube(self.cube, simpfit=simpfit, ncomp=nc, **kwargs)
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
@@ -259,8 +260,12 @@ class UCubePlus(UltraCube):
 
 #======================================================================================================================#
 
-def fit_cube(cube, **kwargs):
-    return mvf.cubefit_gen(cube, **kwargs)
+def fit_cube(cube, simpfit=False, **kwargs):
+    if simpfit:
+        # fit the cube with the provided guesses and masks with no pre-processing
+        return mvf.cubefit_simp(cube, **kwargs)
+    else:
+        return mvf.cubefit_gen(cube, **kwargs)
 
 
 def save_fit(pcube, savename, ncomp):
