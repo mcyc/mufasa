@@ -466,7 +466,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     sigmin = 0.07   # km/s
     sigmax = 2.5    # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
     taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
-    taumin = 1e-3#0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
+    taumin = 0.1#0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
     eps = 0.001 # a small perturbation that can be used in guesses
 
     v_peak_hwidth = 10
