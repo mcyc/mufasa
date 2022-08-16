@@ -171,6 +171,8 @@ def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine
     :param window_hwidth: float
         half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
 
+    :param v_atpeak: float or ndarray
+        the velociy or a map of velocities to center the spectral window on
     '''
 
     if multicore is None:
@@ -332,8 +334,8 @@ def moment_guesses_1c(m0, m1, m2):
     mom0 = m0 * gs_sig * np.sqrt(2 * np.pi)
 
     mom0_thres = 3.0
-    tau_fx = 1.5 #2.5
-    tex_fx = 7.0 #6.0 # K
+    tau_fx = 2.5 #1.5 #2.5
+    tex_fx = 6.0 #7.0 #6.0 # K
 
     # divide the tau tex guess into two regimes by integrated flux
     # if flux is greater than mom0_thres, assume a fixed tau value and caculate the corrosponding tex assume Gaussian
@@ -555,6 +557,8 @@ def window_mask_pcube(pcube, vmid, win_hwidth=4.0):
     pcube = pcube.copy()
     #pcube.cube[~smask] = 0.0
     pcube.cube[~smask] = np.nan
+    pcube.maskmap = np.any(np.isfinite(pcube.cube), axis=0)
+
     return pcube
 
 #=======================================================================================================================
