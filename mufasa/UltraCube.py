@@ -374,7 +374,7 @@ def get_aic(chisq, p, N=None):
 '''
 
 
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True):
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False):
     '''
     Calculate residual sum of squares (RSS)
 
@@ -402,16 +402,20 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-    mask = expand_mask(mask, expand)
+    if expand > 0:
+        mask = expand_mask(mask, expand)
     mask = mask.astype(np.float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
     rss = np.nansum((residual * mask)**2, axis=0)
 
+    returns = (rss,)
+
     if return_size:
-        return rss, np.nansum(mask, axis=0)
-    else:
-        return rss
+        returns += (np.nansum(mask, axis=0),)
+    if return_mask:
+        returns += mask
+    return returns
 
 
 
@@ -445,7 +449,8 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-    mask = expand_mask(mask, expand)
+    if expand > 0:
+        mask = expand_mask(mask, expand)
     mask = mask.astype(np.float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
@@ -509,7 +514,8 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-    mask = expand_mask(mask, expand)
+    if expand > 0:
+        mask = expand_mask(mask, expand)
     mask = mask.astype(np.float)
 
 
