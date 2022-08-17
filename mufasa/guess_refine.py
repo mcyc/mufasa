@@ -111,18 +111,37 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
 
 
 
-def tautex_renorm(taumap, texmap, tau_thresh = 0.3, tex_thresh = 10.0):
+def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
+    from . import moment_guess as mmg
 
     # attempt to re-normalize the tau & text values at the optically thin regime (where the two are degenerate)
+    # note, the latest recipe also works for the optically thick regime in principle
+    # only emission with lower amplitude than TA_ltau_thres and tau < tau_thin will have tex > tex_thresh recalculated
+    #  (i.e., expected to be optically thin
+
     isthin = np.logical_and(taumap < tau_thresh, np.isfinite(taumap))
-    texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
+    TA_lowtau = mmg.peakT(texmap[isthin], taumap[isthin])
+    TA_ltau_thres = 0.5 # where tau ~1 for Tex = 3.5; tau with Ta above this diverges quickly
+    # assume a fixed Tex for low TA
+    tex_thin = 3.5      # note: at Tk = 30K, n = 1e3, N = 1e13, & sig = 0.2 km.s --> Tex = 3.49 K, tau = 0.8
+    tau_thin = 1.0      # where the main hyperfines of NH3 (1,1) starts to get optically thick
+
+    # for when tau is less than tau_thresh
+    #texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
+    #taumap[isthin] = tau_thresh
+    texmap[isthin] = mmg.get_tex(TA_lowtau, tau=tau_thresh) #note: tex can be higher than at 40K at Ta~7K
     taumap[isthin] = tau_thresh
 
     # optically thin gas are also unlikely to have high spatial density and thus high Tex
-    tex_thin = 3.5      # note: at Tk = 30K, n = 1e3, N = 1e13, & sig = 0.2 km.s --> Tex = 3.49 K, tau = 0.8
     hightex = np.logical_and(texmap > tex_thresh, np.isfinite(texmap))
-    texmap[hightex] = tex_thin
-    taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
+    TA_hightex = mmg.peakT(texmap[hightex], taumap[hightex])
+    mask = TA_hightex < TA_ltau_thres # only renormalize high tex when Ta is less than the threshold
+    mask = np.logical_and(mask, taumap[hightex] < tau_thin)
+
+    #texmap[hightex] = tex_thin
+    #taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
+    texmap[hightex][mask] = tex_thin
+    taumap[hightex][mask] = mmg.get_tau(TA_hightex[mask], tex=tex_thin, nu=23.722634)
 
     # note, tau values that are too low will be taken care of by refine_each_comp()
     return taumap, texmap
