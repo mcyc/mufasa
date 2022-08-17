@@ -477,6 +477,20 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
 
+    def impose_lim(data, min=None, max=None):
+        if min is not None:
+            mask = data < min
+            data[mask] = min
+        if max is not None:
+            mask = data > max
+            data[mask] = max
+
+    # impose parameter limits on the guesses
+    impose_lim(guesses[::4], vmin, vmax)
+    impose_lim(guesses[1::4], sigmin, sigmax)
+    impose_lim(guesses[2::4], Texmin, Texmax)
+    impose_lim(guesses[3::4], taumin, taumax)
+
     pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, use_neighbor_as_guess=False, multicore=multicore,
                   maskmap=maskmap,
                   limitedmax=[True, True, True, True] * ncomp,
