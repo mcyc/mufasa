@@ -333,7 +333,8 @@ def moment_guesses_1c(m0, m1, m2):
     gs_sig = m2 ** 0.5
     mom0 = m0 * gs_sig * np.sqrt(2 * np.pi)
 
-    mom0_thres = 3.0
+    mom0_thres = 3.0 # the regime boundary between fix-tau- or fix-tex-based calculation
+    mom0_min = 0.03 # Ta ~ 0.25 at Tex=3, tau=0.1
     tau_fx = 2.5 #1.5 #2.5
     tex_fx = 6.0 #7.0 #6.0 # K
 
@@ -341,6 +342,9 @@ def moment_guesses_1c(m0, m1, m2):
     # if flux is greater than mom0_thres, assume a fixed tau value and caculate the corrosponding tex assume Gaussian
     # otherwise, assume a fixed tex value and calculate tau instead
     if m0.ndim == 2:
+        # aassume all mom0 lower than mom0 to be mom0_min
+        mom0[mom0 < mom0_min] = mom0_min
+
         # for 2D
         tau_guess = np.zeros(m0.shape)
         tex_guess = np.zeros(m0.shape)
@@ -354,6 +358,9 @@ def moment_guesses_1c(m0, m1, m2):
 
     elif m0.ndim==0:
         # for 0D
+        if mom0 < mom0_min:
+            mom0 = mom0_min
+
         if mom0 > mom0_thres:
             tau_guess = tau_fx
             tex_guess = get_tex(mom0, tau_fx)
