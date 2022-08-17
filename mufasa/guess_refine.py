@@ -147,7 +147,7 @@ def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
     return taumap, texmap
 
 
-def refine_each_comp(guess_comp, mask=None):
+def refine_each_comp(guess_comp, mask=None, v_range=None, sig_range=None):
     # refine guesses for each component, with values outside ranges specified below removed
 
     Tex_min = 3.0
@@ -160,8 +160,21 @@ def refine_each_comp(guess_comp, mask=None):
     if mask is None:
         mask = master_mask(guess_comp)
 
-    guess_comp[0] = refine_guess(guess_comp[0], min=None, max=None, mask=mask, disksize=disksize)
-    guess_comp[1] = refine_guess(guess_comp[1], min=None, max=None, mask=mask, disksize=disksize)
+    if v_range is None:
+        vmin = None
+        vmax = None
+    else:
+        vmin, vmax =v_range
+
+    if sig_range is None:
+        sigmin = None
+        sigmax = None
+    else:
+        sigmin, sigmax = sig_range
+
+
+    guess_comp[0] = refine_guess(guess_comp[0], min=vmin, max=vmax, mask=mask, disksize=disksize)
+    guess_comp[1] = refine_guess(guess_comp[1], min=sigmin, max=sigmax, mask=mask, disksize=disksize)
 
     # re-normalize the degenerated tau & text for the purpose of estimate guesses
     guess_comp[3], guess_comp[2] = tautex_renorm(guess_comp[3], guess_comp[2], tau_thresh = 0.1)
