@@ -261,7 +261,8 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         print("recovery second component from residual")
         wide_comp_guess = get_2comp_wide_guesses(reg)
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
-        final_guess = np.append(reg.ucube.pcubes['1'].parcube, wide_comp_guess, axis=0)
+        c1_guess = reg.ucube.pcubes['1'].parcube
+        final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
     elif method == 'moments':
         final_guess = mmg.mom_guess_wide_sep(reg.ucube.cube, planemask=mask)
     else:
@@ -471,6 +472,10 @@ def get_2comp_wide_guesses(reg):
         #ncomp = 1
         #gg = mmg.moment_guesses(moms_res[1], moms_res[2], ncomp, moment0=moms_res[0])
         gg = mmg.moment_guesses_1c(moms_res[0], moms_res[1], moms_res[2])
+        # make sure the guesses falls within the limits
+
+        mask = np.isfinite(moms_res[0])
+        gg = gss_rf.refine_each_comp(gg, mask=mask)
         return gg
 
     if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
@@ -495,6 +500,7 @@ def get_2comp_wide_guesses(reg):
             guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
                                                       mask=gmask)
         else:
+            print("no good fit from convolved guess, using the moment guess for the full-res refit instead")
             # get moment guesses without masking instead
             guesses_final = get_mom_guesses(reg)
 
@@ -536,7 +542,14 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
         raise
 
     #gg = mmg.moment_guesses(moms_res_cnv[1], moms_res_cnv[2], ncomp, moment0=moms_res_cnv[0])
-    nsize = np.sum(np.isfinite(moms_res_cnv[0]))
+    #nsize = np.sum(np.isfinite(moms_res_cnv[0]))
+
+    # use the brightest pixel based on mom0 as the starting point
+    mom0 = moms_res_cnv[0]
+    indx_g = np.where(mom0 == np.nanmax(mom0))
+    idx_x = indx_g[1][0]
+    idx_y = indx_g[0][0]
+    start_from_point = (idx_x, idx_y)
 
     gg = mmg.moment_guesses_1c(moms_res_cnv[0], moms_res_cnv[1], moms_res_cnv[2])
 
@@ -546,7 +559,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     # should try to use UCubePlus??? may want to avoid saving too many intermediate cube products
     reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
     #reg.ucube_res_cnv.fit_cube(ncomp=[1], snr_min=3, guesses=gg)
-    reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg)
+    reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg, start_from_point=start_from_point)
 
     # save the residual fit
     if savefit:
