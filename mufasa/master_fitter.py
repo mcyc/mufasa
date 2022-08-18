@@ -175,7 +175,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
 
     gc.collect()
     # re-fit and save the updated model
-    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21)
+    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=False)
 
 
 
