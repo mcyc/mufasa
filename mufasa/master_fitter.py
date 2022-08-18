@@ -20,6 +20,7 @@ from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
 
 
+
 #=======================================================================================================================
 
 class Region(object):
@@ -175,7 +176,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
 
     gc.collect()
     # re-fit and save the updated model
-    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=False)
+    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=True)
 
 
 
@@ -271,13 +272,17 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         c1_guess = gss_rf.refine_each_comp(c1_guess)
 
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
+        simpfit = True
+
     elif method == 'moments':
         final_guess = mmg.mom_guess_wide_sep(reg.ucube.cube, planemask=mask)
+        simpfit = True
+
     else:
         print("[ERROR] the following method specified is invalid: {}".format(method))
         return None
 
-    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=False)
+    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit)
 
 
 
@@ -297,7 +302,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
             good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
-            good_mask = np.logical_and(lnk_NvsO > 0, lnk_NvsO)
+            good_mask = np.logical_and(lnk_NvsO > 0, mask)
             print("replace bad pix mask size: {}".format(good_mask.sum()))
 
         # replace the values
@@ -684,14 +689,19 @@ def get_best_2comp_model(reg):
     return modbest
 
 
-def replace_para(pcube, pcube_ref, mask, multicore=1):
+def replace_para(pcube, pcube_ref, mask, multicore=None):
+    import multiprocessing
+
     # replace values in masked pixels with the reference values
     pcube_ref = pcube_ref.copy('deep')
     pcube.parcube[:,mask] = pcube_ref.parcube[:,mask]
     pcube.errcube[:,mask] = pcube_ref.errcube[:,mask]
 
     if pcube._modelcube is not None:
-        # this update is import for proper residual and AICc calculations
+        if multicore is None:
+            # use n-1 cores on the computer
+            multicore = multiprocessing.cpu_count() - 1
+
         newmod = pcube_ref.get_modelcube(multicore=multicore)
         pcube._modelcube[:, mask] = newmod[:, mask]
 
