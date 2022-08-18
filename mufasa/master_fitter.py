@@ -20,7 +20,6 @@ from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
 
 
-
 #=======================================================================================================================
 
 class Region(object):
@@ -150,6 +149,8 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     # refit pixels where 2 component fits are substentially worse than good one components
     # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
 
+    from astropy.convolution import Gaussian2DKernel, convolve
+
     print("begin re-fitting bad 2-comp pixels")
 
     lnk21 = ucube.get_AICc_likelihood(2, 1)
@@ -158,14 +159,19 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     # where the fits are poor
     mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
     mask = np.logical_and(mask, np.isfinite(lnk10))
-
     mask_size = np.sum(mask)
     print("refit mask size for bad_2comp: {}".format(mask_size))
 
     guesses = ucube.pcubes['2'].parcube.copy()
+    # remove the bad pixels
+    guesses[:,mask] = np.nan
 
+    # use astropy convolution to interpolate guesses (we assume bad fits are usually well surrounded by good fits)
+    kernel = Gaussian2DKernel(2)
     for i, gmap in enumerate(guesses):
-        guesses[i] = medfilt2d(gmap, kernel_size=3)
+        gmap[mask] = np.nan
+        #guesses[i] = medfilt2d(gmap, kernel_size=3)
+        guesses[i] = convolve(gmap, kernel, boundary='extend')
 
     gc.collect()
     # re-fit and save the updated model
@@ -262,6 +268,8 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         wide_comp_guess = get_2comp_wide_guesses(reg)
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
         c1_guess = reg.ucube.pcubes['1'].parcube
+        c1_guess = gss_rf.refine_each_comp(c1_guess)
+
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
     elif method == 'moments':
         final_guess = mmg.mom_guess_wide_sep(reg.ucube.cube, planemask=mask)
@@ -269,17 +277,17 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         print("[ERROR] the following method specified is invalid: {}".format(method))
         return None
 
-    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21)
+    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=False)
 
 
 
 
-def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None):
+def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
     # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
     if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile)
         # fit using simpfit (and take the provided guesses as they are)
-        ucube_new.fit_cube(ncomp=[2], simpfit=True, maskmap=mask, snr_min=snr_min, guesses=guesses)
+        ucube_new.fit_cube(ncomp=[2], simpfit=simpfit, maskmap=mask, snr_min=snr_min, guesses=guesses)
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
@@ -478,7 +486,7 @@ def get_2comp_wide_guesses(reg):
         gg = gss_rf.refine_each_comp(gg, mask=mask)
         return gg
 
-    if not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
+    if ('1' not in reg.ucube_res_cnv.pcubes) or not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
         # if there were no successful fit to the convolved cube, get moment map from no masking
         return get_mom_guesses(reg)
 
@@ -549,17 +557,29 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     indx_g = np.where(mom0 == np.nanmax(mom0))
     idx_x = indx_g[1][0]
     idx_y = indx_g[0][0]
-    start_from_point = (idx_x, idx_y)
+    start_from_point = (idx_y, idx_x)
 
     gg = mmg.moment_guesses_1c(moms_res_cnv[0], moms_res_cnv[1], moms_res_cnv[2])
 
     mask = np.isfinite(gg[0])
     gg = gss_rf.refine_each_comp(gg, mask=mask)
 
+    rms = cube_res_cnv.mad_std(axis=0)
+    snr = mom0/rms
+    maskmap = snr >= res_snr_cut
+
     # should try to use UCubePlus??? may want to avoid saving too many intermediate cube products
     reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
     #reg.ucube_res_cnv.fit_cube(ncomp=[1], snr_min=3, guesses=gg)
-    reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg, start_from_point=start_from_point)
+    #reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg, start_from_point=start_from_point)
+
+    if np.sum(maskmap) > 0:
+        # only attempt the fit if any pixel is about the snr cut
+        #reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=0.0, guesses=gg, maskmap=maskmap,
+        #                           start_from_point=start_from_point)
+        reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg, maskmap=maskmap)
+    else:
+        return None
 
     # save the residual fit
     if savefit:
