@@ -451,7 +451,8 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=Non
             # we only need a crude estimate
             rms = mad_std(spec._data, axis=0, ignore_nan=True)
 
-        pcube = pyspeckit.Cube(cube=spec, maskmap=planemask)
+        spec = spec.with_spectral_unit("km/s", velocity_convention="radio")
+        pcube = pyspeckit.Cube(cube=spec, maskmap=planemask, velocity_convention = 'radio')
 
         # get the moments using the pyspeckit method
         m0, m1, m2 = window_moments(pcube, window_hwidth=win_hwidth, v_atpeak=vpeak)
