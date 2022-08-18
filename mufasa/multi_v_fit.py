@@ -447,11 +447,20 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
         if multicore < 1:
             multicore = 1
 
-    if maskmap is not None and 'start_from_point' not in kwargs:
+    # get the masking for the fit
+    footprint_mask = np.any(np.isfinite(cube._data), axis=0)
+    planemask = np.any(np.isfinite(guesses), axis=0)
+
+    if maskmap is not None:
+        print("using user specified mask")
+        maskmap *= planemask * footprint_mask
+    else:
+        maskmap = planemask * footprint_mask
+
+    if 'start_from_point' not in kwargs:
         print("using automated starting point")
         indx_g = np.argwhere(maskmap)
         start_from_point = (indx_g[0,1], indx_g[0,0])
-        #start_from_point = (indx_g[0, 0], indx_g[0, 1])
         kwargs['start_from_point'] = start_from_point
 
     if 'signal_cut' not in kwargs:
@@ -477,19 +486,19 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
 
-    def impose_lim(data, min=None, max=None):
+    def impose_lim(data, min=None, max=None, eps=0):
         if min is not None:
             mask = data < min
-            data[mask] = min
+            data[mask] = min + eps
         if max is not None:
             mask = data > max
-            data[mask] = max
+            data[mask] = max - eps
 
     # impose parameter limits on the guesses
-    impose_lim(guesses[::4], vmin, vmax)
-    impose_lim(guesses[1::4], sigmin, sigmax)
-    impose_lim(guesses[2::4], Texmin, Texmax)
-    impose_lim(guesses[3::4], taumin, taumax)
+    impose_lim(guesses[::4], vmin, vmax, eps)
+    impose_lim(guesses[1::4], sigmin, sigmax, eps)
+    impose_lim(guesses[2::4], Texmin, Texmax, eps)
+    impose_lim(guesses[3::4], taumin, taumax, eps)
 
     # add all the pcube.fiteach kwargs)
     kwargs['multicore'] = multicore
@@ -497,7 +506,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     kwargs['limitedmax'] = [True, True, True, True] * ncomp
     kwargs['maxpars'] = [vmax, sigmax, Texmax, taumax] * ncomp
     kwargs['limitedmin'] = [True, True, True, True] * ncomp
-    kwargs[' minpars'] = [vmin, sigmin, Texmin, taumin] * ncomp
+    kwargs['minpars'] = [vmin, sigmin, Texmin, taumin] * ncomp
 
     pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
 
