@@ -269,10 +269,11 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
             map[:] = 0.0
         return map
 
-    map_med = median_filter(map, footprint=disk(disksize))
-    if np.sum(np.isfinite(map_med)) == 0:
-        kernel = Gaussian2DKernel(disksize)
-        map = convolve(map, kernel, boundary='extend')
+    #map_med = median_filter(map, footprint=disk(disksize))
+    #if np.sum(np.isfinite(map_med)) == 0:
+
+    kernel = Gaussian2DKernel(disksize)
+    map = convolve(map, kernel, boundary='extend')
 
     if mask is None:
         mask = np.isfinite(map)
