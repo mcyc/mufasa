@@ -448,8 +448,8 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
             multicore = 1
 
     if maskmap is not None and 'start_from_point' not in kwargs:
+        print("using automated starting point")
         indx_g = np.argwhere(maskmap)
-        print("yo yo!")
         start_from_point = (indx_g[0,1], indx_g[0,0])
         #start_from_point = (indx_g[0, 0], indx_g[0, 1])
         kwargs['start_from_point'] = start_from_point
@@ -491,13 +491,27 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     impose_lim(guesses[2::4], Texmin, Texmax)
     impose_lim(guesses[3::4], taumin, taumax)
 
-    pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, use_neighbor_as_guess=False, multicore=multicore,
-                  maskmap=maskmap,
-                  limitedmax=[True, True, True, True] * ncomp,
-                  maxpars=[vmax, sigmax, Texmax, taumax] * ncomp,
-                  limitedmin=[True, True, True, True] * ncomp,
-                  minpars=[vmin, sigmin, Texmin, taumin] * ncomp,
-                  **kwargs)
+    # add all the pcube.fiteach kwargs)
+    kwargs['multicore'] = multicore
+    kwargs['use_neighbor_as_guess'] = False
+    kwargs['limitedmax'] = [True, True, True, True] * ncomp
+    kwargs['maxpars'] = [vmax, sigmax, Texmax, taumax] * ncomp
+    kwargs['limitedmin'] = [True, True, True, True] * ncomp
+    kwargs[' minpars'] = [vmin, sigmin, Texmin, taumin] * ncomp
+
+    pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
+
+    '''
+    try:
+        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
+
+    except AssertionError:
+        # if the start_from_point is invalid
+        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
+        indx_g = np.argwhere(maskmap)
+        start_from_point = (indx_g[0,1], indx_g[0,0])
+        kwargs['start_from_point'] = start_from_point
+    '''
 
     return pcube
 
