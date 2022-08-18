@@ -341,7 +341,20 @@ def moment_guesses_1c(m0, m1, m2):
     # divide the tau tex guess into two regimes by integrated flux
     # if flux is greater than mom0_thres, assume a fixed tau value and caculate the corrosponding tex assume Gaussian
     # otherwise, assume a fixed tex value and calculate tau instead
-    if m0.ndim == 2:
+    if isinstance(m0, float):
+        # for 0D
+        if mom0 < mom0_min:
+            mom0 = mom0_min
+
+        if mom0 > mom0_thres:
+            tau_guess = tau_fx
+            tex_guess = get_tex(mom0, tau_fx)
+
+        else:
+            tex_guess = tex_fx
+            tau_guess = get_tau(mom0, tex_guess)
+
+    elif m0.ndim == 2:
         # aassume all mom0 lower than mom0 to be mom0_min
         mom0[mom0 < mom0_min] = mom0_min
 
@@ -356,21 +369,10 @@ def moment_guesses_1c(m0, m1, m2):
         tau_guess[~mask] = get_tau(mom0[~mask], tex_fx)
         tex_guess[~mask] = tex_fx
 
-    elif m0.ndim==0:
-        # for 0D
-        if mom0 < mom0_min:
-            mom0 = mom0_min
-
-        if mom0 > mom0_thres:
-            tau_guess = tau_fx
-            tex_guess = get_tex(mom0, tau_fx)
-
-        else:
-            tex_guess = tex_fx
-            tau_guess = get_tau(mom0, tex_guess)
 
     else:
         print("[ERROR]: the moment 0 input has the wrong dimension ({})".format(m0.ndim))
+        return None
 
     return np.asarray([m1, gs_sig, tex_guess, tau_guess])
 
@@ -395,6 +397,9 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=Non
         multicore = multiprocessing.cpu_count() - 1
 
     if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
+        spec.xarr.velocity_convention = 'radio'
+        spec.xarr = spec.xarr.as_unit('km/s')
+
         if rms is None:
             # we only need a crude estimate
             rms = mad_std(spec.data, axis=None, ignore_nan=True)
