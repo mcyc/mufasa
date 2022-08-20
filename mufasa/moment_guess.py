@@ -101,15 +101,32 @@ def vmask_cube(cube, vmap, window_hwidth=3.0):
 
 
 def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
+    '''
+    :param spec:
+        A spectrum or cube. Can be either pyspeckit objects or spectral_cube objects
+    :param window_hwidth:
+        <float>
+        the half-width of the spectral window to calculate moments from (useful to isolate hyperfine lines)
+    :param v_atpeak:
+        <float or ndarraay>
+        the velocity or velocity map to center the moment calculation on
+    :param signal_mask:
+    :return:
+    '''
     # wrapper to find moments for different types of inputs
 
     if isinstance(spec, pyspeckit.Cube):
+        # this method is much slower than using SpectralCube, but also seems more robust at spectral peaks
         return window_moments_pyspcube(spec, window_hwidth, v_atpeak)
 
     elif isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         return window_moments_spc(spec, window_hwidth, v_atpeak)
 
     elif isinstance(spec, SpectralCube):
+        # currently cannot handle v_atpeak as a map
+        if not hasattr(v_atpeak, 'ndim'):
+            print("[ERROR]: the method that handle SpectralCube cannot current hanlde v_atpeak as a map")
+            print("please use single value v_atpeak instead")
         return window_window_moments_spcube(spec, window_hwidth, v_atpeak, signal_mask)
 
     else:
