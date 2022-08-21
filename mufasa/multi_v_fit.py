@@ -461,6 +461,8 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
         print("using automated starting point")
         indx_g = np.argwhere(maskmap)
         start_from_point = (indx_g[0,1], indx_g[0,0])
+        #start_from_point = (indx_g[0, 0], indx_g[0, 1]) # probably the wrong order
+        print("starting point: {}".format(start_from_point))
         kwargs['start_from_point'] = start_from_point
 
     if 'signal_cut' not in kwargs:

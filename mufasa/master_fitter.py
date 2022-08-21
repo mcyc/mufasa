@@ -260,6 +260,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
 
     mask_size = np.sum(mask)
     print("wide recovery refit mask size: {}".format(mask_size))
+
     if mask_size ==0:
         print("no pixel in the recovery mask, no fit is performed")
         return None
@@ -271,16 +272,25 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         c1_guess = reg.ucube.pcubes['1'].parcube
         c1_guess = gss_rf.refine_each_comp(c1_guess)
 
+        #mask_size = np.sum(mask)
+        #print("wide recovery refit mask size: {}".format(mask_size))
+
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
+        mask = np.logical_and(mask, np.all(np.isfinite(final_guess), axis=0))
         simpfit = True
 
     elif method == 'moments':
+        # this method could be computationally expensive if the mask contains a larger number of pixels
         final_guess = mmg.mom_guess_wide_sep(reg.ucube.cube, planemask=mask)
+        mask = np.logical_and(mask, np.all(np.isfinite(final_guess), axis=0))
         simpfit = True
 
     else:
         print("[ERROR] the following method specified is invalid: {}".format(method))
         return None
+
+    mask_size = np.sum(mask)
+    print("final wide recovery refit mask size: {}".format(mask_size))
 
     replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit)
 
