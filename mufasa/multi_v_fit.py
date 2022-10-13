@@ -656,10 +656,30 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
     else:
         signal_mask = default_masking(peaksnr, snr_min=10.0)
+        sig_mask_size = signal_mask.sum()
+
+        if sig_mask_size < 1:
+            print("try sig mask SNR 5")
+            # if there's no pixel above SNR > 10, try lower the threshold to 5
+            signal_mask = default_masking(peaksnr, snr_min=5.0)
+            sig_mask_size = signal_mask.sum()
+
+        if sig_mask_size < 1:
+            print("try sig mask SNR 3")
+            # if there's no pixel above SNR > 10, try lower the threshold to 5
+            signal_mask = default_masking(peaksnr, snr_min=3.0)
+            sig_mask_size = signal_mask.sum()
+
+        if sig_mask_size < 1:
+            # if no pixel in the map still, use all pixels
+            print("sig mask set to equal plane mask")
+            signal_mask = planemask
+            sig_mask_size = signal_mask.sum()
+
+        print("signal_mask size: {}".format(sig_mask_size))
+
         signal_mask *= err_mask
 
-
-        print("signal_mask size: {}".format(signal_mask.sum()))
 
         from skimage.morphology import binary_dilation
 
