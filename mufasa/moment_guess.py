@@ -196,18 +196,26 @@ def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine
         # use all the cores minus one
         multicore = multiprocessing.cpu_count() - 1
 
-
     def get_win_moms(pcube, v_atpeak):
         # get window moments when v_atpeak is given
         pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
-        pcube_masked.momenteach(unit='km/s', verbose=False, multicore=multicore)
+        try:
+            pcube_masked.momenteach(unit='km/s', verbose=False, multicore=multicore)
+        except AttributeError:
+            # if multicore fails, only use one core
+            pcube_masked.momenteach(unit='km/s', verbose=False, multicore=1)
         moments = pcube_masked.momentcube
         return moments
 
     # note: the current implementation may be memory intensitive
     if v_atpeak is None:
         # note the moment 1 estimate of pcube.momenteach seem to be pretty good at ignoring hyperfine structures
-        pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=multicore)
+        try:
+            pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=multicore)
+        except AttributeError:
+            # if multicore fails, only use one core
+            pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=1)
+
         moments = pcube.momentcube
         # redo again with the hyperfine lines masked out
         moments = get_win_moms(pcube, v_atpeak=moments[1])
