@@ -21,7 +21,7 @@ from . import convolve_tools as cnvtool
 
 class UltraCube(object):
 
-    def __init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2, multicore=None):
         '''
         # a data frame work to handel multiple component fits and their results
         Parameters
@@ -43,7 +43,10 @@ class UltraCube(object):
         self.master_model_mask = None
         self.snr_min = 0.0
         self.cnv_factor = cnv_factor
-        self.n_cores = multiprocessing.cpu_count()
+        if multicore is None:
+            self.n_cores = multiprocessing.cpu_count() - 1
+        else:
+            self.n_cores = multicore
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -89,7 +92,7 @@ class UltraCube(object):
         # currently limited to NH3 (1,1) 2-slab fit
 
         if not 'multicore' in kwargs:
-            kwargs['multicore'] = multiprocessing.cpu_count()
+            kwargs['multicore'] = self.n_cores #multiprocessing.cpu_count()
 
         if not 'snr_min' in kwargs:
             kwargs['snr_min'] = self.snr_min
