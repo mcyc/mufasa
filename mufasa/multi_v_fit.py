@@ -848,7 +848,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     if multicore is None:
         # use n-1 cores on the computer
-        multicore= multiprocessing.cpu_count() - 1
+        multicore = multiprocessing.cpu_count() - 1
 
         if multicore < 1:
             multicore = 1

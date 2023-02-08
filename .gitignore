@@ -1,0 +1,5 @@
+*test/
+env.yml
+*.pyc
+test.py
+mufasa/master_fit_structure.py
