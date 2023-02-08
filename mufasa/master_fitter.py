@@ -230,7 +230,11 @@ def refit_swap_2comp(reg, snr_min=3, **kwargs):
 
 
 
-def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, **kwargs):
+def refit_2comp_wide(reg, snr_min=3, planemask=None, **kwargs):
+    if 'wide_refit_method' in kwargs:
+       method =  kwargs['wide_refit_method']
+    else:
+        method = 'residual'
 
     print("begin wide component recovery")
 
