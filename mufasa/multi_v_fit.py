@@ -115,7 +115,6 @@ def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrnam
     return cubes
 
 
-
 def get_SNR(paraname, savename = None, rms = 0.15, n_comp = 2, linename='oneone'):
     '''
     Take a multiple velocity componet fit and produce a signal to noise ratio of the two velocity components
@@ -239,7 +238,6 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         return chisq, np.sum(mask, axis=0)
 
 
-
 def main_hf_moments(maskcube, window_hwidth, v_atpeak=None, signal_mask=None):
     '''
     # find moments for the main hyperfine lines
@@ -275,7 +273,6 @@ def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_gues
     :return:
     '''
     return momgue.moment_guesses(moment1, moment2, ncomp, sigmin, tex_guess, tau_guess, moment0)
-
 
 
 def make_guesses(sigv_para_name, n_comp = 2, tex_guess =10.0, tau_guess = 0.5):
@@ -525,8 +522,6 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     '''
 
     return pcube
-
-
 
 
 def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None, guesses = None, errmap11name = None,
@@ -879,7 +874,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     return pcube
 
 
-
 def save_pcube(pcube, savename, ncomp=2):
     # a method to save the fitted parameter cube with relavent header information
 
@@ -907,4 +901,3 @@ def save_pcube(pcube, savename, ncomp=2):
 
     fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube,pcube.errcube]), header=hdr_new)
     fitcubefile.writeto(savename ,overwrite=True)
-

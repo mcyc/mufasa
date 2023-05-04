@@ -65,7 +65,6 @@ class UltraCube(object):
             self.rmsfile = kwargs['rmsfile']
 
 
-
     def load_cube(self, fitsfile):
         # loads SpectralCube
         self.cube = SpectralCube.read(fitsfile)
@@ -89,7 +88,11 @@ class UltraCube(object):
 
 
     def fit_cube(self, ncomp, simpfit=False, **kwargs):
-        # currently limited to NH3 (1,1) 2-slab fit
+        '''
+        currently limited to NH3 (1,1) 2-slab fit
+
+        kwargs are those used for pyspeckit.Cube.fiteach
+        '''
 
         if not 'multicore' in kwargs:
             kwargs['multicore'] = self.n_cores #multiprocessing.cpu_count()
@@ -119,6 +122,7 @@ class UltraCube(object):
             self.master_model_mask = mask
         else:
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
+
 
     def save_fit(self, savename, ncomp):
         # note, this implementation currently relies on
@@ -152,6 +156,7 @@ class UltraCube(object):
 
         self.rms_maps[compID] = get_rms(self.residual_cubes[compID])
         return self.rms_maps[compID]
+
 
     def get_rss(self, ncomp, mask=None):
         # residual sum of squares
@@ -237,9 +242,12 @@ class UCubePlus(UltraCube):
         self.paraPaths = {}
 
 
-
     def get_model_fit(self, ncomp, update=True, **kwargs):
-        # load the model fits if it exist, else
+        '''
+        load the model fits if it exist, else
+
+        kwargs are passed to pyspeckit.Cube.fiteach (if update)
+        '''
 
         for nc in ncomp:
             if not str(nc) in self.paraPaths:
@@ -264,6 +272,9 @@ class UCubePlus(UltraCube):
 #======================================================================================================================#
 
 def fit_cube(cube, simpfit=False, **kwargs):
+    '''
+    kwargs are those used for pyspeckit.Cube.fiteach
+    '''
     if simpfit:
         # fit the cube with the provided guesses and masks with no pre-processing
         return mvf.cubefit_simp(cube, **kwargs)
@@ -421,7 +432,6 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
     return returns
 
 
-
 def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None):
     '''
     cube : SpectralCube
@@ -474,7 +484,6 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     else:
         # return the ch-squared values and the number of data points used
         return chisq, np.nansum(mask, axis=0)
-
 
 
 def get_masked_moment(cube, model, order=0, expand=10, mask=None):

@@ -101,6 +101,12 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
 
 
 def get_convolved_fits(reg, ncomp, **kwargs):
+    '''
+    kwargs:
+        update (bool) : call reg.get_convolved_cube even if reg has ucube_cnv attribute
+
+        kwargs passed to reg.ucube_cnv.get_model_fit
+    '''
     if not hasattr(reg, 'ucube_cnv'):
         reg.get_convolved_cube(update=True)
     elif 'update' in kwargs:
@@ -117,7 +123,15 @@ def get_fits(reg, ncomp, **kwargs):
 
 
 def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True, **kwargs):
-    # note, planemask superseeds snr-based maask
+    '''
+    note: planemask supercedes snr-based mask
+
+    kwargs are passed to
+        iter_2comp_fit (update, kwargs for pyspeckit.Cube.fiteach)
+        refit_bad_2comp (kwargs for pyspeckit.Cube.fiteach)
+        refit_2comp_wide (kwargs for pyspeckit.Cube.fiteach)
+    '''
+
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, **kwargs)
 
     if refit_bad_pix:
@@ -131,11 +145,15 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
 
 
 def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, **kwargs):
-    # ensure this is a two compnent fitting method
+    '''
+    kwargs are passed to
+        get_convolved_fits (update, kwargs for reg.ucube.get_model_fit)
+        reg.ucube.get_model_fit (kwargs for pyspeckit.Cube.fiteach)
+    '''
+    # ensure this is a two component fitting method
     ncomp = [1,2]
 
     # convolve the cube and fit it
-    # get_convolved_cube(reg, update=updateCnvFits)
     get_convolved_fits(reg, ncomp, update=updateCnvFits, snr_min=snr_min, **kwargs)
 
     # use the result from the convolved cube as guesses for the full resolution fits
@@ -154,8 +172,12 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, **kwargs)
 
 
 def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20, **kwargs):
-    # refit pixels where 2 component fits are substentially worse than good one components
-    # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
+    '''
+    refit pixels where 2 component fits are substantially worse than good one components
+    default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
+
+    kwargs are passed to replace_bad_pix (kwargs for pyspeckit.Cube.fiteach)
+    '''
 
     from astropy.convolution import Gaussian2DKernel, convolve
 
@@ -186,8 +208,10 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20, **kwargs):
     replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=True, **kwargs)
 
 
-
 def refit_swap_2comp(reg, snr_min=3, **kwargs):
+    '''
+    kwargs are passed to UCube.UltraCube.fit_cube (kwargs for pyspeckit.Cube.fiteach)
+    '''
 
     ncomp = [1, 2]
 
@@ -229,13 +253,10 @@ def refit_swap_2comp(reg, snr_min=3, **kwargs):
     save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
 
-
-def refit_2comp_wide(reg, snr_min=3, planemask=None, **kwargs):
-    if 'wide_refit_method' in kwargs:
-       method =  kwargs['wide_refit_method']
-    else:
-        method = 'residual'
-
+def refit_2comp_wide(reg, snr_min=3, planemask=None, method='residual', **kwargs):
+    '''
+    kwargs are passed to replace_bad_pix (kwargs for pyspeckit.Cube.fiteach)
+    '''
     print("begin wide component recovery")
 
     ncomp = [1, 2]
@@ -309,7 +330,11 @@ def refit_2comp_wide(reg, snr_min=3, planemask=None, **kwargs):
 
 
 def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, **kwargs):
-    # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+    '''
+    refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+
+    kwargs are passed to Ucube.UltraCube.fit_cube (kwargs for pyspeckit.Cube.fiteach)
+    '''
     if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile, multicore=ucube.n_cores)
         # fit using simpfit (and take the provided guesses as they are)
@@ -335,7 +360,6 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, **k
         print("not enough pixels to refit, no-refit is done")
 
 
-
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
     ncomp = [1,2]
@@ -356,7 +380,6 @@ def save_updated_paramaps(ucube, ncomps):
             print("[ERROR]: the ucube does not have paraPath for '{}' components".format(nc))
         else:
             ucube.save_fit(ucube.paraPaths[str(nc)], nc)
-
 
 
 def save_best_2comp_fit(reg):
@@ -484,6 +507,9 @@ def save_map(map, header, savename, overwrite=True):
 
 
 def get_2comp_wide_guesses(reg, **kwargs):
+    '''
+    kwargs are passed to fit_best_2comp_residual_cnv (kwargs for pyspeckit.Cube.fiteach)
+    '''
 
     if not hasattr(reg, 'ucube_res_cnv'):
         # fit the residual with the one component model if this has not already been done.
@@ -532,8 +558,7 @@ def get_2comp_wide_guesses(reg, **kwargs):
 
             # use the dialated mask as a footprint to interpolate the guesses
             gmask = dilation(aic1v0_mask)
-            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
-                                                      mask=gmask)
+            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header, mask=gmask)
         else:
             print("no good fit from convolved guess, using the moment guess for the full-res refit instead")
             # get moment guesses without masking instead
@@ -542,12 +567,14 @@ def get_2comp_wide_guesses(reg, **kwargs):
         return guesses_final
 
 
-
 def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=True, **kwargs):
-    # fit the residual of the best fitted model (note, this approach may not hold well if the two-slab model
-    # insufficiently at describing the observation. Luckily, however, this fit is only to provide initial guess for the
-    # final fit)
-    # the default window_hwidth = 3.5 is about half-way between the main hyperfine and the satellite
+    '''
+    fit the residual of the best fitted model (note, this approach may not hold well if the two-slab model is insufficient at describing the observation. Luckily, however, this fit is only to provide initial guess for the final fit)
+
+    the default window_hwidth = 3.5 is about half-way between the main hyperfine and the satellite
+
+    kwargs are passed to reg.ucube_res_cnv.fit_cube
+    '''
 
     # need a mechanism to make sure reg.ucube.pcubes['1'], reg.ucube.pcubes['2'] exists
     cube_res_cnv = get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=window_hwidth, res_snr_cut=res_snr_cut)
@@ -615,7 +642,6 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
         reg.ucube_res_cnv.save_fit(savename, ncomp)
 
 
-
 def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut=5):
     #convolved residual cube.If masked is True, only convolve over where 'excessive' residual is
     # above a peak SNR value of res_snr_cut masked
@@ -670,8 +696,6 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
     cube_res_masked = cube_res_masked.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
     return cube_res_masked
-
-
 
 
 def get_best_2comp_residual(reg):
@@ -737,6 +761,3 @@ def get_skyheader(cube_header):
     hdr2D['NAXIS1'] = hdr['NAXIS1']
     hdr2D['NAXIS2'] = hdr['NAXIS2']
     return hdr2D
-
-
-
