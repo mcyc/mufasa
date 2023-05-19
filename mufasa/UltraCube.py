@@ -554,7 +554,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 def expand_mask(mask, expand):
 
     # adds a buffer of size set by the expand keyword to a 2D mask,
-    selem = np.ones(expand,dtype=np.bool)
+    selem = np.ones(expand,dtype=bool)
     selem.shape += (1,1,)
     mask = nd.binary_dilation(mask, selem)
     return mask
