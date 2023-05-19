@@ -398,7 +398,7 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
     mask = expand_mask(mask, expand)
-    mask = mask.astype(np.float)
+    mask = mask.astype(float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
     rss = np.nansum((residual * mask)**2, axis=0)
@@ -441,7 +441,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
     mask = expand_mask(mask, expand)
-    mask = mask.astype(np.float)
+    mask = mask.astype(float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
     chisq = np.nansum((residual * mask) ** 2, axis=0)
@@ -499,23 +499,23 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     mask[:, ~mask_highT_2d] = mask_lowT[:, ~mask_highT_2d]
 
     # get pixels that aren't modeled
-    #mask_s = np.zeros(mask.shape, dtype=np.bool)
+    #mask_s = np.zeros(mask.shape, dtype=bool)
     #mask_s[: ~np.all(mask, axis=0)] =
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
     mask = expand_mask(mask, expand)
-    mask = mask.astype(np.float)
+    mask = mask.astype(float)
 
 
     '''
     # expand in all directions instead
-    #selem = np.ones(shape=(expand, expand, expand), dtype=np.bool)
+    #selem = np.ones(shape=(expand, expand, expand), dtype=bool)
     #mask = nd.binary_dilation(mask, selem)
     mask = nd.binary_dilation(mask, iterations=expand)
 
     # pixels with less than expand number of spectral chanels
-    mask_s = np.zeros(mask.shape, dtype=np.bool)
+    mask_s = np.zeros(mask.shape, dtype=bool)
     mask_s[:, np.sum(mask, axis=0) < expand] = True
     mask_s = expand_mask(mask_s, expand)
 
@@ -531,7 +531,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 def expand_mask(mask, expand):
 
     # adds a buffer of size set by the expand keyword to a 2D mask,
-    selem = np.ones(expand,dtype=np.bool)
+    selem = np.ones(expand,dtype=bool)
     selem.shape += (1,1,)
     mask = nd.binary_dilation(mask, selem)
     return mask
