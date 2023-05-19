@@ -418,7 +418,7 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
     # plus a buffer of size set by the expand keyword.
     if expand > 0:
         mask = expand_mask(mask, expand)
-    mask = mask.astype(np.float)
+    mask = mask.astype(float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
     rss = np.nansum((residual * mask)**2, axis=0)
@@ -464,7 +464,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     # plus a buffer of size set by the expand keyword.
     if expand > 0:
         mask = expand_mask(mask, expand)
-    mask = mask.astype(np.float)
+    mask = mask.astype(float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
     chisq = np.nansum((residual * mask) ** 2, axis=0)
@@ -528,7 +528,7 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     # plus a buffer of size set by the expand keyword.
     if expand > 0:
         mask = expand_mask(mask, expand)
-    mask = mask.astype(np.float)
+    mask = mask.astype(float)
 
 
     '''
