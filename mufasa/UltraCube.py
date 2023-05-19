@@ -58,11 +58,11 @@ class UltraCube(object):
                 self.cube = cube
 
         if not snr_min is None:
-            self.snr_min = kwargs['snr_min']
+            self.snr_min = snr_min
 
 
         if not rmsfile is None:
-            self.rmsfile = kwargs['rmsfile']
+            self.rmsfile = rmsfile
 
 
     def load_cube(self, fitsfile):
