@@ -21,6 +21,7 @@ from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
 from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,remove_small_holes #, closing
 from astropy.convolution import Gaussian2DKernel, convolve
+from astropy.stats import mad_std
 
 from . import ammonia_multiv as ammv
 from . import moment_guess as momgue
@@ -413,6 +414,120 @@ def get_singv_tau11(singv_para):
     return tau11
 
 
+def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename="oneone", **kwargs):
+    # a simper version of cubefit_gen that assumes good user provided guesses
+
+    print("using simp fit!")
+
+    if hasattr(cube, 'spectral_axis'):
+        pcube = pyspeckit.Cube(cube=cube)
+
+    else:
+        cubename = cube
+        pcube = pyspeckit.Cube(filename=cubename)
+
+    pcube.unit="K"
+
+    # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
+    # note: this assume the data cube has the right units
+
+    if pcube.wcs.wcs.restfrq == np.nan:
+        # Specify the rest frequency not present
+        pcube.xarr.refX = freq_dict[linename]*u.Hz
+    pcube.xarr.velocity_convention = 'radio'
+
+    # always register the fitter just in case different lines are used
+    fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
+    pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
+
+    if multicore is None:
+        # use n-1 cores on the computer
+        multicore= multiprocessing.cpu_count() - 1
+
+        if multicore < 1:
+            multicore = 1
+
+    # get the masking for the fit
+    footprint_mask = np.any(np.isfinite(cube._data), axis=0)
+    planemask = np.any(np.isfinite(guesses), axis=0)
+
+    if maskmap is not None:
+        print("using user specified mask")
+        maskmap *= planemask * footprint_mask
+    else:
+        maskmap = planemask * footprint_mask
+
+    if 'start_from_point' not in kwargs:
+        print("using automated starting point")
+        indx_g = np.argwhere(maskmap)
+        start_from_point = (indx_g[0,1], indx_g[0,0])
+        #start_from_point = (indx_g[0, 0], indx_g[0, 1]) # probably the wrong order
+        print("starting point: {}".format(start_from_point))
+        kwargs['start_from_point'] = start_from_point
+
+    if 'signal_cut' not in kwargs:
+        kwargs['signal_cut'] = 0.0
+
+    if 'errmap' not in kwargs:
+        kwargs['errmap'] = mad_std(pcube.cube, axis=0, ignore_nan = True)
+
+    # set the fit parameter limits (consistent with GAS DR1)
+    Texmin = 3.0    # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
+    Texmax = 40    # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
+    sigmin = 0.07   # km/s
+    sigmax = 2.5    # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
+    taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
+    taumin = 0.1#0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
+    eps = 0.001 # a small perturbation that can be used in guesses
+
+    v_peak_hwidth = 10
+    v_guess = guesses[::4]
+    v_guess[v_guess == 0] = np.nan
+    v_median = np.nanmedian(v_guess)
+
+    vmax = v_median + v_peak_hwidth
+    vmin = v_median - v_peak_hwidth
+
+    def impose_lim(data, min=None, max=None, eps=0):
+        if min is not None:
+            mask = data < min
+            data[mask] = min + eps
+        if max is not None:
+            mask = data > max
+            data[mask] = max - eps
+
+    # impose parameter limits on the guesses
+    impose_lim(guesses[::4], vmin, vmax, eps)
+    impose_lim(guesses[1::4], sigmin, sigmax, eps)
+    impose_lim(guesses[2::4], Texmin, Texmax, eps)
+    impose_lim(guesses[3::4], taumin, taumax, eps)
+
+    # add all the pcube.fiteach kwargs)
+    kwargs['multicore'] = multicore
+    kwargs['use_neighbor_as_guess'] = False
+    kwargs['limitedmax'] = [True, True, True, True] * ncomp
+    kwargs['maxpars'] = [vmax, sigmax, Texmax, taumax] * ncomp
+    kwargs['limitedmin'] = [True, True, True, True] * ncomp
+    kwargs['minpars'] = [vmin, sigmin, Texmin, taumin] * ncomp
+
+    pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
+
+    '''
+    try:
+        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
+
+    except AssertionError:
+        # if the start_from_point is invalid
+        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
+        indx_g = np.argwhere(maskmap)
+        start_from_point = (indx_g[0,1], indx_g[0,0])
+        kwargs['start_from_point'] = start_from_point
+    '''
+
+    return pcube
+
+
+
 
 def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None, guesses = None, errmap11name = None,
             multicore = None, mask_function = None, snr_min=0.0, linename="oneone", momedgetrim=True, saveguess=False,
@@ -541,22 +656,66 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
     else:
         signal_mask = default_masking(peaksnr, snr_min=10.0)
+        sig_mask_size = signal_mask.sum()
+
+        if sig_mask_size < 1:
+            print("try sig mask SNR 5")
+            # if there's no pixel above SNR > 10, try lower the threshold to 5
+            signal_mask = default_masking(peaksnr, snr_min=5.0)
+            sig_mask_size = signal_mask.sum()
+
+        if sig_mask_size < 1:
+            print("try sig mask SNR 3")
+            # if there's no pixel above SNR > 10, try lower the threshold to 5
+            signal_mask = default_masking(peaksnr, snr_min=3.0)
+            sig_mask_size = signal_mask.sum()
+
+        if sig_mask_size < 1:
+            # if no pixel in the map still, use all pixels
+            print("sig mask set to equal plane mask")
+            signal_mask = planemask
+            sig_mask_size = signal_mask.sum()
+
+        print("signal_mask size: {}".format(sig_mask_size))
+
         signal_mask *= err_mask
 
-        if signal_mask.sum() < 9:
-            signal_mask = default_masking(peaksnr, snr_min=5.0)
-            signal_mask *= err_mask
 
-        print("signal_mask size: {}".format(signal_mask.sum()))
+        from skimage.morphology import binary_dilation
 
-        if signal_mask.sum() > 9:
-            # if the signal mask used to find the peak of the main hyperfines is large enough:
-            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=signal_mask)
-        elif err_mask.sum() > 9:
-            # use err_mask only if err_mask is large enough
-            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, signal_mask=err_mask)
+        def asoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
+            # a method to divide the cube into different regions and moments in each region
+            _, n_seeds = ndi.label(seeds)
+            if n_seeds > 10:
+                # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
+                seeds = binary_dilation(seeds, disk(5))
+
+            return momgue.adoptive_moment_maps(maskcube, seeds, window_hwidth=window_hwidth,
+                                              weights=weights, signal_mask=signal_mask)
+
+
+        # find the number of structures in the signal_mask
+        from scipy import ndimage as ndi
+
+        _, n_sig_parts = ndi.label(signal_mask)
+
+        if n_sig_parts > 1:
+            # if there is more than one structure in the signal mask
+            seeds = signal_mask
+            m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                                 weights=peaksnr, signal_mask=signal_mask)
+
         else:
-            m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
+            # use err_mask if it has structures
+            _, n_parts = ndi.label(~err_mask)
+            if n_parts > 1:
+                seeds = err_mask
+                m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                                     weights=peaksnr, signal_mask=signal_mask)
+            else:
+                # use the simplest main_hf_moments
+                m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
+
         v_median = np.median(m1[np.isfinite(m1)])
         print("median velocity: {0}".format(v_median))
 
@@ -624,10 +783,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # fill in the failed sigma guesses with interpotaed guesseses
         gmask = guesses[1::4] < sigmin
         guesses[1::4][gmask] = guesses_smooth[1::4][gmask]
-
-        # then  moment guesses
-        # gmask = guesses[1::4] < sigmin
-        # guesses[1::4][gmask] = gg[1::4][gmask]
 
         print("user provided guesses accepted")
 

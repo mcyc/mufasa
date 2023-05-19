@@ -28,7 +28,7 @@ pip install mufasa
 
 - ```spectral_cube > v0.6.0```
 
-- ```pyspeckit > v0.1.24```
+- ```pyspeckit > v1.0.1```
 
 - ```reproject > v0.7.1```
 

@@ -85,7 +85,7 @@ class UltraCube(object):
             print("[WARNING]: the specified file does not exist.")
 
 
-    def fit_cube(self, ncomp, **kwargs):
+    def fit_cube(self, ncomp, simpfit=False, **kwargs):
         # currently limited to NH3 (1,1) 2-slab fit
 
         if not 'multicore' in kwargs:
@@ -99,7 +99,8 @@ class UltraCube(object):
             ncomp = [ncomp]
 
         for nc in ncomp:
-            self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
+            #self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
+            self.pcubes[str(nc)] = fit_cube(self.cube, simpfit=simpfit, ncomp=nc, **kwargs)
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
@@ -259,8 +260,12 @@ class UCubePlus(UltraCube):
 
 #======================================================================================================================#
 
-def fit_cube(cube, **kwargs):
-    return mvf.cubefit_gen(cube, **kwargs)
+def fit_cube(cube, simpfit=False, **kwargs):
+    if simpfit:
+        # fit the cube with the provided guesses and masks with no pre-processing
+        return mvf.cubefit_simp(cube, **kwargs)
+    else:
+        return mvf.cubefit_gen(cube, **kwargs)
 
 
 def save_fit(pcube, savename, ncomp):
@@ -369,7 +374,7 @@ def get_aic(chisq, p, N=None):
 '''
 
 
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True):
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False):
     '''
     Calculate residual sum of squares (RSS)
 
@@ -397,16 +402,21 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-    mask = expand_mask(mask, expand)
+
+    if expand > 0:
+        mask = expand_mask(mask, expand)
     mask = mask.astype(float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
     rss = np.nansum((residual * mask)**2, axis=0)
 
+    returns = (rss,)
+
     if return_size:
-        return rss, np.nansum(mask, axis=0)
-    else:
-        return rss
+        returns += (np.nansum(mask, axis=0),)
+    if return_mask:
+        returns += mask
+    return returns
 
 
 
@@ -440,7 +450,9 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-    mask = expand_mask(mask, expand)
+
+    if expand > 0:
+        mask = expand_mask(mask, expand)
     mask = mask.astype(float)
 
     # note: using nan-sum may walk over some potential bad pixel cases
@@ -504,9 +516,10 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-    mask = expand_mask(mask, expand)
-    mask = mask.astype(float)
 
+    if expand > 0:
+        mask = expand_mask(mask, expand)
+    mask = mask.astype(float)
 
     '''
     # expand in all directions instead
