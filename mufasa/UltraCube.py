@@ -82,7 +82,7 @@ class UltraCube(object):
         if filename is None:
             self.convolve_cube(factor=self.cnv_factor)
         elif os.path.exists(filename):
-            self.cube_cnv = SpectralCube.read(fitsfile)
+            self.cube_cnv = SpectralCube.read(filename)
         else:
             print("[WARNING]: the specified file does not exist.")
 
