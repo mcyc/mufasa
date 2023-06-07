@@ -487,10 +487,24 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     v_peak_hwidth = 10
     v_guess = guesses[::4]
     v_guess[v_guess == 0] = np.nan
+
+    '''
     v_median = np.nanmedian(v_guess)
+    v_guess_finite = v_guess[np.isfinite(v_guess)]
+    v_99p = np.percentile(v_guess_finite, 99)
+    v_1p = np.percentile(v_guess_finite, 1)
+    '''
+
+    v_median, v_99p, v_1p = get_vstats(v_guess)
 
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
+
+    # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
+    if v_99p + sigmax > vmax:
+        vmax = v_99p + sigmax
+    if v_1p - sigmax < vmin:
+        vmin = v_1p - sigmax
 
     def impose_lim(data, min=None, max=None, eps=0):
         if min is not None:
@@ -658,6 +672,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         v_median = np.median(v_guess)
         print("The median of the user provided velocities is: {0}".format(v_median))
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
+        v_median, v_99p, v_1p = get_vstats(v_guess)
     else:
         signal_mask = default_masking(peaksnr, snr_min=10.0)
         sig_mask_size = signal_mask.sum()
@@ -721,6 +736,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
                 m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
 
         # mask over robust moment guess pixels to set the velocity fitting range
+        '''
         mask = np.isfinite(m1)
         mask = np.logical_and(mask, signal_mask)
         m1_good = m1[mask]
@@ -728,7 +744,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         v_median = np.median(m1_good)
         v_99p = np.percentile(m1_good, 99)
         v_1p = np.percentile(m1_good, 1)
-        print("median velocity: {0}".format(v_median))
+        '''
+        v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
 
         if False:
             # save the moment maps for diagnostic purposes
@@ -742,6 +759,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             fitcubefile = fits.PrimaryHDU(data=np.array([m0,m1,m2]), header=hdr_new)
             fitcubefile.writeto(savename ,overwrite=True)
 
+
+    print("median velocity: {0}".format(v_median))
 
     # remove the nana values to allow np.nanargmax(m0) to operate smoothly
     m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
@@ -918,3 +937,15 @@ def save_pcube(pcube, savename, ncomp=2):
     fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube,pcube.errcube]), header=hdr_new)
     fitcubefile.writeto(savename ,overwrite=True)
 
+##################
+def get_vstats(velocities, signal_mask=None):
+    m1 = velocities
+    mask = np.isfinite(m1)
+    if signal_mask is not None:
+        mask = np.logical_and(mask, signal_mask)
+    m1_good = m1[mask]
+
+    v_median = np.median(m1_good)
+    v_99p = np.percentile(m1_good, 99)
+    v_1p = np.percentile(m1_good, 1)
+    return v_median, v_99p, v_1p
