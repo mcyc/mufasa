@@ -31,6 +31,19 @@ from . import moment_guess as momgue
 line_names = ["oneone"]
 
 #=======================================================================================================================
+# set global constants
+
+# set the fit parameter limits (consistent with GAS DR1) for NH3 fits
+Texmin = 3.0  # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
+Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
+sigmin = 0.07  # km/s
+sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
+#taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
+taumax = 30.0  # when the satellite hyperfine lines becomes optically thick
+taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
+eps = 0.001  # a small perturbation that can be used in guesses
+
+#=======================================================================================================================
 
 def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrname = None, rms = 0.15, rmspath = None,
                       linename = "oneone"):
@@ -471,15 +484,6 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     if 'errmap' not in kwargs:
         kwargs['errmap'] = mad_std(pcube.cube, axis=0, ignore_nan = True)
 
-    # set the fit parameter limits (consistent with GAS DR1)
-    Texmin = 3.0    # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
-    Texmax = 40    # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
-    sigmin = 0.07   # km/s
-    sigmax = 2.5    # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-    taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
-    taumin = 0.1#0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
-    eps = 0.001 # a small perturbation that can be used in guesses
-
     v_peak_hwidth = 10
     v_guess = guesses[::4]
     v_guess[v_guess == 0] = np.nan
@@ -742,15 +746,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # find the location of the peak signal (to determine the first pixel to fit if nearest neighbour method is used)
     peakloc = np.nanargmax(m0)
     ymax,xmax = np.unravel_index(peakloc, m0.shape)
-
-    # set the fit parameter limits (consistent with GAS DR1)
-    Texmin = 3.0    # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
-    Texmax = 40    # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
-    sigmin = 0.07   # km/s
-    sigmax = 2.5    # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-    taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
-    taumin = 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
-    eps = 0.001 # a small perturbation that can be used in guesses
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
