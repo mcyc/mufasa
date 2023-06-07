@@ -687,7 +687,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         from skimage.morphology import binary_dilation
 
-        def asoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
+        def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
             # a method to divide the cube into different regions and moments in each region
             _, n_seeds = ndi.label(seeds)
             if n_seeds > 10:
@@ -706,7 +706,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         if n_sig_parts > 1:
             # if there is more than one structure in the signal mask
             seeds = signal_mask
-            m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+            m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                  weights=peaksnr, signal_mask=signal_mask)
 
         else:
@@ -714,13 +714,20 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             _, n_parts = ndi.label(~err_mask)
             if n_parts > 1:
                 seeds = err_mask
-                m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                      weights=peaksnr, signal_mask=signal_mask)
             else:
                 # use the simplest main_hf_moments
                 m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
 
-        v_median = np.median(m1[np.isfinite(m1)])
+        # mask over robust moment guess pixels to set the velocity fitting range
+        mask = np.isfinite(m1)
+        mask = np.logical_and(mask, signal_mask)
+        m1_good = m1[mask]
+
+        v_median = np.median(m1_good)
+        v_99p = np.percentile(m1_good, 99)
+        v_1p = np.percentile(m1_good, 1)
         print("median velocity: {0}".format(v_median))
 
         if False:
@@ -742,6 +749,14 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # define acceptable v range based on the provided or determined median velocity
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
+
+    # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
+    if v_99p + sigmax > vmax:
+        vmax = v_99p + sigmax
+    if v_1p - sigmax < vmin:
+        vmin = v_1p - sigmax
+
+    print("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
 
     # find the location of the peak signal (to determine the first pixel to fit if nearest neighbour method is used)
     peakloc = np.nanargmax(m0)
