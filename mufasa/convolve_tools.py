@@ -16,13 +16,14 @@ from scipy.interpolate import griddata
 import scipy.ndimage as nd
 import gc
 
-
+#=======================================================================================================================
+from .utils.mufasa_log import get_logger
+logger = get_logger(__name__)
 #=======================================================================================================================
 # utility tools for convolve cubes
 
 def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True, **kwargs):
-
-    factor = factor * 1.0
+    # factor = factor * 1.0 # probably unecessary, better option is factor = float(factor)
 
     if not isinstance(cube, SpectralCube):
         cube = SpectralCube.read(cube)
@@ -34,7 +35,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
 
     # sanity check
     if hdr['CUNIT1'] != hdr['CUNIT2']:
-        print("[ERROR]: the axis units for the do not match each other!")
+        raise Exception("the spatial axis units for the cube do not match each other!")
         return None
 
     beamunit = getattr(u, hdr['CUNIT1'])
@@ -86,15 +87,15 @@ def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0):
         plane_mask_size = np.sum(planemask)
         if plane_mask_size > 25:
             mask = mask * planemask
-            print("snr plane mask size = {}".format(plane_mask_size))
+            logger.info("snr plane mask size = {}".format(plane_mask_size))
         else:
-            print("[WARNING] snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
+            logger.warning("snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
 
     maskcube = cube.with_mask(mask.astype(bool))
 
     # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
     if maskcube.size > 1e8:
-        print("WARNING: maskcube is large ({} pixels)".format(maskcube.size))
+        logger.warning("maskcube is large ({} pixels)".format(maskcube.size))
     maskcube.allow_huge_operations = True
     cnv_cube = maskcube.convolve_to(beam)
     maskcube.allow_huge_operations = False
@@ -102,15 +103,15 @@ def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0):
 
     if snrmasked and iterrefine:
         # use the convolved cube for new masking
-        print("--- second iteration refinement ---")
+        logger.debug("--- second iteration refinement ---")
         mask = np.isfinite(cube._data)
         planemask = snr_mask(cnv_cube, snr_min)
         plane_mask_size = np.sum(planemask)
         if np.sum(planemask) > 25:
              mask = mask*planemask
-             print("snr plane mask size = {}".format(plane_mask_size))
+             logger.info("snr plane mask size = {}".format(plane_mask_size))
         else:
-            print("[WARNING] snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
+            logger.warning("snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
         maskcube = cube.with_mask(mask.astype(bool))
         maskcube.allow_huge_operations = True
         cnv_cube = maskcube.convolve_to(beam)
@@ -130,7 +131,7 @@ def snr_mask(cube, snr_min=1.0, errmappath=None):
         # make a quick RMS estimate using median absolute deviation (MAD)
         mask_gg = np.isfinite(cube._data)
         errmap = mad_std(cube._data[mask_gg], axis=0)
-        print("median rms: {0}".format(np.nanmedian(errmap)))
+        logger.info("median rms: {0}".format(np.nanmedian(errmap)))
 
     snr = cube.filled_data[:].value / errmap
     peaksnr = np.nanmax(snr, axis=0)

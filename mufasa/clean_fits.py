@@ -3,7 +3,9 @@ __author__ = 'mcychen'
 
 import numpy as np
 from astropy.io import fits
-
+#=======================================================================================================================
+from .utils.mufasa_log import get_logger
+logger = get_logger(__name__)
 #=======================================================================================================================
 
 class fit_results(object):
@@ -28,7 +30,7 @@ class fit_results(object):
                 self.lnkMaps['{}{}'.format(ncomp, 0)] = fits.getdata(path_lnkn0)
             self.ncompList.append(ncomp)
         else:
-            print("[ERROR]: ncomp must be >1. The provide value is {}. No action taken.".format(ncomp))
+            logger.error("ncomp must be >1. The provide value is {}. No action taken.".format(ncomp))
 
 #=======================================================================================================================
 

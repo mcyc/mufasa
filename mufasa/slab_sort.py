@@ -89,7 +89,7 @@ def refmap_2c_mask(pmaps, refmaps, method="v_n_sig"):
         return np.hypot(del_vlsr[0], del_sigv[0]) > np.hypot(del_vlsr[1], del_sigv[1])
 
     else:
-        print("[Error]: the method provided is not valid! Returns nothing.")
+        raise Exception("The method provided is not valid!")
         return None
 
 
