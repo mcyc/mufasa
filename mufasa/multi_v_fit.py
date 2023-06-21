@@ -33,6 +33,19 @@ logger = get_logger(__name__)
 line_names = ["oneone"]
 
 #=======================================================================================================================
+# set global constants
+
+# set the fit parameter limits (consistent with GAS DR1) for NH3 fits
+Texmin = 3.0  # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
+Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
+sigmin = 0.07  # km/s
+sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
+#taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
+taumax = 30.0  # when the satellite hyperfine lines becomes optically thick
+taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
+eps = 0.001  # a small perturbation that can be used in guesses
+
+#=======================================================================================================================
 
 def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrname = None, rms = 0.15, rmspath = None,
                       linename = "oneone"):
@@ -470,24 +483,27 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     if 'errmap' not in kwargs:
         kwargs['errmap'] = mad_std(pcube.cube, axis=0, ignore_nan = True)
 
-    # set the fit parameter limits (consistent with GAS DR1)
-    Texmin = 3.0    # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
-    Texmax = 40    # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
-    sigmin = 0.07   # km/s
-    sigmax = 2.5    # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-    taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
-    taumin = 0.1#0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
-    eps = 0.001 # a small perturbation that can be used in guesses
-
-    kwargs = set_pyspeckit_verbosity(**kwargs)
-
     v_peak_hwidth = 10
     v_guess = guesses[::4]
     v_guess[v_guess == 0] = np.nan
+
+    '''
     v_median = np.nanmedian(v_guess)
+    v_guess_finite = v_guess[np.isfinite(v_guess)]
+    v_99p = np.percentile(v_guess_finite, 99)
+    v_1p = np.percentile(v_guess_finite, 1)
+    '''
+
+    v_median, v_99p, v_1p = get_vstats(v_guess)
 
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
+
+    # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
+    if v_99p + sigmax > vmax:
+        vmax = v_99p + sigmax
+    if v_1p - sigmax < vmin:
+        vmin = v_1p - sigmax
 
     def impose_lim(data, min=None, max=None, eps=0):
         if min is not None:
@@ -654,6 +670,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         v_median = np.median(v_guess)
         logger.info("The median of the user provided velocities is: {0}".format(v_median))
         m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
+        v_median, v_99p, v_1p = get_vstats(v_guess)
     else:
         signal_mask = default_masking(peaksnr, snr_min=10.0)
         sig_mask_size = signal_mask.sum()
@@ -683,7 +700,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         from skimage.morphology import binary_dilation
 
-        def asoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
+        def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
             # a method to divide the cube into different regions and moments in each region
             _, n_seeds = ndi.label(seeds)
             if n_seeds > 10:
@@ -702,7 +719,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         if n_sig_parts > 1:
             # if there is more than one structure in the signal mask
             seeds = signal_mask
-            m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+            m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                  weights=peaksnr, signal_mask=signal_mask)
 
         else:
@@ -710,14 +727,23 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             _, n_parts = ndi.label(~err_mask)
             if n_parts > 1:
                 seeds = err_mask
-                m0, m1, m2 = asoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                      weights=peaksnr, signal_mask=signal_mask)
             else:
                 # use the simplest main_hf_moments
                 m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
 
-        v_median = np.median(m1[np.isfinite(m1)])
-        print("median velocity: {0}".format(v_median))
+        # mask over robust moment guess pixels to set the velocity fitting range
+        '''
+        mask = np.isfinite(m1)
+        mask = np.logical_and(mask, signal_mask)
+        m1_good = m1[mask]
+
+        v_median = np.median(m1_good)
+        v_99p = np.percentile(m1_good, 99)
+        v_1p = np.percentile(m1_good, 1)
+        '''
+        v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
 
         if False:
             # save the moment maps for diagnostic purposes
@@ -732,6 +758,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             fitcubefile.writeto(savename ,overwrite=True)
 
 
+    print("median velocity: {0}".format(v_median))
+
     # remove the nana values to allow np.nanargmax(m0) to operate smoothly
     m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
 
@@ -741,18 +769,17 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     logger.info("median velocity: {0}".format(v_median))
     logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
 
+    # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
+    if v_99p + sigmax > vmax:
+        vmax = v_99p + sigmax
+    if v_1p - sigmax < vmin:
+        vmin = v_1p - sigmax
+
+    print("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
+
     # find the location of the peak signal (to determine the first pixel to fit if nearest neighbour method is used)
     peakloc = np.nanargmax(m0)
     ymax,xmax = np.unravel_index(peakloc, m0.shape)
-
-    # set the fit parameter limits (consistent with GAS DR1)
-    Texmin = 3.0    # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
-    Texmax = 40    # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
-    sigmin = 0.07   # km/s
-    sigmax = 2.5    # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-    taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
-    taumin = 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
-    eps = 0.001 # a small perturbation that can be used in guesses
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
@@ -921,5 +948,19 @@ def set_pyspeckit_verbosity(**kwargs):
         kwargs['verbose'] = False
         # pyspeckit defaults to verbose=True
         # if verbose=True and verbose_level=0 it prints output
-
+        
     return kwargs
+
+##################
+def get_vstats(velocities, signal_mask=None):
+    m1 = velocities
+    mask = np.isfinite(m1)
+    if signal_mask is not None:
+        mask = np.logical_and(mask, signal_mask)
+    m1_good = m1[mask]
+
+    v_median = np.median(m1_good)
+    v_99p = np.percentile(m1_good, 99)
+    v_1p = np.percentile(m1_good, 1)
+    return v_median, v_99p, v_1p
+
