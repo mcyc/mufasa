@@ -20,14 +20,28 @@ from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
 
-
-
+#=======================================================================================================================
+from .utils.mufasa_log import init_logging, get_logger
+logger = get_logger(__name__)
 #=======================================================================================================================
 
 class Region(object):
 
-    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2):
-
+    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, **kwargs):
+        """initialize region object
+            :param cubePath (str): path to spectral cube
+            :param paraNameRoot (str): string to prepend to output file names
+            :param paraDir (str, optional): directory to output files. Defaults to None.
+            :param cnv_factor (int, optional): nuber of beam-widths to convolve by. Defaults to 2.
+            :param multicore (int, optional): number of cpu cores to use. Defaults to None.
+            
+            kwargs are passed to init_logging:
+                :param logfile: file to save to (default mufasa.log)
+                :param console_level: minimum logging level to print to screen (default logging.INFO)
+                :param file_level: minimum logging level to save to file (default logging.INFO)
+                :param log_pyspeckit_to_file: whether to include psypeckit outputs in log file (default False)
+        """
+        init_logging(**kwargs)
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
@@ -64,8 +78,6 @@ class Region(object):
     def standard_2comp_fit(self, planemask=None):
         standard_2comp_fit(self, planemask=planemask)
 
-
-
 #=======================================================================================================================
 
 
@@ -95,6 +107,11 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
 
 
 def get_convolved_fits(reg, ncomp, **kwargs):
+    '''
+    kwargs:
+        update (bool) : call reg.get_convolved_cube even if reg has ucube_cnv attribute
+        kwargs passed to reg.ucube_cnv.get_model_fit
+    '''
     if not hasattr(reg, 'ucube_cnv'):
         reg.get_convolved_cube(update=True)
     elif 'update' in kwargs:
@@ -107,11 +124,13 @@ def get_fits(reg, ncomp, **kwargs):
 
 
 #=======================================================================================================================
-# functions specific to 2-comonent fits
+# functions specific to 2-component fits
 
 
 def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True):
-    # note, planemask superseeds snr-based maask
+    '''
+    note: planemask supercedes snr-based mask
+    '''
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask)
 
     if refit_bad_pix:
@@ -125,11 +144,10 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
 
 
 def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
-    # ensure this is a two compnent fitting method
+    # ensure this is a two component fitting method
     ncomp = [1,2]
 
     # convolve the cube and fit it
-    # get_convolved_cube(reg, update=updateCnvFits)
     get_convolved_fits(reg, ncomp, update=updateCnvFits, snr_min=snr_min)
 
     # use the result from the convolved cube as guesses for the full resolution fits
@@ -148,12 +166,14 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
 
 
 def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
-    # refit pixels where 2 component fits are substentially worse than good one components
-    # defualt threshold of -20 should be able to pickup where 2 compoent fits are exceptionally poor
+    '''
+    refit pixels where 2 component fits are substantially worse than good one components
+    default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
+    '''
 
     from astropy.convolution import Gaussian2DKernel, convolve
 
-    print("begin re-fitting bad 2-comp pixels")
+    logger.info("begin re-fitting bad 2-comp pixels")
 
     lnk21 = ucube.get_AICc_likelihood(2, 1)
     lnk10 = ucube.get_AICc_likelihood(1, 0)
@@ -162,7 +182,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
     mask = np.logical_and(mask, np.isfinite(lnk10))
     mask_size = np.sum(mask)
-    print("refit mask size for bad_2comp: {}".format(mask_size))
+    logger.info("refit mask size for bad_2comp: {}".format(mask_size))
 
     guesses = ucube.pcubes['2'].parcube.copy()
     # remove the bad pixels
@@ -178,7 +198,6 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     gc.collect()
     # re-fit and save the updated model
     replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=True)
-
 
 
 def refit_swap_2comp(reg, snr_min=3):
@@ -223,10 +242,9 @@ def refit_swap_2comp(reg, snr_min=3):
     save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
 
-
 def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
 
-    print("begin wide component recovery")
+    logger.info("begin wide component recovery")
 
     ncomp = [1, 2]
 
@@ -260,14 +278,15 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         lnk21 = None
 
     mask_size = np.sum(mask)
-    print("wide recovery refit mask size: {}".format(mask_size))
+    logger.info("wide recovery refit mask size: {}".format(mask_size))
+
 
     if mask_size ==0:
-        print("no pixel in the recovery mask, no fit is performed")
+        logger.info("no pixels in the recovery mask, no fit is performed")
         return None
 
     if method == 'residual':
-        print("recovery second component from residual")
+        logger.info("recovering second component from residual")
         wide_comp_guess = get_2comp_wide_guesses(reg)
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
         c1_guess = reg.ucube.pcubes['1'].parcube
@@ -287,15 +306,12 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         simpfit = True
 
     else:
-        print("[ERROR] the following method specified is invalid: {}".format(method))
-        return None
+        raise Exception("the following method specified is invalid: {}".format(method))
 
     mask_size = np.sum(mask)
-    print("final wide recovery refit mask size: {}".format(mask_size))
+    logger.info("final wide recovery refit mask size: {}".format(mask_size))
 
     replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit)
-
-
 
 
 def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
@@ -314,7 +330,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, mask)
-            print("replace bad pix mask size: {}".format(good_mask.sum()))
+            logger.info("replace bad pix mask size: {}".format(good_mask.sum()))
 
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
@@ -322,9 +338,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
         # save the updated results
         save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
-        print("not enough pixels to refit, no-refit is done")
-
-
+        logger.info("not enough pixels to refit, no-refit is done")
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
@@ -343,10 +357,9 @@ def save_updated_paramaps(ucube, ncomps):
     # save the updated parameter cubes
     for nc in ncomps:
         if not str(nc) in ucube.paraPaths:
-            print("[ERROR]: the ucube does not have paraPath for '{}' components".format(nc))
+            logger.error("the ucube does not have paraPath for '{}' components".format(nc))
         else:
             ucube.save_fit(ucube.paraPaths[str(nc)], nc)
-
 
 
 def save_best_2comp_fit(reg):
@@ -367,7 +380,7 @@ def save_best_2comp_fit(reg):
             reg_final.load_fits(ncomp=[nc])
         else:
             # load files using paths from reg if they exist
-            print("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
+            logger.info("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
             reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc)
 
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
@@ -375,7 +388,7 @@ def save_best_2comp_fit(reg):
     # make the 2-comp para maps with the best fit model
     lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
-    print("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
+    logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
     pcube_final.parcube[:4, ~mask] = reg_final.ucube.pcubes['1'].parcube[:4, ~mask].copy()
     pcube_final.errcube[:4, ~mask] = reg_final.ucube.pcubes['1'].errcube[:4, ~mask].copy()
     pcube_final.parcube[4:8, ~mask] = np.nan
@@ -415,20 +428,24 @@ def save_best_2comp_fit(reg):
     # save the lnk21 map
     savename = make_save_name(paraRoot, paraDir, "lnk21")
     save_map(lnk21, hdr2D, savename)
+    logger.info('{} saved.'.format(savename))
 
     # save the lnk10 map
     savename = make_save_name(paraRoot, paraDir, "lnk10")
     save_map(lnk10, hdr2D, savename)
+    logger.info('{} saved.'.format(savename))
 
     # create and save the lnk20 map for reference:
     lnk20 = reg_final.ucube.get_AICc_likelihood(2, 0)
     savename = make_save_name(paraRoot, paraDir, "lnk20")
     save_map(lnk20, hdr2D, savename)
+    logger.info('{} saved.'.format(savename))
 
     # save the SNR map
     snr_map = get_best_2comp_snr_mod(reg_final)
     savename = make_save_name(paraRoot, paraDir, "SNR")
     save_map(snr_map, hdr2D, savename)
+    logger.info('{} saved.'.format(savename))
 
     # create moment0 map
     modbest = get_best_2comp_model(reg_final)
@@ -439,11 +456,13 @@ def save_best_2comp_fit(reg):
     mom0_mod = cube_mod.moment0()
     savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)
+    logger.info('{} saved.'.format(savename))
 
     # created masked mom0 map with model as the mask
     mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=20, mask=None)
     savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
+    logger.info('{} saved.'.format(savename))
 
     # save reduced chi-squred maps
     # would be useful to check if 3rd component is needed
@@ -451,6 +470,7 @@ def save_best_2comp_fit(reg):
     chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=modbest, expand=20, reduced=True, usemask=True,
                               mask=None)
     save_map(chi_map, hdr2D, savename)
+    logger.info('{} saved.'.format(savename))
 
     # save reduced chi-squred maps for 1 comp and 2 comp individually
     chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
@@ -458,9 +478,11 @@ def save_best_2comp_fit(reg):
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
     save_map(chiRed_1c, hdr2D, savename)
+    logger.info('{} saved.'.format(savename))
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_2c")
     save_map(chiRed_2c, hdr2D, savename)
+    logger.info('{} saved.'.format(savename))
 
     return reg
 
@@ -470,7 +492,7 @@ def save_map(map, header, savename, overwrite=True):
     fits_map.writeto(savename,overwrite=overwrite)
 
 #=======================================================================================================================
-# functions that ficilates
+# functions that facilitate
 
 
 def get_2comp_wide_guesses(reg):
@@ -480,7 +502,7 @@ def get_2comp_wide_guesses(reg):
         try:
             fit_best_2comp_residual_cnv(reg)
         except ValueError:
-            print("retry with no SNR threshold")
+            logger.info("retry with no SNR threshold")
             fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
 
 
@@ -512,7 +534,7 @@ def get_2comp_wide_guesses(reg):
         aic1v0_mask = reg.ucube_res_cnv.get_AICc_likelihood(1, 0) > 5
 
         if np.sum(aic1v0_mask) >= 1:
-            print("number of good fit to convolved residual: {}".format(np.sum(aic1v0_mask)))
+            logger.info("number of good fits to convolved residual: {}".format(np.sum(aic1v0_mask)))
             # if there are at least one well fitted pixel to the residual
             data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
             preguess = data_cnv.copy()
@@ -522,15 +544,13 @@ def get_2comp_wide_guesses(reg):
 
             # use the dialated mask as a footprint to interpolate the guesses
             gmask = dilation(aic1v0_mask)
-            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
-                                                      mask=gmask)
+            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header, mask=gmask)
         else:
-            print("no good fit from convolved guess, using the moment guess for the full-res refit instead")
+            logger.info("no good fit from convolved guess, using the moment guess for the full-res refit instead")
             # get moment guesses without masking instead
             guesses_final = get_mom_guesses(reg)
 
         return guesses_final
-
 
 
 def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=True):
@@ -563,8 +583,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     try:
         moms_res_cnv = mmg.window_moments(pcube_res_cnv, v_atpeak=vmap, window_hwidth=window_hwidth)
     except ValueError:
-        print("[WARNING]: There doesn't seem to be enough pixels to find the residual moments")
-        raise
+        raise Exception("There doesn't seem to be enough pixels to find the residual moments")
 
     #gg = mmg.moment_guesses(moms_res_cnv[1], moms_res_cnv[2], ncomp, moment0=moms_res_cnv[0])
     #nsize = np.sum(np.isfinite(moms_res_cnv[0]))
@@ -603,7 +622,6 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
         oriParaPath = reg.ucube.paraPaths[str(ncomp)]
         savename = "{}_onBestResidual.fits".format(os.path.splitext(oriParaPath)[0])
         reg.ucube_res_cnv.save_fit(savename, ncomp)
-
 
 
 def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut=5):
@@ -660,8 +678,6 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
     cube_res_masked = cube_res_masked.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
     return cube_res_masked
-
-
 
 
 def get_best_2comp_residual(reg):
@@ -727,6 +743,3 @@ def get_skyheader(cube_header):
     hdr2D['NAXIS1'] = hdr['NAXIS1']
     hdr2D['NAXIS2'] = hdr['NAXIS2']
     return hdr2D
-
-
-

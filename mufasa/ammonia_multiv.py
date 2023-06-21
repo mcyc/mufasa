@@ -40,7 +40,7 @@ def nh3_multi_v_model_generator(n_comp, linenames = None):
     nlines = len(linenames)
 
     if nlines > 1:
-        print("[ERROR]: modeling more than a line yet to be implemented. Please only use one line for the time being")
+        raise Exception("modeling more than one line yet to be implemented. Please only use one line for the time being")
         return None
 
     def nh3_vtau_multimodel(xarr, *args):
@@ -83,7 +83,7 @@ def ammonia_multi_v(xarr, *args, **kwargs):
         if "line_names" in kwargs:
             line_names = kwargs["line_names"]
             if len(line_names) > 1:
-                print("[ERROR]: modeling more than a line yet to be implemented. Please only use one line for the time being")
+                raise Exception("modeling more than one line yet to be implemented. Please only use one line for the time being")
                 return None
 
     background_ta = T_antenna(TCMB, xarr.value)

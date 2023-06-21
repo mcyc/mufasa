@@ -18,6 +18,9 @@ from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
 
 #======================================================================================================================#
+from .utils.mufasa_log import get_logger
+logger = get_logger(__name__)
+#======================================================================================================================#
 
 class UltraCube(object):
 
@@ -62,7 +65,6 @@ class UltraCube(object):
             self.rmsfile = rmsfile
 
 
-
     def load_cube(self, fitsfile):
         # loads SpectralCube
         self.cube = SpectralCube.read(fitsfile)
@@ -82,14 +84,18 @@ class UltraCube(object):
         elif os.path.exists(filename):
             self.cube_cnv = SpectralCube.read(filename)
         else:
-            print("[WARNING]: the specified file does not exist.")
+            logger.warning("the specified convolved cube file does not exist.")
 
 
     def fit_cube(self, ncomp, simpfit=False, **kwargs):
-        # currently limited to NH3 (1,1) 2-slab fit
+        '''
+        currently limited to NH3 (1,1) 2-slab fit
+
+        kwargs are those used for pyspeckit.Cube.fiteach
+        '''
 
         if not 'multicore' in kwargs:
-            kwargs['multicore'] = multiprocessing.cpu_count()
+            kwargs['multicore'] = self.n_cores 
 
         if not 'snr_min' in kwargs:
             kwargs['snr_min'] = self.snr_min
@@ -117,19 +123,20 @@ class UltraCube(object):
         else:
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
 
+
     def save_fit(self, savename, ncomp):
         # note, this implementation currently relies on
         if hasattr(self.pcubes[str(ncomp)], 'parcube'):
             save_fit(self.pcubes[str(ncomp)], savename, ncomp)
         else:
-            print("[WARNING]: no fit was performed and thus no file will saved")
+            logger.warning("no fit was performed and thus no file will be saved")
 
 
     def load_model_fit(self, filename, ncomp):
         self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
-        print("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
+        logger.info("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
         gc.collect()
         self.include_model_mask(mod_mask)
 
@@ -149,6 +156,7 @@ class UltraCube(object):
 
         self.rms_maps[compID] = get_rms(self.residual_cubes[compID])
         return self.rms_maps[compID]
+
 
     def get_rss(self, ncomp, mask=None):
         # residual sum of squares
@@ -206,7 +214,6 @@ class UltraCube(object):
         return None
 
 
-
 class UCubePlus(UltraCube):
     # create a subclass of UltraCube that holds the directory information
     #__init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2)
@@ -234,9 +241,12 @@ class UCubePlus(UltraCube):
         self.paraPaths = {}
 
 
-
     def get_model_fit(self, ncomp, update=True, **kwargs):
-        # load the model fits if it exist, else
+        '''
+        load the model fits if it exist, else
+
+        kwargs are passed to pyspeckit.Cube.fiteach (if update)
+        '''
 
         for nc in ncomp:
             if not str(nc) in self.paraPaths:
@@ -256,11 +266,12 @@ class UCubePlus(UltraCube):
             self.load_model_fit(path, nc)
 
 
-
-
 #======================================================================================================================#
 
 def fit_cube(cube, simpfit=False, **kwargs):
+    '''
+    kwargs are those used for pyspeckit.Cube.fiteach
+    '''
     if simpfit:
         # fit the cube with the provided guesses and masks with no pre-processing
         return mvf.cubefit_simp(cube, **kwargs)
@@ -293,10 +304,8 @@ def load_model_fit(cube, filename, ncomp):
 def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
     return cnvtool.convolve_sky_byfactor(cube, factor, savename, **kwargs)
 
-
 #======================================================================================================================#
 # UltraCube based methods
-
 
 def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True):
     # calculate residual sum of squares
@@ -353,7 +362,7 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
     NSampEqual = ucube.NSamp_maps[str(ncomp_A)] == ucube.NSamp_maps[str(ncomp_B)]
 
     if np.nansum(~NSampEqual) != 0:
-        print("[WARNING]: Number of samples do not match. Recalculating AICc values")
+        logger.warning("Number of samples do not match. Recalculating AICc values") # TODO: investigate why I get this error
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
@@ -379,15 +388,11 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
     Calculate residual sum of squares (RSS)
 
     cube : SpectralCube
-
     model: numpy array
-
     expand : int
         Expands the region where the residual is evaluated by this many channels in the spectral dimension
-
     reduced : boolean
         Whether or not to return the reduced chi-squared value or not
-
     mask: boolean array
         A mask stating which array elements the chi-squared values are calculated from
     '''
@@ -419,23 +424,17 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
     return returns
 
 
-
 def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None):
     '''
     cube : SpectralCube
-
     model: numpy array
-
     expand : int
         Expands the region where the residual is evaluated by this many channels in the spectral dimension
-
     reduced : boolean
         Whether or not to return the reduced chi-squared value or not
-
     usemask: boolean
         Whether or not to mask out some parts of the data.
         If no mask is provided, it masks out samples with model values of zero.
-
     mask: boolean array
         A mask stating which array elements the chi-squared values are calculated from
     '''
@@ -473,7 +472,6 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     else:
         # return the ch-squared values and the number of data points used
         return chisq, np.nansum(mask, axis=0)
-
 
 
 def get_masked_moment(cube, model, order=0, expand=10, mask=None):
