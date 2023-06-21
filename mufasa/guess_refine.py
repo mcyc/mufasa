@@ -12,7 +12,9 @@ from FITS_tools.hcongrid import get_pixel_mapping
 from astropy.convolution import Gaussian2DKernel, convolve
 
 from scipy.spatial.qhull import QhullError
-
+#=======================================================================================================================
+from .utils.mufasa_log import get_logger
+logger = get_logger(__name__)
 #=======================================================================================================================
 
 
@@ -61,7 +63,6 @@ def mask_swap_2comp(data_cnv, swapmask):
     return data_cnv
 
 
-
 def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     # a wrapper to make guesses based on the parameters fitted to the convolved data
     npara = 4
@@ -108,7 +109,6 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
         guesses_final.append(new_guess_cnv)
 
     return np.array(guesses_final)
-
 
 
 def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
@@ -183,7 +183,6 @@ def refine_each_comp(guess_comp, mask=None, v_range=None, sig_range=None):
     guess_comp[2] = refine_guess(guess_comp[2], min=Tex_min, max=Tex_max, mask=mask, disksize=disksize)
     guess_comp[3] = refine_guess(guess_comp[3], min=Tau_min, max=Tau_max, mask=mask, disksize=disksize)
     return guess_comp
-
 
 
 def simple_para_clean(pmaps, ncomp, npara=4):
@@ -304,18 +303,16 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
             # interpolate the mask
             zi = interpolate(map, mask)
         except QhullError as e:
-            print("[WARNING]: qhull input error found; astropy convolve will be used instead")
-            #print(e)
-            # use astropy convolve as a proxi for interpolation
-            zi = interpolate_via_cnv(map)
+            logger.warning("qhull input error found; astropy convolve will be used instead")
+            zi = interpolate_via_cnv(map) # use astropy convolve as a proxy for interpolation
+            
         except ValueError as e:
-            print("[WARNING]: valueError found (no points given); astropy convolve will be used instead")
+            logger.error("ValueError found (no points given); astropy convolve will be used instead")
             zi = interpolate_via_cnv(map)
     else:
         zi = interpolate_via_cnv(map)
 
     return zi
-
 
 
 def save_guesses(paracube, header, savename, ncomp=2):

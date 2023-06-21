@@ -12,7 +12,9 @@ from astropy.stats import mad_std
 
 from .utils import map_divide
 import multiprocessing
-
+#=======================================================================================================================
+from .utils.mufasa_log import get_logger
+logger = get_logger(__name__)
 #=======================================================================================================================
 
 # define max and min values of tex and tau to use for the test
@@ -61,6 +63,7 @@ def master_guess(spectrum, ncomp, sigmin=0.07, v_peak_hwidth=3.0, v_atpeak=None,
     return gg
 
 
+# THIS FUNCTION IS NEVER  CALLED
 def get_window_slab(maskcube, window_hwidth=3.0, v_atpeak=None):
     if v_atpeak is None:
         # find the peak of the integrated spectrum if v_atpeak isn't provided
@@ -99,7 +102,6 @@ def vmask_cube(cube, vmap, window_hwidth=3.0):
     return cubemasked
 
 
-
 def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
     '''
     :param spec:
@@ -113,149 +115,146 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
     :param signal_mask:
     :return:
     '''
+
+    def moments_pys_spectrum(spectrum, window_hwidth=4.0, v_atpeak=None, iter_refine=False):
+        '''
+        find moments within a given window (e.g., around the main hyperfine lines)
+        # note: iter_refine has not proven to be very effective in our tests
+
+        :param spectrum:
+            <pyspeckit.spectrum.classes.Spectrum>
+            the spectrum to take the momentw of
+
+        :param window_hwidth: float
+            half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
+
+        '''
+
+        if v_atpeak is None:
+            moments = spectrum.moments(unit=u.km/u.s)
+            v_atpeak = moments[2]
+
+        vmax = v_atpeak + window_hwidth
+        vmin = v_atpeak - window_hwidth
+
+        # Extract the spectrum within the window defined around the main hyperfine components and take moments
+        slice = spectrum.slice(vmin, vmax, unit=u.km/u.s)
+        moments = slice.moments(unit=u.km/u.s)
+
+        if iter_refine:
+            # for low snr- this method really doesn't work well
+            m0, m1, m2 = moments[1], moments[2], moments[3]
+            # make the window smaller by making out channels outside a specific width around moment 1
+            # create a window 2 times the second moment
+            new_window_hw = m2*3.0
+            if new_window_hw > window_hwidth:
+                new_window_hw = window_hwidth
+            vmax = m1 + new_window_hw
+            vmin = m1 - new_window_hw
+            slice = spectrum.slice(vmin, vmax, unit=u.km / u.s)
+            moments = slice.moments(unit=u.km / u.s)
+
+        return moments[1], moments[2], moments[3]
+
+
+    def moments_pys_cube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine=False, multicore=None):
+        '''
+        find moments within a given window (e.g., around the main hyperfine lines)
+        # note: iter_refine has not proven to be very effective in our tests
+
+        :param pcube:
+            <pyspeckit.cubes.SpectralCube.Cube>
+            the cube to take the moments of
+
+        :param window_hwidth: float
+            half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
+
+        :param v_atpeak: float or ndarray
+            the velociy or a map of velocities to center the spectral window on
+        '''
+
+        if multicore is None:
+            # use all the cores minus one
+            multicore = multiprocessing.cpu_count() - 1
+
+        def get_win_moms(pcube, v_atpeak):
+            # get window moments when v_atpeak is given
+            pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
+            try:
+                pcube_masked.momenteach(unit='km/s', verbose=False, multicore=multicore)
+            except AttributeError:
+                # if multicore fails, only use one core
+                pcube_masked.momenteach(unit='km/s', verbose=False, multicore=1)
+            moments = pcube_masked.momentcube
+            return moments
+
+        # note: the current implementation may be memory intensitive
+        if v_atpeak is None:
+            # note the moment 1 estimate of pcube.momenteach seem to be pretty good at ignoring hyperfine structures
+            try:
+                pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=multicore)
+            except AttributeError:
+                # if multicore fails, only use one core
+                pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=1)
+
+            moments = pcube.momentcube
+            # redo again with the hyperfine lines masked out
+            moments = get_win_moms(pcube, v_atpeak=moments[1])
+        else:
+            moments = get_win_moms(pcube, v_atpeak)
+
+        if iter_refine:
+            # use the moment 1 estimated velocity to define new windows
+            # for low snr this method may not work well
+            moments = get_win_moms(pcube, v_atpeak=moments[1])
+
+        return moments[0], moments[1], moments[2]
+
+
+    def moments_spectralcube(maskcube, window_hwidth, v_atpeak=None, signal_mask=None):
+        # signal_mask is to provide additional masking specifically and only for v_atpeak estimate
+        if v_atpeak is None:
+            # find the peak of the integrated spectrum if v_atpeak isn't provided
+            mask = maskcube.get_mask_array()
+            if signal_mask is not None:
+                mask = mask*signal_mask
+            tot_spec = np.nansum(maskcube._data[:,]*mask, axis=(1,2))
+            idx_peak = np.nanargmax(tot_spec)
+            logger.info("Getting window moments of SpectralCube")
+            logger.info("peak T_B: {0}".format(np.nanmax(tot_spec)))
+            v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
+            logger.info("v_atpeak: {0}".format(v_atpeak))
+
+        vmax = v_atpeak + window_hwidth
+        vmin = v_atpeak - window_hwidth
+
+        # Extract the spectrum within the window defined around the main hyperfine components and take moments
+        slab = maskcube.spectral_slab(vmin*u.km/u.s, vmax*u.km/u.s)
+        m0 = slab.moment0(axis=0).value
+        m1 = slab.moment1(axis=0).to(u.km/u.s).value
+        m2 = (np.abs(slab.moment2(axis=0))**0.5).to(u.km/u.s).value
+
+        return m0, m1, m2
+    
     # wrapper to find moments for different types of inputs
 
     if isinstance(spec, pyspeckit.Cube):
         # this method is much slower than using SpectralCube, but also seems more robust at spectral peaks
-        return window_moments_pyspcube(spec, window_hwidth, v_atpeak)
+        return moments_pys_cube(spec, window_hwidth, v_atpeak)
 
     elif isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
-        return window_moments_spc(spec, window_hwidth, v_atpeak)
+        return moments_pys_spectrum(spec, window_hwidth, v_atpeak)
 
     elif isinstance(spec, SpectralCube):
         # currently cannot handle v_atpeak as a map
         if not hasattr(v_atpeak, 'ndim'):
-            print("[ERROR]: the method that handle SpectralCube cannot current hanlde v_atpeak as a map")
-            print("please use single value v_atpeak instead")
-        return window_window_moments_spcube(spec, window_hwidth, v_atpeak, signal_mask)
+            logger.error("the method that handles SpectralCube cannot currently handle v_atpeak as a map, please use single value v_atpeak instead")
+            # TODO: investigate why I get this all the time
+        return moments_spectralcube(spec, window_hwidth, v_atpeak, signal_mask)
 
     else:
-        print("[ERROR] the spec provided is invalid")
+        raise Exception("the spec provided is of invalid type")
         return None
-
-
-def window_moments_spc(spectrum, window_hwidth=4.0, v_atpeak=None, iter_refine=False):
-    '''
-    find moments within a given window (e.g., around the main hyperfine lines)
-    # note: iter_refine has not proven to be very effective in our tests
-
-    :param spectrum:
-        <pyspeckit.spectrum.classes.Spectrum>
-        the spectrum to take the momentw of
-
-    :param window_hwidth: float
-        half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
-
-    '''
-
-    if v_atpeak is None:
-        moments = spectrum.moments(unit=u.km/u.s)
-        v_atpeak = moments[2]
-
-    vmax = v_atpeak + window_hwidth
-    vmin = v_atpeak - window_hwidth
-
-    # Extract the spectrum within the window defined around the main hyperfine components and take moments
-    slice = spectrum.slice(vmin, vmax, unit=u.km/u.s)
-    moments = slice.moments(unit=u.km/u.s)
-
-    if iter_refine:
-        # for low snr- this method really doesn't work well
-        m0, m1, m2 = moments[1], moments[2], moments[3]
-        # make the window smaller by making out channels outside a specific width around moment 1
-        # create a window 2 times the second moment
-        new_window_hw = m2*3.0
-        if new_window_hw > window_hwidth:
-            new_window_hw = window_hwidth
-        vmax = m1 + new_window_hw
-        vmin = m1 - new_window_hw
-        slice = spectrum.slice(vmin, vmax, unit=u.km / u.s)
-        moments = slice.moments(unit=u.km / u.s)
-
-    return moments[1], moments[2], moments[3]
-
-
-
-def window_moments_pyspcube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine=False, multicore=None):
-    '''
-    find moments within a given window (e.g., around the main hyperfine lines)
-    # note: iter_refine has not proven to be very effective in our tests
-
-    :param pcube:
-        <pyspeckit.cubes.SpectralCube.Cube>
-        the cube to take the moments of
-
-    :param window_hwidth: float
-        half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
-
-    :param v_atpeak: float or ndarray
-        the velociy or a map of velocities to center the spectral window on
-    '''
-
-    if multicore is None:
-        # use all the cores minus one
-        multicore = multiprocessing.cpu_count() - 1
-
-    def get_win_moms(pcube, v_atpeak):
-        # get window moments when v_atpeak is given
-        pcube_masked = window_mask_pcube(pcube, v_atpeak, win_hwidth=window_hwidth)
-        try:
-            pcube_masked.momenteach(unit='km/s', verbose=False, multicore=multicore)
-        except AttributeError:
-            # if multicore fails, only use one core
-            pcube_masked.momenteach(unit='km/s', verbose=False, multicore=1)
-        moments = pcube_masked.momentcube
-        return moments
-
-    # note: the current implementation may be memory intensitive
-    if v_atpeak is None:
-        # note the moment 1 estimate of pcube.momenteach seem to be pretty good at ignoring hyperfine structures
-        try:
-            pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=multicore)
-        except AttributeError:
-            # if multicore fails, only use one core
-            pcube.momenteach(unit='km/s', vheight=False, verbose=False, multicore=1)
-
-        moments = pcube.momentcube
-        # redo again with the hyperfine lines masked out
-        moments = get_win_moms(pcube, v_atpeak=moments[1])
-    else:
-        moments = get_win_moms(pcube, v_atpeak)
-
-    if iter_refine:
-        # use the moment 1 estimated velocity to define new windows
-        # for low snr this method may not work well
-        moments = get_win_moms(pcube, v_atpeak=moments[1])
-
-    return moments[0], moments[1], moments[2]
-
-
-
-def window_window_moments_spcube(maskcube, window_hwidth, v_atpeak=None, signal_mask=None):
-    # signal_mask is to provide additional masking specifically and only for v_atpeak estimate
-    if v_atpeak is None:
-        # find the peak of the integrated spectrum if v_atpeak isn't provided
-        mask = maskcube.get_mask_array()
-        if signal_mask is not None:
-            mask = mask*signal_mask
-        tot_spec = np.nansum(maskcube._data[:,]*mask, axis=(1,2))
-        idx_peak = np.nanargmax(tot_spec)
-        print("peak T_B: {0}".format(np.nanmax(tot_spec)))
-        v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
-        print("v_atpeak: {0}".format(v_atpeak))
-
-    vmax = v_atpeak + window_hwidth
-    vmin = v_atpeak - window_hwidth
-
-    # Extract the spectrum within the window defined around the main hyperfine components and take moments
-    slab = maskcube.spectral_slab(vmin*u.km/u.s, vmax*u.km/u.s)
-    m0 = slab.moment0(axis=0).value
-    m1 = slab.moment1(axis=0).to(u.km/u.s).value
-    m2 = (np.abs(slab.moment2(axis=0))**0.5).to(u.km/u.s).value
-
-    return m0, m1, m2
-
-
 
 
 def noisemask_moment(sp, m1, m2, mask_sigma=4, noise_rms = None, **kwargs):
@@ -396,7 +395,7 @@ def moment_guesses_1c(m0, m1, m2):
 
 
     else:
-        print("[ERROR]: the moment 0 input has the wrong dimension ({})".format(m0.ndim))
+        raise Exception("the moment 0 input has the wrong dimension ({})".format(m0.ndim))
         return None
 
     return np.asarray([m1, gs_sig, tex_guess, tau_guess])
@@ -436,7 +435,7 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=Non
             idx = np.argmax(sp_smooth.data)
             vpeak = sp_smooth.xarr[idx]
             vpeak = vpeak.value
-            print("vpeak: {}".format(vpeak))
+            logger.info("vpeak for widely separated moment guesses: {}".format(vpeak))
 
         # get the moments
         m0, m1, m2 = window_moments(spec, window_hwidth=win_hwidth, v_atpeak=vpeak)
@@ -601,7 +600,6 @@ def window_mask_pcube(pcube, vmid, win_hwidth=4.0):
 
 #=======================================================================================================================
 # physics functions
-
 
 def get_tex(Ta, tau=0.5, nu=23.722634):
     # calculate the excitation temperature given tau
