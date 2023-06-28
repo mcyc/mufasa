@@ -4,14 +4,16 @@ from logging import INFO, WARNING, DEBUG, ERROR
 
 logging_format = dict(format='%(asctime)s - %(levelname)s: %(message)s [%(name)s]', datefmt='%m/%d %I:%M%p')
 
-def init_logging(logfile='mufasa.log', console_level=logging.INFO, file_level=logging.DEBUG, log_pyspeckit_to_file=False):
+# TODO: colrorize output
+
+def init_logging(logfile='mufasa.log', console_level=INFO, file_level=DEBUG, pyspeckit_file_level=WARNING):
     '''
     :param logfile: file to save to (default mufasa.log)
     :param console_level: minimum logging level to print to screen (default logging.INFO)
     :param file_level: minimum logging level to save to file (default logging.INFO)
-    :param log_pyspeckit_to_file: whether to include psypeckit outputs in log file (default False)
+    :param pyspeckit_file_level: at what log severity to save pyspeckit records
     
-    Note that technically log_pyspeckit_to_file applies to not just pyspeckit but all modules using astropy.log
+    Note that technically pyspeckit_file_level applies to not just pyspeckit but all modules using astropy.log
     However, astropy says that you shouldn't use it, and you should write your own
     '''
     log_formatter = logging.Formatter(logging_format['format'], datefmt=logging_format['datefmt'])
@@ -40,16 +42,13 @@ def init_logging(logfile='mufasa.log', console_level=logging.INFO, file_level=lo
     astropy_log.propagate = False # don't send astropy logs through the MUFASA logger
     astropy_log.removeHandler(astropy_log.handlers[0]) # don't print astropy logs directly to console
     astropy_log.addHandler(console_handler)
-    if log_pyspeckit_to_file:
-        astropy_log.addHandler(file_handler)
-    else: 
-        # override user input for log entries with severity warning or higher
-        # haven't actually tested if warnings/errors successfully pass through
-        override_file_handler = logging.FileHandler(logfile)
-        override_file_handler.setLevel(logging.WARNING)
-        override_file_handler.addFilter(log_filter)
-        astropy_log.addHandler(override_file_handler)
 
+    # log pyspeckit to file at specified level
+    pyspeckit_file_handler = logging.FileHandler(logfile)
+    pyspeckit_file_handler.setLevel(pyspeckit_file_level)
+    pyspeckit_file_handler.addFilter(log_filter)
+    astropy_log.addHandler(pyspeckit_file_handler)
+    
     return root_logger
 
 
