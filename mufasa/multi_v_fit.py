@@ -847,13 +847,10 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         fitcubefile.writeto(savename ,overwrite=True)
 
     # set some of the fiteach() inputs to that used in GAS DR1 reduction
-    if not 'integral' in kwargs:
-        kwargs['integral'] = False
-
-    kwargs = set_pyspeckit_verbosity(**kwargs)
+    if not 'integral' in kwargs: kwargs['integral'] = False # False is default so this isn't required
 
     if not 'signal_cut' in kwargs:
-        kwargs['signal_cut'] = 2
+        kwargs['signal_cut'] = 2 # Note: cubefit_simp has this as 0
 
     # Now fit the cube. (Note: the function inputs are consistent with GAS DR1 whenever possible)
 

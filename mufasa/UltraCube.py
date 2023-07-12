@@ -368,10 +368,11 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
     if not str(ncomp_B) in ucube.NSamp_maps:
         ucube.get_AICc(ncomp_B)
 
-    NSampEqual = ucube.NSamp_maps[str(ncomp_A)] == ucube.NSamp_maps[str(ncomp_B)]
+    NSamp_mapA = ucube.NSamp_maps[str(ncomp_A)] # since (np.nan == np.nan) is False, this threw the below warning unnecessarily
+    NSamp_mapB = ucube.NSamp_maps[str(ncomp_B)]
 
-    if np.nansum(~NSampEqual) != 0:
-        logger.warning("Number of samples do not match. Recalculating AICc values") # TODO: investigate why I get this error
+    if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
+        logger.warning("Number of samples do not match. Recalculating AICc values")
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
@@ -468,7 +469,9 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
     if reduced:
         # assuming n_size >> n_parameters
-        chisq /= np.nansum(mask, axis=0)
+        reduction = np.nansum(mask, axis=0) # avoid division by zero
+        reduction[reduction == 0] = np.nan
+        chisq /= reduction
 
     rms = get_rms(residual)
     chisq /= rms ** 2
