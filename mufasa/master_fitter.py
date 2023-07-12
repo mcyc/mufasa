@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 
 class Region(object):
 
-    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, **kwargs):
+    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, initialize_logging=True, **kwargs):
         """initialize region object
             :param cubePath (str): path to spectral cube
             :param paraNameRoot (str): string to prepend to output file names
@@ -41,7 +41,7 @@ class Region(object):
                 :param file_level: minimum logging level to save to file (default logging.INFO)
                 :param log_pyspeckit_to_file: whether to include psypeckit outputs in log file (default False)
         """
-        init_logging(**kwargs)
+        if initialize_logging: init_logging(**kwargs)
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
@@ -75,6 +75,7 @@ class Region(object):
     def master_2comp_fit(self, snr_min=0.0, **kwargs):
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
+
     def standard_2comp_fit(self, planemask=None):
         standard_2comp_fit(self, planemask=planemask)
 
@@ -106,17 +107,19 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
     # MC: a mechanism is needed to make sure the convolved cube has the same resolution has the cnv_factor
 
 
-def get_convolved_fits(reg, ncomp, **kwargs):
+def get_convolved_fits(reg, ncomp, update=True, **kwargs):
     '''
-    kwargs:
-        update (bool) : call reg.get_convolved_cube even if reg has ucube_cnv attribute
-        kwargs passed to reg.ucube_cnv.get_model_fit
+    update (bool) : call reg.get_convolved_cube even if reg has ucube_cnv attribute
+
+    kwargs: passed to UCubePlus.fit_cube by reg.ucube_cnv.get_model_fit
     '''
+
     if not hasattr(reg, 'ucube_cnv'):
         reg.get_convolved_cube(update=True)
-    elif 'update' in kwargs:
-        reg.get_convolved_cube(update=kwargs['update'])
-    reg.ucube_cnv.get_model_fit(ncomp, **kwargs)
+    else:
+        reg.get_convolved_cube(update=update)
+
+    reg.ucube_cnv.get_model_fit(ncomp, update=update, **kwargs)
 
 
 def get_fits(reg, ncomp, **kwargs):
@@ -182,7 +185,7 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
     mask = np.logical_and(mask, np.isfinite(lnk10))
     mask_size = np.sum(mask)
-    logger.info("refit mask size for bad_2comp: {}".format(mask_size))
+    logger.debug("refit mask size for bad_2comp: {}".format(mask_size))
 
     guesses = ucube.pcubes['2'].parcube.copy()
     # remove the bad pixels
@@ -278,15 +281,15 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         lnk21 = None
 
     mask_size = np.sum(mask)
-    logger.info("wide recovery refit mask size: {}".format(mask_size))
+    logger.debug("wide recovery refit mask size: {}".format(mask_size))
 
 
     if mask_size ==0:
-        logger.info("no pixels in the recovery mask, no fit is performed")
+        logger.debug("no pixels in the recovery mask, no fit is performed")
         return None
 
     if method == 'residual':
-        logger.info("recovering second component from residual")
+        logger.debug("recovering second component from residual")
         wide_comp_guess = get_2comp_wide_guesses(reg)
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
         c1_guess = reg.ucube.pcubes['1'].parcube
@@ -309,7 +312,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         raise Exception("the following method specified is invalid: {}".format(method))
 
     mask_size = np.sum(mask)
-    logger.info("final wide recovery refit mask size: {}".format(mask_size))
+    logger.debug("final wide recovery refit mask size: {}".format(mask_size))
 
     replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit)
 
@@ -330,7 +333,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, mask)
-            logger.info("replace bad pix mask size: {}".format(good_mask.sum()))
+            logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
 
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
@@ -338,7 +341,8 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
         # save the updated results
         save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
-        logger.info("not enough pixels to refit, no-refit is done")
+        logger.debug("not enough pixels to refit, no-refit is done")
+
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
@@ -371,7 +375,7 @@ def save_best_2comp_fit(reg):
     # ideally, a copy function should be in place of reloading
 
     # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
-    reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir)
+    reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, initialize_logging=False)
 
     # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
     # load the file based on the passed in reg, rather than the default
@@ -380,7 +384,7 @@ def save_best_2comp_fit(reg):
             reg_final.load_fits(ncomp=[nc])
         else:
             # load files using paths from reg if they exist
-            logger.info("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
+            logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
             reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc)
 
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')

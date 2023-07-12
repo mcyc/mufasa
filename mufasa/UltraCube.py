@@ -136,7 +136,7 @@ class UltraCube(object):
         self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
-        logger.info("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
+        logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
         gc.collect()
         self.include_model_mask(mod_mask)
 
@@ -255,11 +255,20 @@ class UCubePlus(UltraCube):
         if update:
             # re-fit the cube
             for nc in ncomp:
+                if 'conv' in self.paraPaths[str(nc)]:
+                    logger.info(f'Fitting convolved cube for {nc} component(s)')
+                else:
+                    logger.info(f'Fitting cube for {nc} component(s)')
                 #if update or (not os.path.isfile(self.paraPaths[str(nc)])):
                 self.fit_cube(ncomp=[nc], **kwargs)
                 gc.collect()
                 self.save_fit(self.paraPaths[str(nc)], nc)
                 gc.collect()
+        else:
+            if 'conv' in self.paraPaths[str(nc)]:
+                logger.info(f'Loading convolved cube fits for {nc} component(s)')
+            else:
+                logger.info(f'Loading fits for {nc} component(s)')
 
         for nc in ncomp:
             path = self.paraPaths[str(nc)]
