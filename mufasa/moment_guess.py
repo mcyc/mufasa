@@ -221,9 +221,9 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
             tot_spec = np.nansum(maskcube._data[:,]*mask, axis=(1,2))
             idx_peak = np.nanargmax(tot_spec)
             logger.info("Getting window moments of SpectralCube")
-            logger.info("peak T_B: {0}".format(np.nanmax(tot_spec)))
+            logger.info("peak T_B: {:.5f}".format(np.nanmax(tot_spec)))
             v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
-            logger.info("v_atpeak: {0}".format(v_atpeak))
+            logger.info("v_atpeak: {:.5f}".format(v_atpeak))
 
         vmax = v_atpeak + window_hwidth
         vmin = v_atpeak - window_hwidth
@@ -247,9 +247,8 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
 
     elif isinstance(spec, SpectralCube):
         # currently cannot handle v_atpeak as a map
-        if not hasattr(v_atpeak, 'ndim'):
+        if hasattr(v_atpeak, 'ndim') and v_atpeak.ndim>0: # numpy floats have ndim=0
             logger.error("the method that handles SpectralCube cannot currently handle v_atpeak as a map, please use single value v_atpeak instead")
-            # TODO: investigate why I get this all the time
         return moments_spectralcube(spec, window_hwidth, v_atpeak, signal_mask)
 
     else:
