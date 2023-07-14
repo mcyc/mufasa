@@ -220,10 +220,10 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
                 mask = mask*signal_mask
             tot_spec = np.nansum(maskcube._data[:,]*mask, axis=(1,2))
             idx_peak = np.nanargmax(tot_spec)
-            logger.info("Getting window moments of SpectralCube")
-            logger.info("peak T_B: {:.5f}".format(np.nanmax(tot_spec)))
+            logger.debug("Getting window moments of SpectralCube")
+            logger.debug("peak T_B: {0}".format(np.nanmax(tot_spec)))
             v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
-            logger.info("v_atpeak: {:.5f}".format(v_atpeak))
+            logger.debug("v_atpeak: {0}".format(v_atpeak))
 
         vmax = v_atpeak + window_hwidth
         vmin = v_atpeak - window_hwidth
