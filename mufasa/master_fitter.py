@@ -5,6 +5,7 @@ __author__ = 'mcychen'
 #=======================================================================================================================
 import os
 import numpy as np
+import multiprocessing
 from spectral_cube import SpectralCube
 from astropy import units as u
 from skimage.morphology import dilation
@@ -146,12 +147,18 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     return reg
 
 
-def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
+def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True):
     # ensure this is a two component fitting method
     ncomp = [1,2]
 
+    if isinstance(multicore, bool):
+        if multicore: multicore = multiprocessing.cpu_count() - 1
+        else: multicore = 1
+    if not isinstance(multicore, int):
+        multicore = multiprocessing.cpu_count() - 1
+
     # convolve the cube and fit it
-    get_convolved_fits(reg, ncomp, update=updateCnvFits, snr_min=snr_min)
+    get_convolved_fits(reg, ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
 
     # use the result from the convolved cube as guesses for the full resolution fits
     for nc in ncomp:
@@ -162,7 +169,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None):
 
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header)
         # update is set to True to save the fits
-        kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min}
+        kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min, 'multicore':multicore}
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
@@ -385,7 +392,7 @@ def save_best_2comp_fit(reg):
         else:
             # load files using paths from reg if they exist
             logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
-            reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc)
+            reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multiprocessing.cpu_count()-1)
 
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
 
