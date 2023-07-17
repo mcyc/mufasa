@@ -21,9 +21,11 @@ from multiprocessing import Pool, cpu_count
 # import from this directory
 #import ammonia_hf_multiv as amhf
 from .spec_models import nh3_deblended
+from .utils.multicore import validate_n_cores
 
 #=======================================================================================================================
 
+# not called?
 def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 0.1, n_cpu=None):
     '''
     Deblend hyperfine structures in a cube based on fitted models, i.e., reconstruct the fitted model with Gaussian
@@ -107,10 +109,7 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 
         mcube._data[:,y,x] = np.nansum(np.array(models), axis=0)
         return ((x, y), mcube._data[:, y, x])
 
-    if n_cpu is None:
-        n_cpu = cpu_count() - 1
-    else:
-        n_cpu=1
+    n_cpu = validate_n_cores(n_cpu)
 
     if n_cpu > 1:
         print("------------------ deblending cube -----------------")

@@ -8,7 +8,6 @@ import numpy as np
 
 from spectral_cube import SpectralCube
 import pyspeckit
-import multiprocessing
 import gc
 from astropy import units as u
 import scipy.ndimage as nd
@@ -16,7 +15,7 @@ import scipy.ndimage as nd
 from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
-
+from .utils.multicore import validate_n_cores
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -24,7 +23,7 @@ logger = get_logger(__name__)
 
 class UltraCube(object):
 
-    def __init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
         '''
         # a data frame work to handel multiple component fits and their results
         Parameters
@@ -46,7 +45,7 @@ class UltraCube(object):
         self.master_model_mask = None
         self.snr_min = 0.0
         self.cnv_factor = cnv_factor
-        self.n_cores = multiprocessing.cpu_count()
+        self.n_cores = validate_n_cores(n_cores)
 
         if cubefile is not None:
             self.cubefile = cubefile

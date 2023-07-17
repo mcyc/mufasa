@@ -452,12 +452,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
 
-    if multicore is None:
-        # use n-1 cores on the computer
-        multicore= multiprocessing.cpu_count() - 1
-
-        if multicore < 1:
-            multicore = 1
+    multicore = validate_n_cores(multicore)
 
     # get the masking for the fit
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
@@ -866,12 +861,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         logger.warning("guesses has no pixels, no fitting will be performed")
         return pcube
 
-    if multicore is None:
-        # use n-1 cores on the computer
-        multicore = multiprocessing.cpu_count() - 1
-
-        if multicore < 1:
-            multicore = 1
+    multicore = validate_n_cores(multicore)
 
     kwargs = set_pyspeckit_verbosity(**kwargs)
     pcube.fiteach(fittype='nh3_multi_v', guesses=guesses,

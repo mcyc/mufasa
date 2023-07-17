@@ -12,6 +12,7 @@ from astropy.stats import mad_std
 
 from .utils import map_divide
 import multiprocessing
+from .utils.multicore import validate_n_cores
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -173,9 +174,7 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
             the velociy or a map of velocities to center the spectral window on
         '''
 
-        if multicore is None:
-            # use all the cores minus one
-            multicore = multiprocessing.cpu_count() - 1
+        multicore = validate_n_cores(multicore)
 
         def get_win_moms(pcube, v_atpeak):
             # get window moments when v_atpeak is given
@@ -415,9 +414,7 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=Non
     f_tau = 0.5 # weight of the tau for the "equal-weight" guesses
     f_sig = 0.5 # weight of the linewidth for all guesses
 
-    if multicore is None:
-        # use all the cores minus one
-        multicore = multiprocessing.cpu_count() - 1
+    multicore = validate_n_cores(multicore)
 
     if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         spec.xarr.velocity_convention = 'radio'
