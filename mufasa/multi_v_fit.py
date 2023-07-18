@@ -25,6 +25,7 @@ from astropy.stats import mad_std
 
 from . import ammonia_multiv as ammv
 from . import moment_guess as momgue
+from .utils.multicore import validate_n_cores
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
