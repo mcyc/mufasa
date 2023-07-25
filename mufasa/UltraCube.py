@@ -131,10 +131,10 @@ class UltraCube(object):
             logger.warning("no fit was performed and thus no file will be saved")
 
 
-    def load_model_fit(self, filename, ncomp, multicore):
+    def load_model_fit(self, filename, ncomp):
         self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
         # update model mask
-        mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=multicore) > 0
+        mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
         logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
         gc.collect()
         self.include_model_mask(mod_mask)
@@ -259,6 +259,8 @@ class UCubePlus(UltraCube):
                 else:
                     logger.info(f'Fitting cube for {nc} component(s)')
                 #if update or (not os.path.isfile(self.paraPaths[str(nc)])):
+                if 'multicore' not in kwargs:
+                    kwargs['multicore'] = self.n_cores
                 self.fit_cube(ncomp=[nc], **kwargs)
                 gc.collect()
                 self.save_fit(self.paraPaths[str(nc)], nc)
@@ -271,7 +273,7 @@ class UCubePlus(UltraCube):
 
         for nc in ncomp:
             path = self.paraPaths[str(nc)]
-            self.load_model_fit(path, nc, kwargs['multicore'])
+            self.load_model_fit(path, nc)
 
 
 #======================================================================================================================#

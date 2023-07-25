@@ -84,7 +84,6 @@ class Region(object):
 
 
 def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None, multicore=True):
-
     if cnv_cubePath is None:
         root = "conv{0}Xbeam".format(int(np.rint(reg.cnv_factor)))
         reg.cnv_cubePath = "{0}_{1}.fits".format(os.path.splitext(reg.cubePath)[0], root)
@@ -108,7 +107,7 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
     # MC: a mechanism is needed to make sure the convolved cube has the same resolution has the cnv_factor
 
 
-def get_convolved_fits(reg, ncomp, update=True, **kwargs):
+def get_convolved_fits(reg, ncomp, update=True, multicore=True, **kwargs):
     '''
     update (bool) : call reg.get_convolved_cube even if reg has ucube_cnv attribute
 
@@ -116,9 +115,9 @@ def get_convolved_fits(reg, ncomp, update=True, **kwargs):
     '''
 
     if not hasattr(reg, 'ucube_cnv'):
-        reg.get_convolved_cube(update=True)
+        reg.get_convolved_cube(update=True, multicore=multicore)
     else:
-        reg.get_convolved_cube(update=update)
+        reg.get_convolved_cube(update=update, multicore=multicore)
 
     reg.ucube_cnv.get_model_fit(ncomp, update=update, **kwargs)
 
@@ -148,7 +147,6 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
 
 
 def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True):
-    
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
