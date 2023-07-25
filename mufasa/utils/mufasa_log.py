@@ -37,7 +37,8 @@ def init_logging(logfile='mufasa.log', console_level=INFO, file_level=DEBUG, ast
 
     # deal with astropy
     astropy_log.propagate = False # don't send astropy logs through the MUFASA logger
-    astropy_log.removeHandler(astropy_log.handlers[0]) # don't print astropy logs directly to console
+    try: astropy_log.removeHandler(astropy_log.handlers[0]) # don't print astropy logs directly to console
+    except IndexError: pass # if no handlers to remove
     astropy_console_handler = logging.StreamHandler()
     astropy_console_handler.setLevel(astropy_console_level)
     astropy_console_handler.setFormatter(log_formatter)
