@@ -107,7 +107,7 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
     # MC: a mechanism is needed to make sure the convolved cube has the same resolution has the cnv_factor
 
 
-def get_convolved_fits(reg, ncomp, update=True, multicore=True, **kwargs):
+def get_convolved_fits(reg, ncomp, update=True, **kwargs):
     '''
     update (bool) : call reg.get_convolved_cube even if reg has ucube_cnv attribute
 
@@ -115,9 +115,9 @@ def get_convolved_fits(reg, ncomp, update=True, multicore=True, **kwargs):
     '''
 
     if not hasattr(reg, 'ucube_cnv'):
-        reg.get_convolved_cube(update=True, multicore=multicore)
+        reg.get_convolved_cube(update=True, multicore=kwargs['multicore'])
     else:
-        reg.get_convolved_cube(update=update, multicore=multicore)
+        reg.get_convolved_cube(update=update, multicore=kwargs['multicore'])
 
     reg.ucube_cnv.get_model_fit(ncomp, update=update, **kwargs)
 
