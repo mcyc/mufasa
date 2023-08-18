@@ -876,19 +876,29 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # use n-1 cores on the computer
         multicore = multiprocessing.cpu_count() - 1
 
-        if multicore < 1:
-            multicore = 1
+    kwargs = set_pyspeckit_verbosity(**kwargs)
 
-    pcube.fiteach (fittype='nh3_multi_v', guesses=guesses,
-                  start_from_point=(xmax,ymax),
-                  use_neighbor_as_guess=False,
-                  limitedmax=[True,True,True,True]*ncomp,
-                  maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
-                  limitedmin=[True,True,True,True]*ncomp,
-                  minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
-                  multicore=multicore,
-                  **kwargs
-                  )
+    try:
+        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses,
+                      start_from_point=(xmax,ymax),
+                      use_neighbor_as_guess=False,
+                      limitedmax=[True,True,True,True]*ncomp,
+                      maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
+                      limitedmin=[True,True,True,True]*ncomp,
+                      minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
+                      multicore=multicore,
+                      **kwargs)
+    except Exception as E:
+        logger.error('Error occurred during cubefit_gen: {E}')
+        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses,
+                      start_from_point='center',
+                      use_neighbor_as_guess=False,
+                      limitedmax=[True,True,True,True]*ncomp,
+                      maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
+                      limitedmin=[True,True,True,True]*ncomp,
+                      minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
+                      multicore=multicore,
+                      **kwargs)
 
     if paraname != None:
         save_pcube(pcube, paraname, ncomp=ncomp)
