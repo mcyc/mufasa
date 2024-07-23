@@ -12,13 +12,11 @@ import multiprocessing
 
 from astropy import units as u
 from pyspeckit.spectrum.units import SpectroscopicAxis
-from pyspeckit.spectrum.models.ammonia_constants import freq_dict
-from pyspeckit.spectrum.models import ammonia
 import scipy.ndimage as nd
 
 from spectral_cube import SpectralCube
 from astropy.utils.console import ProgressBar
-from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,remove_small_holes #, closing
+from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,remove_small_holes
 from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
@@ -27,28 +25,41 @@ from . import moment_guess as momgue
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
-#=======================================================================================================================
-# the current implementation only fits the 1-1 lines
-line_names = ["oneone"]
-
-#=======================================================================================================================
-# set global constants
-
-# set the fit parameter limits (consistent with GAS DR1) for NH3 fits
-Texmin = 3.0  # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
-Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
-sigmin = 0.07  # km/s
-sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-#taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
-taumax = 30.0  # when the satellite hyperfine lines becomes optically thick
-taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
-eps = 0.001  # a small perturbation that can be used in guesses
 
 #=======================================================================================================================
 
+class MetaModel(object):
+    def __init__(self, fittype):
+        self.fittype = fittype
+
+        if self.fittype is 'nh3_multi_v':
+            from pyspeckit.spectrum.models.ammonia_constants import freq_dict
+            from pyspeckit.spectrum.models import ammonia
+
+            self.freq_dict = freq_dict
+            self.spec_model = ammonia._ammonia_spectrum
+
+            # set the fit parameter limits (consistent with GAS DR1) for NH3 fits
+            self.Texmin = 3.0  # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
+            self.Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
+            self.sigmin = 0.07  # km/s
+            self.sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
+            # taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
+            self.taumax = 30.0  # when the satellite hyperfine lines becomes optically thick
+            self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
+            self.eps = 0.001  # a small perturbation that can be used in guesses
+
+            # the current implementation only fits the 1-1 lines
+            self.linenames = ["oneone"]
+        else:
+            raise Exception("{} is an invalid fittype".format(fittype))
+
+#=======================================================================================================================
+
+'''
 def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrname = None, rms = 0.15, rmspath = None,
                       linename = "oneone"):
-    '''
+
     Creates a fits file containing the model cubes of individual components stacked into a hypercube
     :param paraname:
     :param refcubename:
@@ -58,7 +69,6 @@ def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrnam
     :param rms:
     :param rmspath:
     :return:
-    '''
 
     para, hdr = fits.getdata(paraname, header = True)
 
@@ -130,15 +140,12 @@ def get_multiV_models(paraname, refcubename, n_comp = 2, savename = None, snrnam
 
 
 def get_SNR(paraname, savename = None, rms = 0.15, n_comp = 2, linename='oneone'):
-    '''
     Take a multiple velocity componet fit and produce a signal to noise ratio of the two velocity components
     :param paraname:
     :param savename:
     :param rms:
     :param n_comp:
     :return:
-    '''
-
     para, hdr = fits.getdata(paraname, header = True)
     n_para = n_comp*4
 
@@ -191,9 +198,9 @@ def get_SNR(paraname, savename = None, rms = 0.15, n_comp = 2, linename='oneone'
         newfits.writeto(savename ,overwrite=True)
 
     return peakT/rms
+'''
 
-
-def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None):
+def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None, rest_value=None):
     '''
     cube : SpectralCube
 
@@ -213,7 +220,8 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         A mask stating which array elements the chi-squared values are calculated from
     '''
 
-    cube = cube.with_spectral_unit(u.Hz, rest_value = freq_dict['oneone']*u.Hz)
+    if rest_value is not None:
+        cube = cube.with_spectral_unit(u.Hz, rest_value = rest_value)
 
     if usemask:
         if mask is None:
@@ -289,8 +297,8 @@ def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_gues
     return momgue.moment_guesses(moment1, moment2, ncomp, sigmin, tex_guess, tau_guess, moment0)
 
 
+'''
 def make_guesses(sigv_para_name, n_comp = 2, tex_guess =10.0, tau_guess = 0.5):
-    '''
     Make 2 velocity component fit guesses based on the GAS DR1 parameter maps
     Parameters
     ----------
@@ -304,8 +312,6 @@ def make_guesses(sigv_para_name, n_comp = 2, tex_guess =10.0, tau_guess = 0.5):
     -------
     guesses : ndarray
         parameter guesses for the 2 velocity component fit
-    '''
-
     para = fits.getdata(sigv_para_name)
     vlsr = para[4]
     sigma = para[3]
@@ -369,10 +375,10 @@ def make_guesses(sigv_para_name, n_comp = 2, tex_guess =10.0, tau_guess = 0.5):
         return None
 
     return guesses
+'''
 
-
+'''
 def get_singv_tau11(singv_para):
-    '''
     Take a GAS DR1 parameter maps and return optical depth of the 1-1 line.
     Parameters
     ----------
@@ -382,7 +388,6 @@ def get_singv_tau11(singv_para):
     -------
     tau11 : ndarray
         A map of model optical depths for ammonia (1-1)
-    '''
 
     # Note: the efficiency could benifit from multi-core processing
 
@@ -423,9 +428,9 @@ def get_singv_tau11(singv_para):
         model_a_pixel(xy)
 
     return tau11
+'''
 
-
-def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename="oneone", **kwargs):
+def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename="oneone", fittype='nh3_multi_v', **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
 
     logger.info("using cubefit_simp")
@@ -438,6 +443,18 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
         pcube = pyspeckit.Cube(filename=cubename)
 
     pcube.unit="K"
+
+    # get information on the spectral model
+    mod_info = MetaModel(fittype)
+    freq_dict = mod_info.freq_dict
+
+    Texmin = mod_info.Texmin
+    Texmax = mod_info.Texmax
+    sigmin = mod_info.sigmin
+    sigmax = mod_info.sigmax
+    taumax = mod_info.taumax
+    taumin = mod_info.taumin
+    eps = mod_info.eps
 
     # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
     # note: this assume the data cube has the right units
@@ -486,13 +503,6 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     v_guess = guesses[::4]
     v_guess[v_guess == 0] = np.nan
 
-    '''
-    v_median = np.nanmedian(v_guess)
-    v_guess_finite = v_guess[np.isfinite(v_guess)]
-    v_99p = np.percentile(v_guess_finite, 99)
-    v_1p = np.percentile(v_guess_finite, 1)
-    '''
-
     v_median, v_99p, v_1p = get_vstats(v_guess)
 
     vmax = v_median + v_peak_hwidth
@@ -526,26 +536,14 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     kwargs['limitedmin'] = [True, True, True, True] * ncomp
     kwargs['minpars'] = [vmin, sigmin, Texmin, taumin] * ncomp
 
-    pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
-
-    '''
-    try:
-        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
-
-    except AssertionError:
-        # if the start_from_point is invalid
-        pcube.fiteach(fittype='nh3_multi_v', guesses=guesses, maskmap=maskmap, **kwargs)
-        indx_g = np.argwhere(maskmap)
-        start_from_point = (indx_g[0,1], indx_g[0,0])
-        kwargs['start_from_point'] = start_from_point
-    '''
+    pcube.fiteach(fittype=fittype, guesses=guesses, maskmap=maskmap, **kwargs)
 
     return pcube
 
 
 def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None, guesses = None, errmap11name = None,
             multicore = None, mask_function = None, snr_min=0.0, linename="oneone", momedgetrim=True, saveguess=False,
-            **kwargs):
+            fittype='nh3_multi_v', **kwargs):
     '''
     Perform n velocity component fit on the GAS ammonia 1-1 data.
     (This should be the function to call for all future codes if it has been proven to be reliable)
@@ -576,6 +574,17 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     pcube.unit="K"
 
+    # get information on the spectral model
+    mod_info = MetaModel(fittype)
+    freq_dict = mod_info.freq_dict
+
+    Texmin = mod_info.Texmin
+    Texmax = mod_info.Texmax
+    sigmin = mod_info.sigmin
+    sigmax = mod_info.sigmax
+    taumax = mod_info.taumax
+    taumin = mod_info.taumin
+    eps = mod_info.eps
 
     # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
     # note: this assume the data cube has the right units
@@ -619,7 +628,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     peaksnr = convolve(peaksnr, kernel)
 
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
-
 
     if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
         # trim the edges by 3 pixels to guess the location of the peak emission
@@ -733,29 +741,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
                 m0, m1, m2 = main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
 
         # mask over robust moment guess pixels to set the velocity fitting range
-        '''
-        mask = np.isfinite(m1)
-        mask = np.logical_and(mask, signal_mask)
-        m1_good = m1[mask]
-
-        v_median = np.median(m1_good)
-        v_99p = np.percentile(m1_good, 99)
-        v_1p = np.percentile(m1_good, 1)
-        '''
         v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
-
-        if False:
-            # save the moment maps for diagnostic purposes
-            hdr_new = copy.deepcopy(pcube.header)
-            hdr_new['CDELT3']= 1
-            hdr_new['CTYPE3']= 'FITPAR'
-            hdr_new['CRVAL3']= 0
-            hdr_new['CRPIX3']= 1
-
-            savename = "{0}_moments.fits".format(os.path.splitext(paraname)[0], "parameter_maps")
-            fitcubefile = fits.PrimaryHDU(data=np.array([m0,m1,m2]), header=hdr_new)
-            fitcubefile.writeto(savename ,overwrite=True)
-
 
     print("median velocity: {0}".format(v_median))
 
@@ -878,7 +864,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         if multicore < 1:
             multicore = 1
 
-    pcube.fiteach (fittype='nh3_multi_v', guesses=guesses,
+    pcube.fiteach (fittype=fittype, guesses=guesses,
                   start_from_point=(xmax,ymax),
                   use_neighbor_as_guess=False,
                   limitedmax=[True,True,True,True]*ncomp,
@@ -897,7 +883,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         model.write(modname, overwrite=True)
 
     if chisqname != None:
-        chisq = get_chisq(cube, pcube.get_modelcube(), expand=20)
+        chisq = get_chisq(cube, pcube.get_modelcube(), expand=20, rest_value= freq_dict['oneone']*u.Hz)
         chisqfile = fits.PrimaryHDU(data=chisq, header=cube.wcs.celestial.to_header())
         chisqfile.writeto(chisqname, overwrite=True)
 
