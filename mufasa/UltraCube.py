@@ -290,7 +290,7 @@ def load_model_fit(cube, filename, ncomp):
 
     # reigster fitter
     linename = 'oneone'
-    from . import ammonia_multiv as ammv
+    from .spec_models import ammonia_multiv as ammv
 
     fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)

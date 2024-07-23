@@ -11,9 +11,8 @@ from os import path
 import multiprocessing
 
 from astropy import units as u
-from astropy.stats import mad_std
 from pyspeckit.spectrum.units import SpectroscopicAxis
-from pyspeckit.spectrum.models.ammonia_constants import freq_dict, voff_lines_dict
+from pyspeckit.spectrum.models.ammonia_constants import freq_dict
 from pyspeckit.spectrum.models import ammonia
 import scipy.ndimage as nd
 
@@ -23,7 +22,7 @@ from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,
 from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
-from . import ammonia_multiv as ammv
+from .spec_models import ammonia_multiv as ammv
 from . import moment_guess as momgue
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
