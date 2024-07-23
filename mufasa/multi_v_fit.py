@@ -54,7 +54,15 @@ class MetaModel(object):
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
             self.main_hf_moments = momgue.window_moments
-            self.moment_guesses = momgue.moment_guesses
+
+            # define a nh3-specific moment guess function
+            def mom_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None):
+                kwargs = dict(moment1=moment1, moment2=moment2, ncomp=ncomp, sigmin=sigmin, tex_guess=tex_guess,
+                              tau_guess=tau_guess, moment0=moment0, linetype='nh3')
+                return momgue.moment_guesses(**kwargs)
+
+            self.moment_guesses = mom_guesses
+
 
         elif self.fittype is 'n2hp_multi_v':
             '''
@@ -402,14 +410,14 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         from skimage.morphology import binary_dilation
 
-        def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
+        def adaptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
             # a method to divide the cube into different regions and moments in each region
             _, n_seeds = ndi.label(seeds)
             if n_seeds > 10:
                 # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
                 seeds = binary_dilation(seeds, disk(5))
 
-            return momgue.adoptive_moment_maps(maskcube, seeds, window_hwidth=window_hwidth,
+            return momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=window_hwidth,
                                               weights=weights, signal_mask=signal_mask)
 
 
@@ -421,7 +429,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         if n_sig_parts > 1:
             # if there is more than one structure in the signal mask
             seeds = signal_mask
-            m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+            m0, m1, m2 = adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                  weights=peaksnr, signal_mask=signal_mask)
 
         else:
@@ -429,7 +437,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             _, n_parts = ndi.label(~err_mask)
             if n_parts > 1:
                 seeds = err_mask
-                m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                m0, m1, m2 = adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                      weights=peaksnr, signal_mask=signal_mask)
             else:
                 # use the simplest main_hf_moments
