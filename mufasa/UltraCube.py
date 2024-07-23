@@ -284,19 +284,25 @@ def save_fit(pcube, savename, ncomp):
     mvf.save_pcube(pcube, savename, ncomp)
 
 
-def load_model_fit(cube, filename, ncomp):
+def load_model_fit(cube, filename, ncomp, fittype='nh3_multi_v'):
     # currently only loads ammonia multi-component model
     pcube = pyspeckit.Cube(cube=cube)
 
     # reigster fitter
-    linename = 'oneone'
-    from .spec_models import ammonia_multiv as ammv
+    if fittype is 'nh3_multi_v':
+        linename = 'oneone'
+        from .spec_models import ammonia_multiv as ammv
+        fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
 
-    fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
-    pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
+    elif fittype is 'n2hp_multi_v':
+        linename = 'onezero'
+        from . import n2hp_multiv as n2hpmv
+        fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
+
+    pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
     pcube.xarr.velocity_convention = 'radio'
 
-    pcube.load_model_fit(filename, npars=fitter.npars, fittype='nh3_multi_v')
+    pcube.load_model_fit(filename, npars=fitter.npars, fittype=fittype)
     gc.collect()
     return pcube
 
