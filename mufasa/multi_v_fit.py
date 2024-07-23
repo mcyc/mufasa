@@ -28,6 +28,7 @@ logger = get_logger(__name__)
 class MetaModel(object):
     def __init__(self, fittype, ncomp=None):
         self.fittype = fittype
+        self.adoptive_snr_masking = True
 
         if self.fittype is 'nh3_multi_v':
             from pyspeckit.spectrum.models.ammonia_constants import freq_dict
@@ -54,6 +55,11 @@ class MetaModel(object):
 
             self.main_hf_moments = momgue.window_moments
             self.moment_guesses = momgue.moment_guesses
+
+        elif self.fittype is 'n2hp_multi_v':
+            '''
+            For Julian to fill in for the N2H+ model
+            '''
 
         else:
             raise Exception("{} is an invalid fittype".format(fittype))
