@@ -20,7 +20,6 @@ from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,
 from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
-from .spec_models import ammonia_multiv as ammv
 from . import moment_guess as momgue
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
@@ -29,13 +28,18 @@ logger = get_logger(__name__)
 #=======================================================================================================================
 
 class MetaModel(object):
-    def __init__(self, fittype):
+    def __init__(self, fittype, ncomp=None):
         self.fittype = fittype
 
         if self.fittype is 'nh3_multi_v':
             from pyspeckit.spectrum.models.ammonia_constants import freq_dict
             from pyspeckit.spectrum.models import ammonia
+            from .spec_models import ammonia_multiv as ammv
 
+            # the current implementation only fits the 1-1 lines
+            self.linenames = ["oneone"]
+
+            self.fitter = ammv.nh3_multi_v_model_generator(n_comp=ncomp, linenames=self.linenames)
             self.freq_dict = freq_dict
             self.spec_model = ammonia._ammonia_spectrum
 
@@ -49,8 +53,7 @@ class MetaModel(object):
             self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
-            # the current implementation only fits the 1-1 lines
-            self.linenames = ["oneone"]
+
         else:
             raise Exception("{} is an invalid fittype".format(fittype))
 
@@ -445,7 +448,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     pcube.unit="K"
 
     # get information on the spectral model
-    mod_info = MetaModel(fittype)
+    mod_info = MetaModel(fittype, ncomp)
     freq_dict = mod_info.freq_dict
 
     Texmin = mod_info.Texmin
@@ -465,7 +468,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     pcube.xarr.velocity_convention = 'radio'
 
     # always register the fitter just in case different lines are used
-    fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
+    fitter = mod_info.fitter
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
 
     if multicore is None:
@@ -575,7 +578,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     pcube.unit="K"
 
     # get information on the spectral model
-    mod_info = MetaModel(fittype)
+    mod_info = MetaModel(fittype, ncomp)
     freq_dict = mod_info.freq_dict
 
     Texmin = mod_info.Texmin
@@ -599,7 +602,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     pcube.xarr.velocity_convention = 'radio'
 
     # always register the fitter just in case different lines are used
-    fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
+    fitter = mod_info.fitter
     pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
     logger.info("number of parameters is {0}".format(fitter.npars))
     logger.info("the line to fit is {0}".format(linename))
