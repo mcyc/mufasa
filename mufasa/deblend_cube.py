@@ -13,18 +13,12 @@ import gc
 
 from pyspeckit.parallel_map import parallel_map
 
-#import tqdm
 from multiprocessing import Pool, cpu_count
-#import itertools
-#from itertools import repeat as rp
 
-# import from this directory
-#import ammonia_hf_multiv as amhf
-from .spec_models import nh3_deblended
 
 #=======================================================================================================================
 
-def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 0.1, n_cpu=None):
+def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 0.1, n_cpu=None, linetype='nh3'):
     '''
     Deblend hyperfine structures in a cube based on fitted models, i.e., reconstruct the fitted model with Gaussian
     lines with optical depths accounted for (e.g., similar to CO (J = 0-1))
@@ -58,7 +52,16 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 
         The deblended cube
     '''
 
+    # get different types of deblending models
+    if linetype is 'nh3':
+        from .spec_models import nh3_deblended
+        deblend_mod = nh3_deblended.nh3_vtau_singlemodel_deblended
 
+    elif linetype is 'n2hp':
+        from .spec_models import n2hp_deblended
+        deblend_mod = n2hp_deblended.n2hp_vtau_singlemodel_deblended
+    else:
+        raise Exception("{} is an invalid linetype".format(linetype))
 
     # open the reference cube file
     cube = specCubeRef
@@ -101,7 +104,7 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 
     def model_a_pixel(xy):
         x,y = int(xy[0]), int(xy[1])
         # nh3_vtau_singlemodel_deblended takes Hz as the spectral unit
-        models = [nh3_deblended.nh3_vtau_singlemodel_deblended(xarr, Tex=tex, tau=tau*tau_wgt, xoff_v=vel, width=width)
+        models = [deblend_mod(xarr, Tex=tex, tau=tau*tau_wgt, xoff_v=vel, width=width)
                   for vel, width, tex, tau in zip(para[::4, y,x], para[1::4, y,x], para[2::4, y,x], para[3::4, y,x])]
 
         mcube._data[:,y,x] = np.nansum(np.array(models), axis=0)
