@@ -54,13 +54,43 @@ class MetaModel(object):
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
             self.main_hf_moments = momgue.window_moments
-            self.moment_guesses = momgue.moment_guesses
+
+            # define a nh3-specific moment guess function
+            def mom_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None):
+                kwargs = dict(moment1=moment1, moment2=moment2, ncomp=ncomp, sigmin=sigmin, tex_guess=tex_guess,
+                              tau_guess=tau_guess, moment0=moment0, linetype='nh3')
+                return momgue.moment_guesses(**kwargs)
+
+            self.moment_guesses = mom_guesses
+
 
         elif self.fittype is 'n2hp_multi_v':
             '''
             For Julian to fill in for the N2H+ model
             '''
+            from .spec_models.n2hp_constants import freq_dict
+            from .spec_models import n2hp_multiv as n2hpmv
 
+            # the current implementation only fits the 1-0 lines
+            self.linenames = ["onezero"]
+
+            self.fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=self.linenames)
+            self.freq_dict = freq_dict
+            self.rest_value = freq_dict['onezero'] * u.Hz
+            self.spec_model = n2hpmv._n2hp_spectrum
+
+            # set the fit parameter limits (consistent with GAS DR1) for NH3 fits
+            self.Texmin = 3.0  # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
+            self.Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
+            self.sigmin = 0.07  # km/s
+            self.sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
+            # taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
+            self.taumax = 40.0  # when the satellite hyperfine lines becomes optically thick
+            self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
+            self.eps = 0.001  # a small perturbation that can be used in guesses
+
+            self.main_hf_moments = momgue.window_moments
+            self.moment_guesses = momgue.moment_guesses
         else:
             raise Exception("{} is an invalid fittype".format(fittype))
 
@@ -126,7 +156,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         return chisq, np.sum(mask, axis=0)
 
 
-def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename="oneone", fittype='nh3_multi_v', **kwargs):
+def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='nh3_multi_v', **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
 
     logger.info("using cubefit_simp")
@@ -143,6 +173,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
     freq_dict = mod_info.freq_dict
+    linename=mod_info.linenames
 
     Texmin = mod_info.Texmin
     Texmax = mod_info.Texmax
@@ -238,8 +269,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, linename=
 
 
 def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None, guesses = None, errmap11name = None,
-            multicore = None, mask_function = None, snr_min=0.0, linename="oneone", momedgetrim=True, saveguess=False,
-            fittype='nh3_multi_v', **kwargs):
+            multicore = None, mask_function = None, snr_min=0.0, momedgetrim=True, saveguess=False,fittype='nh3_multi_v', **kwargs):
     '''
     Perform n velocity component fit on the GAS ammonia 1-1 data.
     (This should be the function to call for all future codes if it has been proven to be reliable)
@@ -273,6 +303,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
     freq_dict = mod_info.freq_dict
+    linename = mod_info.linenames
 
     Texmin = mod_info.Texmin
     Texmax = mod_info.Texmax
@@ -402,14 +433,14 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         from skimage.morphology import binary_dilation
 
-        def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
+        def adaptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
             # a method to divide the cube into different regions and moments in each region
             _, n_seeds = ndi.label(seeds)
             if n_seeds > 10:
                 # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
                 seeds = binary_dilation(seeds, disk(5))
 
-            return momgue.adoptive_moment_maps(maskcube, seeds, window_hwidth=window_hwidth,
+            return momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=window_hwidth,
                                               weights=weights, signal_mask=signal_mask)
 
 
@@ -421,7 +452,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         if n_sig_parts > 1:
             # if there is more than one structure in the signal mask
             seeds = signal_mask
-            m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+            m0, m1, m2 = adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                  weights=peaksnr, signal_mask=signal_mask)
 
         else:
@@ -429,7 +460,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             _, n_parts = ndi.label(~err_mask)
             if n_parts > 1:
                 seeds = err_mask
-                m0, m1, m2 = adoptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                m0, m1, m2 = adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
                                      weights=peaksnr, signal_mask=signal_mask)
             else:
                 # use the simplest main_hf_moments
