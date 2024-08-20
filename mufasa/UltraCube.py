@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 
 class UltraCube(object):
 
-    def __init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile=None, cube=None,fittype=None, snr_min=None, rmsfile=None, cnv_factor=2):
         '''
         # a data frame work to handel multiple component fits and their results
         Parameters
@@ -47,6 +47,7 @@ class UltraCube(object):
         self.snr_min = 0.0
         self.cnv_factor = cnv_factor
         self.n_cores = multiprocessing.cpu_count()
+        self.fittype = fittype
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -106,7 +107,7 @@ class UltraCube(object):
 
         for nc in ncomp:
             #self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
-            self.pcubes[str(nc)] = fit_cube(self.cube, simpfit=simpfit, ncomp=nc, **kwargs)
+            self.pcubes[str(nc)] = fit_cube(self.cube, simpfit=simpfit, ncomp=nc, fittype=self.fittype, **kwargs)
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
@@ -133,7 +134,7 @@ class UltraCube(object):
 
 
     def load_model_fit(self, filename, ncomp):
-        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
+        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp,self.fittype)
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
         logger.info("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
@@ -218,9 +219,10 @@ class UCubePlus(UltraCube):
     # create a subclass of UltraCube that holds the directory information
     #__init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2)
 
-    def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None, **kwargs): # snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None,fittype=None, **kwargs): # snr_min=None, rmsfile=None, cnv_factor=2):
         # super(UCube, self).__init__(cubefile=cubefile)
-        UltraCube.__init__(self, cubefile, cube, **kwargs) # snr_min, rmsfile, cnv_factor)
+
+        UltraCube.__init__(self, cubefile, cube, fittype, **kwargs) # snr_min, rmsfile, cnv_factor)
 
         self.cubeDir = os.path.dirname(cubefile)
 
@@ -268,15 +270,15 @@ class UCubePlus(UltraCube):
 
 #======================================================================================================================#
 
-def fit_cube(cube, simpfit=False, **kwargs):
+def fit_cube(cube, simpfit=False,fittype='nh3_multi_v',**kwargs):
     '''
     kwargs are those used for pyspeckit.Cube.fiteach
     '''
     if simpfit:
         # fit the cube with the provided guesses and masks with no pre-processing
-        return mvf.cubefit_simp(cube, **kwargs)
+        return mvf.cubefit_simp(cube,fittype=fittype,**kwargs)
     else:
-        return mvf.cubefit_gen(cube, **kwargs)
+        return mvf.cubefit_gen(cube,fittype=fittype,**kwargs)
 
 
 def save_fit(pcube, savename, ncomp):
@@ -284,25 +286,25 @@ def save_fit(pcube, savename, ncomp):
     mvf.save_pcube(pcube, savename, ncomp)
 
 
-def load_model_fit(cube, filename, ncomp, fittype='nh3_multi_v'):
+def load_model_fit(cube, filename, ncomp, fittype):
     # currently only loads ammonia multi-component model
     pcube = pyspeckit.Cube(cube=cube)
 
     # reigster fitter
     if fittype is 'nh3_multi_v':
         linename = 'oneone'
-        from .spec_models import ammonia_multiv as ammv
+        from spec_models import ammonia_multiv as ammv
         fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
 
     elif fittype is 'n2hp_multi_v':
         linename = 'onezero'
-        from . import n2hp_multiv as n2hpmv
+        import spec_models.n2hp_multiv as n2hpmv
         fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
 
     pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
     pcube.xarr.velocity_convention = 'radio'
 
-    pcube.load_model_fit(filename, npars=fitter.npars, fittype=fittype)
+    pcube.load_model_fit(filename, npars=fitter.npars,fittype=fittype)
     gc.collect()
     return pcube
 
