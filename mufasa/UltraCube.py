@@ -286,7 +286,7 @@ def save_fit(pcube, savename, ncomp):
     mvf.save_pcube(pcube, savename, ncomp)
 
 
-def load_model_fit(cube, filename, ncomp,fittype):
+def load_model_fit(cube, filename, ncomp, fittype):
     # currently only loads ammonia multi-component model
     pcube = pyspeckit.Cube(cube=cube)
 
