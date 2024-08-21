@@ -123,10 +123,11 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 
         merged_result = [core_result for core_result in result
                          if core_result is not None]
         for mr in merged_result:
-            ((x, y), model) = mr
-            x = int(x)
-            y = int(y)
-            mcube._data[:, y, x] = model
+            for i in range(len(mr[:])):
+                ((x, y), model) = mr[i]
+                x = int(x)
+                y = int(y)
+                mcube._data[:, y, x] = model
     else:
         for xy in ProgressBar(list(valid_pixels)):
             model_a_pixel(xy)
