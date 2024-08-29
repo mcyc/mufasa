@@ -36,7 +36,15 @@ class LineSetup(object):
             '''
             For Julian to fill in for the N2H+ model
             '''
-            pass
+            from .spec_models.n2hp_constants import voff_lines_dict
+
+            voff = voff_lines_dict['onezero']
+
+            # define max and min values of tex and tau to use for the test
+            self.tex_max = 8.0
+            self.tau_max = 1.0
+            self.tex_min = 3.1
+            self.tau_min = 0.3
         else:
             raise Exception("{} is an invalid linetype".format(linetype))
 
