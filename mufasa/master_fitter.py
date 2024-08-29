@@ -408,7 +408,7 @@ def save_best_2comp_fit(reg):
     UCube.save_fit(pcube_final, savename=savename, ncomp=2)
 
     hdr2D =reg.ucube.cube.wcs.celestial.to_header()
-    hdr2D['HISTORY'] = f'Written by MUFASA {str(ctime())}'
+    hdr2D['HISTORY'] = 'Written by MUFASA {}'.format({str(ctime())})
 
     paraDir = reg_final.ucube.paraDir
     paraRoot = reg_final.ucube.paraNameRoot
