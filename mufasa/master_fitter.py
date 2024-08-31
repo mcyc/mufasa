@@ -594,9 +594,12 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     gg = gss_rf.refine_each_comp(gg, mask=mask)
 
     mom0 = moms_res_cnv[0]
-    rms = cube_res_cnv.mad_std(axis=0)
-    snr = mom0/rms
-    maskmap = snr >= res_snr_cut
+    if res_snr_cut > 0:
+        rms = cube_res_cnv.mad_std(axis=0)
+        snr = mom0/rms
+        maskmap = snr >= res_snr_cut
+    else:
+        maskmap = np.isfinite(mom0)
 
     # use the brightest pixel based on mom0 as the starting point
     mom0[~maskmap] = np.nan
