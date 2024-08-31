@@ -102,13 +102,12 @@ class UltraCube(object):
         try:
             from collections import Iterable
         except ImportError:
-            # for backwards compitability
+            # for backwards compatibility
             from collections.abc import Iterable
         if not isinstance(ncomp, Iterable):
             ncomp = [ncomp]
 
         for nc in ncomp:
-            #self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
             self.pcubes[str(nc)] = fit_cube(self.cube, simpfit=simpfit, ncomp=nc, **kwargs)
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
@@ -219,8 +218,6 @@ class UltraCube(object):
 
 class UCubePlus(UltraCube):
     # create a subclass of UltraCube that holds the directory information
-    #__init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2)
-
     def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None, **kwargs): # snr_min=None, rmsfile=None, cnv_factor=2):
         # super(UCube, self).__init__(cubefile=cubefile)
         UltraCube.__init__(self, cubefile, cube, **kwargs) # snr_min, rmsfile, cnv_factor)
@@ -246,7 +243,7 @@ class UCubePlus(UltraCube):
 
     def get_model_fit(self, ncomp, update=True, **kwargs):
         '''
-        load the model fits if it exist, else
+        load the model fits if it exists, else
 
         kwargs are passed to pyspeckit.Cube.fiteach (if update)
         '''
@@ -376,16 +373,6 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
 #======================================================================================================================#
 # statistics tools
 
-'''
-def get_aic(chisq, p, N=None):
-    # calculate AIC or AICc values
-    if N is None:
-        return aic.AIC(chisq, p)
-    else:
-        return aic.AICc(chisq, p, N)
-'''
-
-
 def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False):
     '''
     Calculate residual sum of squares (RSS)
@@ -511,30 +498,12 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     mask_lowT[specmask, :] = True
     mask[:, ~mask_highT_2d] = mask_lowT[:, ~mask_highT_2d]
 
-    # get pixels that aren't modeled
-    #mask_s = np.zeros(mask.shape, dtype=bool)
-    #mask_s[: ~np.all(mask, axis=0)] =
-
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
 
     if expand > 0:
         mask = expand_mask(mask, expand)
     mask = mask.astype(float)
-
-    '''
-    # expand in all directions instead
-    #selem = np.ones(shape=(expand, expand, expand), dtype=bool)
-    #mask = nd.binary_dilation(mask, selem)
-    mask = nd.binary_dilation(mask, iterations=expand)
-
-    # pixels with less than expand number of spectral chanels
-    mask_s = np.zeros(mask.shape, dtype=bool)
-    mask_s[:, np.sum(mask, axis=0) < expand] = True
-    mask_s = expand_mask(mask_s, expand)
-
-    mask = np.logical_or(mask, mask_s)
-    '''
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -554,9 +523,7 @@ def expand_mask(mask, expand):
 def get_rms(residual):
     # get robust estimate of the rms from the fit residual
     diff = residual - np.roll(residual, 2, axis=0)
-    #print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
-    #print("finite rms map size: {}".format(np.sum(np.isfinite(rms))))
     gc.collect()
     return rms
 
