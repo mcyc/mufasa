@@ -4,9 +4,14 @@ __author__ = 'mcychen'
 
 #======================================================================================================================#
 import os
+import warnings
 import numpy as np
 
 from spectral_cube import SpectralCube
+# prevent any spectral-cube related warnings from being displayed.
+from spectral_cube.utils import SpectralCubeWarning
+warnings.filterwarnings(action='ignore', category=SpectralCubeWarning, append=True)
+
 import pyspeckit
 import multiprocessing
 import gc
@@ -293,12 +298,12 @@ def load_model_fit(cube, filename, ncomp, fittype):
     # reigster fitter
     if fittype is 'nh3_multi_v':
         linename = 'oneone'
-        from spec_models import ammonia_multiv as ammv
+        from .spec_models import ammonia_multiv as ammv
         fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
 
     elif fittype is 'n2hp_multi_v':
         linename = 'onezero'
-        import spec_models.n2hp_multiv as n2hpmv
+        from .spec_models import n2hp_multiv as n2hpmv
         fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
 
     pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
