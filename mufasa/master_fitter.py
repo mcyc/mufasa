@@ -503,7 +503,7 @@ def get_2comp_wide_guesses(reg):
             fit_best_2comp_residual_cnv(reg)
         except ValueError:
             logger.info("retry with no SNR threshold")
-            fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0,fittype=reg.fittype)
+            fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
 
 
     def get_mom_guesses(reg):
