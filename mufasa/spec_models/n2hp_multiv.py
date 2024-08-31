@@ -5,8 +5,8 @@ __author__ = 'mcychen'
 
 import numpy as np
 from pyspeckit.spectrum.models import model
-from spec_models.n2hp_constants import (line_names, freq_dict, voff_lines_dict, tau_wts_dict)
-from spec_models.n2hp_constants import (ckms, h, kb)
+from .n2hp_constants import (line_names, freq_dict, voff_lines_dict, tau_wts_dict)
+from .n2hp_constants import (ckms, h, kb)
 
 #=======================================================================================================================
 # set CMB as a global constant
