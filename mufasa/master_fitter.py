@@ -588,21 +588,25 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     #gg = mmg.moment_guesses(moms_res_cnv[1], moms_res_cnv[2], ncomp, moment0=moms_res_cnv[0])
     #nsize = np.sum(np.isfinite(moms_res_cnv[0]))
 
-    # use the brightest pixel based on mom0 as the starting point
-    mom0 = moms_res_cnv[0]
-    indx_g = np.where(mom0 == np.nanmax(mom0))
-    idx_x = indx_g[1][0]
-    idx_y = indx_g[0][0]
-    start_from_point = (idx_y, idx_x)
-
     gg = mmg.moment_guesses_1c(moms_res_cnv[0], moms_res_cnv[1], moms_res_cnv[2])
 
     mask = np.isfinite(gg[0])
     gg = gss_rf.refine_each_comp(gg, mask=mask)
 
-    rms = cube_res_cnv.mad_std(axis=0)
-    snr = mom0/rms
-    maskmap = snr >= res_snr_cut
+    mom0 = moms_res_cnv[0]
+    if res_snr_cut > 0:
+        rms = cube_res_cnv.mad_std(axis=0)
+        snr = mom0/rms
+        maskmap = snr >= res_snr_cut
+    else:
+        maskmap = np.isfinite(mom0)
+
+    # use the brightest pixel based on mom0 as the starting point
+    mom0[~maskmap] = np.nan
+    indx_g = np.where(mom0 == np.nanmax(mom0))
+    idx_x = indx_g[1][0]
+    idx_y = indx_g[0][0]
+    start_from_point = (idx_y, idx_x)
 
     # should try to use UCubePlus??? may want to avoid saving too many intermediate cube products
     reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
