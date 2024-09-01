@@ -601,23 +601,18 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     else:
         maskmap = np.isfinite(mom0)
 
-    # use the brightest pixel based on mom0 as the starting point
-    mom0[~maskmap] = np.nan
-    indx_g = np.where(mom0 == np.nanmax(mom0))
-    idx_x = indx_g[1][0]
-    idx_y = indx_g[0][0]
-    start_from_point = (idx_y, idx_x)
-
     # should try to use UCubePlus??? may want to avoid saving too many intermediate cube products
     reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
     #reg.ucube_res_cnv.fit_cube(ncomp=[1], snr_min=3, guesses=gg)
     #reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg, start_from_point=start_from_point)
 
     if np.sum(maskmap) > 0:
-        # only attempt the fit if any pixel is about the snr cut
-        #reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=0.0, guesses=gg, maskmap=maskmap,
-        #                           start_from_point=start_from_point)
-        reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg, maskmap=maskmap)
+        mom0[~maskmap] = np.nan
+        indx_g = np.where(mom0 == np.nanmax(mom0))
+        idx_x = indx_g[1][0]
+        idx_y = indx_g[0][0]
+        start_from_point = (idx_y, idx_x)
+        reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg, maskmap=maskmap, start_from_point=start_from_point)
     else:
         return None
 
