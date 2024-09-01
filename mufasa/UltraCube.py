@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 
 class UltraCube(object):
 
-    def __init__(self, cubefile=None, cube=None,fittype=None, snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2):
         '''
         # a data frame work to handel multiple component fits and their results
         Parameters
@@ -112,7 +112,7 @@ class UltraCube(object):
 
         for nc in ncomp:
             #self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
-            self.pcubes[str(nc)] = fit_cube(self.cube, simpfit=simpfit, ncomp=nc, fittype=self.fittype, **kwargs)
+            self.pcubes[str(nc)] = fit_cube(self.cube, fittype=self.fittype, simpfit=simpfit, ncomp=nc, **kwargs)
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
@@ -275,15 +275,15 @@ class UCubePlus(UltraCube):
 
 #======================================================================================================================#
 
-def fit_cube(cube, simpfit=False,fittype='nh3_multi_v',**kwargs):
+def fit_cube(cube, fittype, simpfit=False, **kwargs):
     '''
     kwargs are those used for pyspeckit.Cube.fiteach
     '''
     if simpfit:
         # fit the cube with the provided guesses and masks with no pre-processing
-        return mvf.cubefit_simp(cube,fittype=fittype,**kwargs)
+        return mvf.cubefit_simp(cube, fittype=fittype, **kwargs)
     else:
-        return mvf.cubefit_gen(cube,fittype=fittype,**kwargs)
+        return mvf.cubefit_gen(cube, fittype=fittype, **kwargs)
 
 
 def save_fit(pcube, savename, ncomp):

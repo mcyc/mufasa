@@ -13,6 +13,7 @@ import gc
 from scipy.signal import medfilt2d
 from skimage.morphology import dilation, square
 from time import ctime
+import warnings
 
 from . import UltraCube as UCube
 from . import moment_guess as mmg
@@ -26,7 +27,7 @@ logger = get_logger(__name__)
 
 class Region(object):
 
-    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype='nh3_multi_v',**kwargs):
+    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, **kwargs):
         """initialize region object
             :param cubePath (str): path to spectral cube
             :param paraNameRoot (str): string to prepend to output file names
@@ -44,8 +45,14 @@ class Region(object):
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
+        if fittype is None:
+            fittype = 'nh3_multi_v'
+            message = "[WARNING] The optionality of the fittype argment for the Region class will be deprecated in the future. " \
+                      "Please ensure the fittype argument is specified going forward."
+            warnings.warn(message, DeprecationWarning, stacklevel=2)
+
         self.fittype = fittype
-        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor,fittype=self.fittype)
+        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor, fittype=self.fittype)
 
         # for convolving cube
         self.cnv_factor = cnv_factor
