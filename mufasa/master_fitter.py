@@ -10,7 +10,6 @@ from astropy import units as u
 from skimage.morphology import dilation
 import astropy.io.fits as fits
 import gc
-#from scipy.ndimage.filters import median_filter
 from scipy.signal import medfilt2d
 from skimage.morphology import dilation, square
 from time import ctime
@@ -192,7 +191,6 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20):
     kernel = Gaussian2DKernel(2)
     for i, gmap in enumerate(guesses):
         gmap[mask] = np.nan
-        #guesses[i] = medfilt2d(gmap, kernel_size=3)
         guesses[i] = convolve(gmap, kernel, boundary='extend')
 
     gc.collect()
@@ -291,9 +289,6 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
         c1_guess = reg.ucube.pcubes['1'].parcube
         c1_guess = gss_rf.refine_each_comp(c1_guess)
-
-        #mask_size = np.sum(mask)
-        #print("wide recovery refit mask size: {}".format(mask_size))
 
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
         mask = np.logical_and(mask, np.all(np.isfinite(final_guess), axis=0))
@@ -424,7 +419,6 @@ def save_best_2comp_fit(reg):
         else:
             return "{}/{}_{}.fits".format(paraDir, paraRoot, key)
 
-
     # save the lnk21 map
     savename = make_save_name(paraRoot, paraDir, "lnk21")
     save_map(lnk21, hdr2D, savename)
@@ -512,12 +506,8 @@ def get_2comp_wide_guesses(reg):
 
         # find moment around where one component has been fitted
         pcube1 = reg.ucube.pcubes['1']
-        #vmap = median_filter(pcube1.parcube[0], size=3)
         vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
         moms_res = mmg.vmask_moments(cube_res, vmap=vmap, window_hwidth=3.5)
-
-        #ncomp = 1
-        #gg = mmg.moment_guesses(moms_res[1], moms_res[2], ncomp, moment0=moms_res[0])
         gg = mmg.moment_guesses_1c(moms_res[0], moms_res[1], moms_res[2])
         # make sure the guesses falls within the limits
 
@@ -568,7 +558,6 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     if not hasattr(reg, 'ucube_cnv'):
         # if convolved cube was not used to produce initial guesses, use the full resolution 1-comp fit as the reference
         pcube1 = reg.ucube.pcubes['1']
-        #vmap = median_filter(pcube1.parcube[0], size=3) # median smooth within a 3x3 square
         vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
         vmap = cnvtool.regrid(vmap, header1=get_skyheader(pcube1.header), header2=get_skyheader(cube_res_cnv.header))
     else:
@@ -578,15 +567,10 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     # use pcube moment estimate instead (it allows different windows for each pixel)
     pcube_res_cnv = pyspeckit.Cube(cube=cube_res_cnv)
 
-    #moms_res_cnv = mmg.vmask_moments(cube_res_cnv, vmap=vmap, window_hwidth=window_hwidth)
-
     try:
         moms_res_cnv = mmg.window_moments(pcube_res_cnv, v_atpeak=vmap, window_hwidth=window_hwidth)
     except ValueError:
         raise Exception("There doesn't seem to be enough pixels to find the residual moments")
-
-    #gg = mmg.moment_guesses(moms_res_cnv[1], moms_res_cnv[2], ncomp, moment0=moms_res_cnv[0])
-    #nsize = np.sum(np.isfinite(moms_res_cnv[0]))
 
     gg = mmg.moment_guesses_1c(moms_res_cnv[0], moms_res_cnv[1], moms_res_cnv[2])
 
@@ -601,23 +585,15 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     else:
         maskmap = np.isfinite(mom0)
 
-    # use the brightest pixel based on mom0 as the starting point
-    mom0[~maskmap] = np.nan
-    indx_g = np.where(mom0 == np.nanmax(mom0))
-    idx_x = indx_g[1][0]
-    idx_y = indx_g[0][0]
-    start_from_point = (idx_y, idx_x)
-
-    # should try to use UCubePlus??? may want to avoid saving too many intermediate cube products
-    reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv,fittype=reg.fittype)
-    #reg.ucube_res_cnv.fit_cube(ncomp=[1], snr_min=3, guesses=gg)
-    #reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=3.0, guesses=gg, start_from_point=start_from_point)
+    reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
 
     if np.sum(maskmap) > 0:
-        # only attempt the fit if any pixel is about the snr cut
-        #reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=True, signal_cut=0.0, guesses=gg, maskmap=maskmap,
-        #                           start_from_point=start_from_point)
-        reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg, maskmap=maskmap)
+        mom0[~maskmap] = np.nan
+        indx_g = np.where(mom0 == np.nanmax(mom0))
+        idx_x = indx_g[1][0]
+        idx_y = indx_g[0][0]
+        start_from_point = (idx_y, idx_x)
+        reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg, maskmap=maskmap, start_from_point=start_from_point)
     else:
         return None
 
@@ -636,8 +612,6 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
 
     cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
                                                  snrmasked=False, iterrefine=False)
-
-    #cube_res_cnv = cube_res_cnv.with_spectral_unit(u.km / u.s, velocity_convention='radio')
     return cube_res_cnv
 
 
