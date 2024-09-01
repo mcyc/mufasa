@@ -216,7 +216,6 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
         logger.info("using automated starting point")
         indx_g = np.argwhere(maskmap)
         start_from_point = (indx_g[0,1], indx_g[0,0])
-        #start_from_point = (indx_g[0, 0], indx_g[0, 1]) # probably the wrong order
         logger.info("starting point: {}".format(start_from_point))
         kwargs['start_from_point'] = start_from_point
 
@@ -269,7 +268,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
 
 
 def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None, guesses = None, errmap11name = None,
-            multicore = None, mask_function = None, snr_min=0.0, momedgetrim=True, saveguess=False,fittype='nh3_multi_v', **kwargs):
+            multicore = None, mask_function = None, snr_min=0.0, momedgetrim=True, saveguess=False, fittype='nh3_multi_v', **kwargs):
     '''
     Perform n velocity component fit on the GAS ammonia 1-1 data.
     (This should be the function to call for all future codes if it has been proven to be reliable)
@@ -489,8 +488,10 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     print("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
 
     # find the location of the peak signal (to determine the first pixel to fit if nearest neighbour method is used)
-    peakloc = np.nanargmax(m0)
-    ymax,xmax = np.unravel_index(peakloc, m0.shape)
+    if "start_from_point" not in kwargs:
+        peakloc = np.nanargmax(m0)
+        ymax, xmax = np.unravel_index(peakloc, m0.shape)
+        kwargs['start_from_point'] = (xmax, ymax)
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
@@ -591,7 +592,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             multicore = 1
 
     pcube.fiteach (fittype=fittype, guesses=guesses,
-                  start_from_point=(xmax,ymax),
                   use_neighbor_as_guess=False,
                   limitedmax=[True,True,True,True]*ncomp,
                   maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
