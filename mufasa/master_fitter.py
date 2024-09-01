@@ -585,7 +585,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     else:
         maskmap = np.isfinite(mom0)
 
-    reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
+    reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv, fittype=reg.fittype)
 
     if np.sum(maskmap) > 0:
         mom0[~maskmap] = np.nan
