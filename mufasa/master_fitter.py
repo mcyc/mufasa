@@ -504,7 +504,11 @@ def get_2comp_wide_guesses(reg):
             fit_best_2comp_residual_cnv(reg)
         except ValueError:
             logger.info("retry with no SNR threshold")
-            fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
+            try:
+                fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
+            except ValueError as e:
+                logger.info(e)
+                pass
 
 
     def get_mom_guesses(reg):
@@ -576,8 +580,8 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
 
     try:
         moms_res_cnv = mmg.window_moments(pcube_res_cnv, v_atpeak=vmap, window_hwidth=window_hwidth)
-    except ValueError:
-        raise Exception("There doesn't seem to be enough pixels to find the residual moments")
+    except ValueError as e:
+        raise ValueError("There doesn't seem to be enough pixels to find the residual moments. {}".format(e))
 
     gg = mmg.moment_guesses_1c(moms_res_cnv[0], moms_res_cnv[1], moms_res_cnv[2])
 
