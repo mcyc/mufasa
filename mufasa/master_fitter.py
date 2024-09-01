@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 
 class Region(object):
 
-    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, **kwargs):
+    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype='nh3_multi_v',**kwargs):
         """initialize region object
             :param cubePath (str): path to spectral cube
             :param paraNameRoot (str): string to prepend to output file names
@@ -44,8 +44,8 @@ class Region(object):
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
-
-        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor)
+        self.fittype = fittype
+        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor,fittype=self.fittype)
 
         # for convolving cube
         self.cnv_factor = cnv_factor
@@ -100,7 +100,7 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
         paraDir = reg.paraDir
 
     reg.ucube_cnv = UCube.UCubePlus(cubefile=reg.cnv_cubePath, paraNameRoot=paraNameRoot,
-                                     paraDir=paraDir, cnv_factor=reg.cnv_factor)
+                                     paraDir=paraDir, cnv_factor=reg.cnv_factor,fittype=reg.fittype)
 
     # MC: a mechanism is needed to make sure the convolved cube has the same resolution has the cnv_factor
 
@@ -206,7 +206,7 @@ def refit_swap_2comp(reg, snr_min=3):
     for nc in ncomp:
         if not str(nc) in reg.ucube.pcubes:
             # no need to worry about wide seperation as they likley don't overlap in velocity space
-            reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc)
+            reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype)
 
     # refit only over where two component models are already determined to be better
     # note: this may miss a few fits where the swapped two-comp may return a better result?
@@ -221,7 +221,7 @@ def refit_swap_2comp(reg, snr_min=3):
     for i in range(4):
         guesses[i], guesses[i+4] = guesses[i+4], guesses[i]
 
-    ucube_new = UCube.UltraCube(reg.ucube.cubefile)
+    ucube_new = UCube.UltraCube(reg.ucube.cubefile,fittype=reg.fittype)
     ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
 
     gc.collect()
@@ -253,11 +253,11 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
                 reg.ucube.paraPaths[str(nc)]= '{}/{}_{}vcomp.fits'.format(reg.ucube.paraDir, reg.ucube.paraNameRoot, nc)
 
             if nc==2 and not ('2_noWideDelV' in reg.ucube.paraPaths):
-                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc)
+                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype)
                 reg.ucube.pcubes['2_noWideDelV'] =\
                     "{}_noWideDelV".format(os.path.splitext(reg.ucube.paraPaths[str(nc)])[0])
             else:
-                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc)
+                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype)
 
     if planemask is None:
         # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
@@ -312,7 +312,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None):
 def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True):
     # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
     if np.sum(mask) >= 1:
-        ucube_new = UCube.UltraCube(ucube.cubefile)
+        ucube_new = UCube.UltraCube(ucube.cubefile,fittype=ucube.fittype)
         # fit using simpfit (and take the provided guesses as they are)
         ucube_new.fit_cube(ncomp=[2], simpfit=simpfit, maskmap=mask, snr_min=snr_min, guesses=guesses)
 
@@ -345,7 +345,7 @@ def standard_2comp_fit(reg, planemask=None, snr_min=3):
         kwargs = {'update':True, 'snr_min':snr_min}
         if planemask is not None:
             kwargs['maskmap'] = planemask
-        reg.ucube.get_model_fit([nc], **kwargs)
+        reg.ucube.get_model_fit([nc],fittype=reg.fittype, **kwargs)
 
 
 def save_updated_paramaps(ucube, ncomps):
@@ -366,7 +366,7 @@ def save_best_2comp_fit(reg):
     # ideally, a copy function should be in place of reloading
 
     # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
-    reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir)
+    reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir,fittype=reg.fittype)
 
     # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
     # load the file based on the passed in reg, rather than the default

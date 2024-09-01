@@ -43,11 +43,11 @@ To perform a two-component NH<sub>3</sub> (1,1) fit automatically, simply run th
 
 ```
 from mufasa import master_fitter as mf
-uReg = mf.Region(cubePath, paraNameRoot, paraDir)
+uReg = mf.Region(cubePath, paraNameRoot, paraDir, fittype='nh3_multi_v')
 uReg.master_2comp_fit(snr_min=0)
 ```
 
-In the example above, ```cubePath``` is the path to the FITS data cube, ```paraNameRoot``` is the commmon 'root' name to all the outputfiles, and ```paraDir``` is the directory of all the outputfiles. If one wishes to fit pixels only above a certain signal-to-noise-ratio (SNR) threshold, use ```snr_min``` to set such a threshold.
+In the example above, ```cubePath``` is the path to the FITS data cube, ```paraNameRoot``` is the commmon 'root' name to all the outputfiles, and ```paraDir``` is the directory of all the outputfiles. The species being fit is specified by```fittype```. N<sub>2</sub>H+ (1-0) can be fit instead of NH<sub>3</sub> (1,1) by setting ```fittype='n2hp_multi_v'```. If one wishes to fit pixels only above a certain signal-to-noise-ratio (SNR) threshold, use ```snr_min``` to set such a threshold.
 
 
 
