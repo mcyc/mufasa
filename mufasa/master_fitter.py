@@ -13,6 +13,7 @@ import gc
 from scipy.signal import medfilt2d
 from skimage.morphology import dilation, square
 from time import ctime
+import warnings
 
 from . import UltraCube as UCube
 from . import moment_guess as mmg
@@ -26,7 +27,7 @@ logger = get_logger(__name__)
 
 class Region(object):
 
-    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype='nh3_multi_v',**kwargs):
+    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, **kwargs):
         """initialize region object
             :param cubePath (str): path to spectral cube
             :param paraNameRoot (str): string to prepend to output file names
@@ -44,8 +45,14 @@ class Region(object):
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
+        if fittype is None:
+            fittype = 'nh3_multi_v'
+            message = "[WARNING] The optionality of the fittype argment for the Region class will be deprecated in the future. " \
+                      "Please ensure the fittype argument is specified going forward."
+            warnings.warn(message, DeprecationWarning, stacklevel=2)
+
         self.fittype = fittype
-        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor,fittype=self.fittype)
+        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor, fittype=self.fittype)
 
         # for convolving cube
         self.cnv_factor = cnv_factor
@@ -497,7 +504,11 @@ def get_2comp_wide_guesses(reg):
             fit_best_2comp_residual_cnv(reg)
         except ValueError:
             logger.info("retry with no SNR threshold")
-            fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
+            try:
+                fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
+            except ValueError as e:
+                logger.info(e)
+                pass
 
 
     def get_mom_guesses(reg):
@@ -569,8 +580,8 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
 
     try:
         moms_res_cnv = mmg.window_moments(pcube_res_cnv, v_atpeak=vmap, window_hwidth=window_hwidth)
-    except ValueError:
-        raise Exception("There doesn't seem to be enough pixels to find the residual moments")
+    except ValueError as e:
+        raise ValueError("There doesn't seem to be enough pixels to find the residual moments. {}".format(e))
 
     gg = mmg.moment_guesses_1c(moms_res_cnv[0], moms_res_cnv[1], moms_res_cnv[2])
 
@@ -585,7 +596,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     else:
         maskmap = np.isfinite(mom0)
 
-    reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv)
+    reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv, fittype=reg.fittype)
 
     if np.sum(maskmap) > 0:
         mom0[~maskmap] = np.nan
