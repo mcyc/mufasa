@@ -4,6 +4,12 @@ from logging import INFO, WARNING, DEBUG, ERROR
 
 logging_format = dict(format='%(asctime)s - %(levelname)s: %(message)s [%(name)s]', datefmt='%m/%d %I:%M%p')
 
+def reset_logger(logger, handler_class):
+    for handler in logger.handlers:
+        if isinstance(handler, handler_class):
+            logger.removeHandler(handler)
+
+
 def init_logging(logfile='mufasa.log', console_level=logging.INFO, file_level=logging.DEBUG, log_pyspeckit_to_file=False):
     '''
     :param logfile: file to save to (default mufasa.log)
@@ -21,6 +27,10 @@ def init_logging(logfile='mufasa.log', console_level=logging.INFO, file_level=lo
     root_logger = logging.getLogger('mufasa')
     root_logger.setLevel(min(console_level, file_level)) # ensure that all desired log levels are caught
     # root_logger.addFilter(log_filter)
+
+    # reset logger so that multiple mufasa calls don't append to the same file when they shouldn't
+    reset_logger(root_logger, logging.FileHandler)
+    reset_logger(root_logger, logging.StreamHandler)
     
     # set up console handler
     console_handler = logging.StreamHandler()
