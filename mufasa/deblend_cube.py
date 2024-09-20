@@ -13,8 +13,7 @@ import gc
 
 from pyspeckit.parallel_map import parallel_map
 
-from multiprocessing import Pool, cpu_count
-
+from .utils.multicore import validate_n_cores
 
 #=======================================================================================================================
 
@@ -110,10 +109,7 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 
         mcube._data[:,y,x] = np.nansum(np.array(models), axis=0)
         return ((x, y), mcube._data[:, y, x])
 
-    if n_cpu is None:
-        n_cpu = cpu_count() - 1
-    else:
-        n_cpu=1
+    n_cpu = validate_n_cores(n_cpu)
 
     if n_cpu > 1:
         print("------------------ deblending cube -----------------")
