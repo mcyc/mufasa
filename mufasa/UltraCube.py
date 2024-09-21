@@ -309,12 +309,12 @@ def load_model_fit(cube, filename, ncomp, fittype):
     pcube = pyspeckit.Cube(cube=cube)
 
     # reigster fitter
-    if fittype is 'nh3_multi_v':
+    if fittype == 'nh3_multi_v':
         linename = 'oneone'
         from .spec_models import ammonia_multiv as ammv
         fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
 
-    elif fittype is 'n2hp_multi_v':
+    elif fittype == 'n2hp_multi_v':
         linename = 'onezero'
         from .spec_models import n2hp_multiv as n2hpmv
         fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
