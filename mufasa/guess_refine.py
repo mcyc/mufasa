@@ -2,6 +2,8 @@ __author__ = 'mcychen'
 
 #=======================================================================================================================
 import numpy as np
+import warnings
+
 from astropy.stats import mad_std
 from astropy.wcs import WCS
 from skimage.morphology import remove_small_objects, dilation, disk, remove_small_holes
@@ -223,7 +225,7 @@ def master_mask(pcube):
 
 def mask_cleaning(mask):
     # designed to clean a noisy map, with a footprint that is likely slightly larger
-    mask = remove_small_objects(mask, min_size=9)
+    #mask = remove_small_objects(mask, min_size=9) #pending investigation before removed permantly
     mask = dilation(mask, disk(1))
     mask = remove_small_holes(mask, 9)
     return mask
@@ -245,7 +247,7 @@ def regrid(image, header1, header2, dmask=None, method='cubic'):
     return griddata((X[mask],Y[mask]), image[mask], (grid1[1]*dmask, grid1[0]*dmask), method=method, fill_value=np.nan)
 
 
-def refine_guess(map, min=None, max=None, mask=None, disksize=1):
+def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpolate=False):
     # refine parameter maps by outlier-fitering, masking, and interpolating
     map = map.copy()
 
@@ -280,7 +282,7 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     map = convolve(map, kernel, boundary='extend')
 
     if mask is None:
-        mask = np.isfinite(map)
+        mask = mask_finite
         mask = mask_cleaning(mask)
 
     def interpolate(map, mask):
@@ -298,12 +300,15 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     def interpolate_via_cnv(map):
         kernel = Gaussian2DKernel(3)
         zi = convolve(map, kernel, boundary='extend')
-        # retrain the original median_filtered map over its original positions
-        map_finite = np.isfinite(map)
-        zi[map_finite] = map[map_finite]
+        # only populate pixels where the original map was finite
+        zi[mask_finite] = map[mask_finite]
         return zi
 
-    if np.sum(mask) >= 2:
+    if scipy_interpolate:
+        warn_msg = "The usage of scipy.interpolate for guess refine is deprecated and will be removed in a future version." \
+                   "The default going forward will be astropy's convovle method."
+        warnings.warn(warn_msg, DeprecationWarning, stacklevel=2)
+        logger.warning(warn_msg)
         try:
             # interpolate the mask
             zi = interpolate(map, mask)
@@ -316,7 +321,6 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
             zi = interpolate_via_cnv(map)
     else:
         zi = interpolate_via_cnv(map)
-
     return zi
 
 
@@ -326,7 +330,6 @@ def save_guesses(paracube, header, savename, ncomp=2):
     from astropy.io import fits
 
     npara = 4
-
     hdr_new = copy.deepcopy(header)
 
     # write the header information for each plane (i.e., map)
