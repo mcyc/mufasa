@@ -127,8 +127,6 @@ def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
     tau_thin = 1.0      # where the main hyperfines of NH3 (1,1) starts to get optically thick
 
     # for when tau is less than tau_thresh
-    #texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
-    #taumap[isthin] = tau_thresh
     texmap[isthin] = mmg.get_tex(TA_lowtau, tau=tau_thresh) #note: tex can be higher than at 40K at Ta~7K
     taumap[isthin] = tau_thresh
 
@@ -138,8 +136,6 @@ def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
     mask = TA_hightex < TA_ltau_thres # only renormalize high tex when Ta is less than the threshold
     mask = np.logical_and(mask, taumap[hightex] < tau_thin)
 
-    #texmap[hightex] = tex_thin
-    #taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
     texmap[hightex][mask] = tex_thin
     taumap[hightex][mask] = mmg.get_tau(TA_hightex[mask], tex=tex_thin, nu=23.722634)
 
@@ -258,19 +254,27 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     if max is not None:
         map[map>max] = np.nan
 
-    # if np.sum(np.isfinite(map)) == 0:
-    if np.sum(np.isfinite(map)) <2:
-        # if there are *few* valid pixel in the guesses, set it to one of the limits or zero
-        if min is not None:
-            map[:] = min
+    # check the number of finite pixels in the provided map
+    mask_finite = np.isfinite(map)
+    n_valid = np.sum(mask_finite)
+
+    # in case there are too few valid pixels in the provided map
+    if n_valid < 2:
+        # if there's a single pixel
+        if n_valid == 1:
+            map[:] = map[mask_finite][0]
+
+        # if there are no valid pixel in the guesses, set it to one of the limits or zero
+        elif min is not None:
+            if max is None:
+                map[:] = min
+            else:
+                map[:] = (max + min) / 2
         elif max is not None:
             map[:] = max
         else:
             map[:] = 0.0
         return map
-
-    #map_med = median_filter(map, footprint=disk(disksize))
-    #if np.sum(np.isfinite(map_med)) == 0:
 
     kernel = Gaussian2DKernel(disksize)
     map = convolve(map, kernel, boundary='extend')
