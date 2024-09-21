@@ -94,7 +94,10 @@ def AIC(rss, p, N):
         Number of samples
     :return:
     '''
-    return N * np.log(rss/N) + 2*p
+    # avoid invalid math values
+    N[N==0] = np.nan
+    aic = N * np.log(rss/N) + 2*p
+    return np.nan_to_num(aic)
 
 
 def AICc(rss, p, N):
@@ -115,6 +118,7 @@ def AICc(rss, p, N):
 
 def likelihood(aiccA, aiccB):
     # return the log likelihood of A relative to B
+    aiccA, aiccB = np.nan_to_num(aiccA), np.nan_to_num(aiccB)
     return -1.0*(aiccA - aiccB) / 2.0
 
 

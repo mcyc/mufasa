@@ -13,7 +13,6 @@ from spectral_cube.utils import SpectralCubeWarning
 warnings.filterwarnings(action='ignore', category=SpectralCubeWarning, append=True)
 
 import pyspeckit
-import multiprocessing
 import gc
 from astropy import units as u
 import scipy.ndimage as nd
@@ -21,7 +20,7 @@ import scipy.ndimage as nd
 from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
-
+from .utils.multicore import validate_n_cores
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -29,7 +28,7 @@ logger = get_logger(__name__)
 
 class UltraCube(object):
 
-    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
         '''
         # a data frame work to handel multiple component fits and their results
         Parameters
@@ -51,7 +50,7 @@ class UltraCube(object):
         self.master_model_mask = None
         self.snr_min = 0.0
         self.cnv_factor = cnv_factor
-        self.n_cores = multiprocessing.cpu_count()
+        self.n_cores = validate_n_cores(n_cores)
         self.fittype = fittype
 
         if cubefile is not None:
@@ -118,7 +117,7 @@ class UltraCube(object):
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
+                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=kwargs['multicore']) > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -140,16 +139,18 @@ class UltraCube(object):
             logger.warning("no fit was performed and thus no file will be saved")
 
 
-    def load_model_fit(self, filename, ncomp):
+    def load_model_fit(self, filename, ncomp, multicore=None):
+        if multicore is None: multicore = self.n_cores
         self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp,self.fittype)
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
-        logger.info("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
+        logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
         gc.collect()
         self.include_model_mask(mod_mask)
 
 
-    def get_residual(self, ncomp):
+    def get_residual(self, ncomp, multicore=None):
+        if multicore is None: multicore = self.n_cores
         compID = str(ncomp)
         model = self.pcubes[compID].get_modelcube(multicore=self.n_cores)
         self.residual_cubes[compID] = get_residual(self.cube, model)
@@ -263,11 +264,22 @@ class UCubePlus(UltraCube):
         if update:
             # re-fit the cube
             for nc in ncomp:
+                if 'conv' in self.paraPaths[str(nc)]:
+                    logger.info(f'Fitting convolved cube for {nc} component(s)')
+                else:
+                    logger.info(f'Fitting cube for {nc} component(s)')
                 #if update or (not os.path.isfile(self.paraPaths[str(nc)])):
+                if 'multicore' not in kwargs:
+                    kwargs['multicore'] = self.n_cores
                 self.fit_cube(ncomp=[nc], **kwargs)
                 gc.collect()
                 self.save_fit(self.paraPaths[str(nc)], nc)
                 gc.collect()
+        else:
+            if 'conv' in self.paraPaths[str(nc)]:
+                logger.info(f'Loading convolved cube fits for {nc} component(s)')
+            else:
+                logger.info(f'Loading fits for {nc} component(s)')
 
         for nc in ncomp:
             path = self.paraPaths[str(nc)]
@@ -373,10 +385,11 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
     if not str(ncomp_B) in ucube.NSamp_maps:
         ucube.get_AICc(ncomp_B)
 
-    NSampEqual = ucube.NSamp_maps[str(ncomp_A)] == ucube.NSamp_maps[str(ncomp_B)]
+    NSamp_mapA = ucube.NSamp_maps[str(ncomp_A)] # since (np.nan == np.nan) is False, this threw the below warning unnecessarily
+    NSamp_mapB = ucube.NSamp_maps[str(ncomp_B)]
 
-    if np.nansum(~NSampEqual) != 0:
-        logger.warning("Number of samples do not match. Recalculating AICc values") # TODO: investigate why I get this error
+    if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
+        logger.warning("Number of samples do not match. Recalculating AICc values")
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
@@ -463,7 +476,9 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
     if reduced:
         # assuming n_size >> n_parameters
-        chisq /= np.nansum(mask, axis=0)
+        reduction = np.nansum(mask, axis=0) # avoid division by zero
+        reduction[reduction == 0] = np.nan
+        chisq /= reduction
 
     rms = get_rms(residual)
     chisq /= rms ** 2

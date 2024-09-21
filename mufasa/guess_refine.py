@@ -258,8 +258,9 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     if max is not None:
         map[map>max] = np.nan
 
-    if np.sum(np.isfinite(map)) == 0:
-        # if there are no valid pixel in the guesses, set it to one of the limits or zero
+    # if np.sum(np.isfinite(map)) == 0:
+    if np.sum(np.isfinite(map)) <2:
+        # if there are *few* valid pixel in the guesses, set it to one of the limits or zero
         if min is not None:
             map[:] = min
         elif max is not None:

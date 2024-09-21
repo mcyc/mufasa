@@ -19,6 +19,7 @@ from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
 from . import moment_guess as momgue
+from .utils.multicore import validate_n_cores
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -159,7 +160,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='nh3_multi_v', **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
 
-    logger.info("using cubefit_simp")
+    logger.debug("using cubefit_simp")
 
     if hasattr(cube, 'spectral_axis'):
         pcube = pyspeckit.Cube(cube=cube)
@@ -195,25 +196,19 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     fitter = mod_info.fitter
     pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
 
-    if multicore is None:
-        # use n-1 cores on the computer
-        multicore= multiprocessing.cpu_count() - 1
-
-        if multicore < 1:
-            multicore = 1
+    multicore = validate_n_cores(multicore)
 
     # get the masking for the fit
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
     planemask = np.any(np.isfinite(guesses), axis=0)
 
     if maskmap is not None:
-        logger.info("using user specified mask")
+        logger.debug("using user specified mask")
         maskmap *= planemask * footprint_mask
     else:
         maskmap = planemask * footprint_mask
 
     if 'start_from_point' not in kwargs:
-        logger.info("using automated starting point")
         indx_g = np.argwhere(maskmap)
         start_from_point = (indx_g[0,1], indx_g[0,0])
         logger.info("starting point: {}".format(start_from_point))
@@ -261,6 +256,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     kwargs['maxpars'] = [vmax, sigmax, Texmax, taumax] * ncomp
     kwargs['limitedmin'] = [True, True, True, True] * ncomp
     kwargs['minpars'] = [vmin, sigmin, Texmin, taumin] * ncomp
+    kwargs = set_pyspeckit_verbosity(**kwargs)
 
     pcube.fiteach(fittype=fittype, guesses=guesses, maskmap=maskmap, **kwargs)
 
@@ -287,7 +283,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     pcube : 'pyspeckit.cubes.SpectralCube.Cube'
         Pyspeckit cube object containing both the fit and the original data cube
     '''
-    logger.info('Using cubefit_gen')
+    logger.debug('Using cubefit_gen')
 
     if hasattr(cube, 'spectral_axis'):
         pcube = pyspeckit.Cube(cube=cube)
@@ -340,7 +336,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         errmap11 = mad_std(cube._data, ignore_nan=True, axis=0)
 
     err_med = np.nanmedian(errmap11)
-    logger.info("median rms: {0}".format(err_med))
+    logger.info("median rms: {:.5f}".format(err_med))
 
     # mask out pixels that are too noisy (in this case, 3 times the median rms in the cube)
     err_mask = errmap11 < err_med * 3.0
@@ -348,7 +344,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     snr = cube.filled_data[:].value / errmap11
     peaksnr = np.nanmax(snr, axis=0)
 
-    # the snr map will inetiabley be noisy, so a little smoothing
+    # the snr map will inevitably be noisy, so a little smoothing
     kernel = Gaussian2DKernel(1)
     peaksnr = convolve(peaksnr, kernel)
 
@@ -356,7 +352,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
         # trim the edges by 3 pixels to guess the location of the peak emission
-        logger.info("triming the edges to make moment maps")
+        logger.debug("triming the edges to make moment maps")
         footprint_mask = binary_erosion(footprint_mask, disk(3))
 
     # the following function is copied directly from GAS
@@ -381,12 +377,12 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     else:
         planemask = mask_function(peaksnr, snr_min=snr_min)
 
-    logger.info("planemask size: {0}, shape: {1}".format(planemask[planemask].sum(), planemask.shape))
+    logger.debug("planemask size: {0}, shape: {1}".format(planemask[planemask].sum(), planemask.shape))
 
     # masking for moment guesses (note that this isn't used for the actual fit)
     mask = np.isfinite(cube._data) * planemask * footprint_mask #* err_mask
 
-    logger.info("mask size: {0}, shape: {1}".format(mask[mask].sum(), mask.shape))
+    logger.debug("mask size: {0}, shape: {1}".format(mask[mask].sum(), mask.shape))
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -400,7 +396,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     if np.isfinite(v_guess).sum() > 0:
         v_guess = v_guess[np.isfinite(v_guess)]
         v_median = np.median(v_guess)
-        logger.info("The median of the user provided velocities is: {0}".format(v_median))
+        logger.debug("The median of the user provided velocities is: {:.3f}".format(v_median))
         m0, m1, m2 = mod_info.main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
         v_median, v_99p, v_1p = get_vstats(v_guess)
     else:
@@ -408,24 +404,24 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         sig_mask_size = signal_mask.sum()
 
         if sig_mask_size < 1:
-            logger.info("No pixels with SNR > 10; try SNR>5")
+            logger.debug("No pixels with SNR > 10; try SNR>5")
             # if there's no pixel above SNR > 10, try lower the threshold to 5
             signal_mask = default_masking(peaksnr, snr_min=5.0)
             sig_mask_size = signal_mask.sum()
 
         if sig_mask_size < 1:
-            logger.info("No pixels with SNR > 5; try SNR>3")
+            logger.debug("No pixels with SNR > 5; try SNR>3")
             # if there's no pixel above SNR > 10, try lower the threshold to 5
             signal_mask = default_masking(peaksnr, snr_min=3.0)
             sig_mask_size = signal_mask.sum()
 
         if sig_mask_size < 1:
             # if no pixel in the map still, use all pixels
-            logger.info("No pixels with SNR > 3; using all pixels")
+            logger.debug("No pixels with SNR > 3; using all pixels")
             signal_mask = planemask
             sig_mask_size = signal_mask.sum()
 
-        logger.info("signal_mask size: {}".format(sig_mask_size))
+        logger.debug("signal_mask size: {}".format(sig_mask_size))
 
         signal_mask *= err_mask
 
@@ -468,7 +464,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # mask over robust moment guess pixels to set the velocity fitting range
         v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
 
-    print("median velocity: {0}".format(v_median))
+    logger.debug("median velocity: {:3f}".format(v_median))
 
     # remove the nana values to allow np.nanargmax(m0) to operate smoothly
     m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
@@ -476,8 +472,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # define acceptable v range based on the provided or determined median velocity
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
-    logger.info("median velocity: {0}".format(v_median))
-    logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
+    logger.info("median input velocity: {:.3f}".format(v_median))
 
     # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
     if v_99p + sigmax > vmax:
@@ -485,7 +480,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     if v_1p - sigmax < vmin:
         vmin = v_1p - sigmax
 
-    print("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
+    logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
 
     # find the location of the peak signal (to determine the first pixel to fit if nearest neighbour method is used)
     if "start_from_point" not in kwargs:
@@ -525,7 +520,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         gmask = guesses[1::4] < sigmin
         guesses[1::4][gmask] = guesses_smooth[1::4][gmask]
 
-        logger.info("provided guesses accepted")
+        logger.debug("provided guesses accepted")
 
 
     # The guesses should be fine in the first case, but just in case, make sure the guesses are confined within the
@@ -562,19 +557,16 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         fitcubefile.writeto(savename ,overwrite=True)
 
     # set some of the fiteach() inputs to that used in GAS DR1 reduction
-    if not 'integral' in kwargs:
-        kwargs['integral'] = False
-
-    kwargs = set_pyspeckit_verbosity(**kwargs)
+    if not 'integral' in kwargs: kwargs['integral'] = False # False is default so this isn't required
 
     if not 'signal_cut' in kwargs:
-        kwargs['signal_cut'] = 2
+        kwargs['signal_cut'] = 2 # Note: cubefit_simp has this as 0
 
     # Now fit the cube. (Note: the function inputs are consistent with GAS DR1 whenever possible)
 
     # use SNR masking if not provided
     if not 'maskmap' in kwargs:
-        logger.info("mask not included in kwargs, generating mask")
+        logger.debug("mask not included in kwargs, generating mask")
         kwargs['maskmap'] = planemask * footprint_mask
 
     if np.sum(kwargs['maskmap']) < 1:
@@ -584,12 +576,9 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         logger.warning("guesses has no pixels, no fitting will be performed")
         return pcube
 
-    if multicore is None:
-        # use n-1 cores on the computer
-        multicore = multiprocessing.cpu_count() - 1
+    multicore = validate_n_cores(multicore)
 
-        if multicore < 1:
-            multicore = 1
+    kwargs = set_pyspeckit_verbosity(**kwargs)
 
     pcube.fiteach (fittype=fittype, guesses=guesses,
                   use_neighbor_as_guess=False,
@@ -641,7 +630,7 @@ def save_pcube(pcube, savename, ncomp=2):
 
     fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube,pcube.errcube]), header=hdr_new)
     fitcubefile.writeto(savename ,overwrite=True)
-    logger.info("{} saved!".format(savename))
+    logger.info("{} saved.".format(savename))
 
 ##################
 
