@@ -11,6 +11,7 @@ from astropy.stats import mad_std
 
 from .utils import map_divide
 import multiprocessing
+from .utils.multicore import validate_n_cores
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -199,9 +200,7 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
             the velociy or a map of velocities to center the spectral window on
         '''
 
-        if multicore is None:
-            # use all the cores minus one
-            multicore = multiprocessing.cpu_count() - 1
+        multicore = validate_n_cores(multicore)
 
         def get_win_moms(pcube, v_atpeak):
             # get window moments when v_atpeak is given
@@ -246,10 +245,10 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
                 mask = mask*signal_mask
             tot_spec = np.nansum(maskcube._data[:,]*mask, axis=(1,2))
             idx_peak = np.nanargmax(tot_spec)
-            logger.info("Getting window moments of SpectralCube")
-            logger.info("peak T_B: {0}".format(np.nanmax(tot_spec)))
+            logger.debug("Getting window moments of SpectralCube")
+            logger.debug("peak T_B: {0}".format(np.nanmax(tot_spec)))
             v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
-            logger.info("v_atpeak: {0}".format(v_atpeak))
+            logger.debug("v_atpeak: {0}".format(v_atpeak))
 
         vmax = v_atpeak + window_hwidth
         vmin = v_atpeak - window_hwidth
@@ -273,9 +272,8 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
 
     elif isinstance(spec, SpectralCube):
         # currently cannot handle v_atpeak as a map
-        if not hasattr(v_atpeak, 'ndim'):
+        if hasattr(v_atpeak, 'ndim') and v_atpeak.ndim>0: # numpy floats have ndim=0
             logger.error("the method that handles SpectralCube cannot currently handle v_atpeak as a map, please use single value v_atpeak instead")
-            # TODO: investigate why I get this all the time
         return moments_spectralcube(spec, window_hwidth, v_atpeak, signal_mask)
 
     else:
@@ -449,9 +447,7 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=Non
     f_tau = 0.5 # weight of the tau for the "equal-weight" guesses
     f_sig = 0.5 # weight of the linewidth for all guesses
 
-    if multicore is None:
-        # use all the cores minus one
-        multicore = multiprocessing.cpu_count() - 1
+    multicore = validate_n_cores(multicore)
 
     if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         spec.xarr.velocity_convention = 'radio'

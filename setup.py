@@ -1,22 +1,34 @@
-import setuptools
+from setuptools import setup, find_packages
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
+setup(
+    name='mufasa',
+    version='1.3.0',
+    description='MUlti-component Fitter for Astrophysical Spectral Applications',
+    author='Michael Chun-Yuan Chen',
+    author_email='mkid.chen@gmail.com',
+    url='https://github.com/mcyc/mufasa',
+    packages=find_packages(),
+    install_requires=[
+        'numpy',
+        'astropy',
+        'matplotlib',
+        'scipy',
+        'scikit-image',
+        'spectral-cube',
+        'radio-beam',
+        'pvextractor',
+        'pandas',
+        'reproject',
+        'pyspeckit @ git+https://github.com/pyspeckit/pyspeckit@master#egg=pyspeckit',
+        'FITS_tools @ git+https://github.com/mcyc/FITS_tools@py312#egg=FITS_tools'
+    ],
 
-setuptools.setup(
-    name="mufasa", 
-    version="1.3.0",
-    author="Michael Chun-Yuan Chen",
-    author_email="chen.m@queensu.ca",
-    description="MUlti-component Fitter for Astrophysical Spectral Applications",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/mcyc/mufasa",
-    packages=setuptools.find_packages(),
     classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-        "Operating System :: OS Independent",
+        'Development Status :: 4 - Beta',
+        'Programming Language :: Python :: 3',
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+        'Operating System :: OS Independent',
     ],
     python_requires='>=3.6',
 )
+

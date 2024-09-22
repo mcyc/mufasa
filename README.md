@@ -8,10 +8,10 @@ Please cite the following paper when using the code:
 
 ## Installation
 
-To install the latest version of ```MUFASA``` from this repository, run:
+To install the latest version of ```MUFASA```, clone this repository and run the following in your local directory:
 
 ```
-python setup.py install
+pip install -e .
 ```
 
 To pip install a 'stable' release, run:
