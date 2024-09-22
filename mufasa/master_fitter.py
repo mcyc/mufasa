@@ -17,6 +17,13 @@ from time import ctime
 from datetime import timezone, datetime
 import warnings
 
+from pandas import DataFrame
+try:
+    from pandas import concat
+except ImportError:
+    # this will only be an issue if the padas version is very old
+    pass
+
 from . import UltraCube as UCube
 from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
@@ -65,7 +72,6 @@ class Region(object):
             self.progress_log = read_csv(self.progress_log_name)
             #could use a checking mechanism to ensure the logfile is the right format
         except FileNotFoundError:
-            from pandas import DataFrame
             self.progress_log = DataFrame(columns=['process', 'last complete'])
 
 
@@ -111,7 +117,10 @@ class Region(object):
         else:
             # add an new entry otherwise
             info = {'process':process_name, 'last complete':time_info}
-            self.progress_log = self.progress_log.append(info, ignore_index=True)
+            try:
+                self.progress_log = concat([self.progress_log, DataFrame([info])], ignore_index=True)
+            except AttributeError:
+                self.progress_log = self.progress_log.append(info, ignore_index=True)
 
         if save:
             # write the log as an csv file
