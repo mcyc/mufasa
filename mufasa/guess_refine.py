@@ -72,9 +72,10 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     # clean up the maps based on vlsr errors
     data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara)
     hdr_conv = get_celestial_hdr(header_cnv)
-    data_cnv[data_cnv == 0] = np.nan
-    data_cnv = data_cnv[0:npara*ncomp]
 
+    # remove the error component
+    data_cnv = data_cnv[0:npara*ncomp]
+    data_cnv[data_cnv == 0] = np.nan
 
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask)
