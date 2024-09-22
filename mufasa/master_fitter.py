@@ -8,11 +8,10 @@ import numpy as np
 import multiprocessing
 from spectral_cube import SpectralCube
 from astropy import units as u
-from skimage.morphology import dilation
+from skimage.morphology import binary_dilation, square
 import astropy.io.fits as fits
 import gc
 from scipy.signal import medfilt2d
-from skimage.morphology import dilation, square
 from time import ctime
 import warnings
 
@@ -280,7 +279,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         # a second componet that is found in wide seperation)
         lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
         mask = lnk21 < 5
-        mask = dilation(mask)
+        mask = binary_dilation(mask)
 
         # combine the mask with where 1 component model is better fitted than the noise to save some computational time
         lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
@@ -556,7 +555,7 @@ def get_2comp_wide_guesses(reg):
             preguess[:, ~aic1v0_mask] = np.nan
 
             # use the dialated mask as a footprint to interpolate the guesses
-            gmask = dilation(aic1v0_mask)
+            gmask = binary_dilation(aic1v0_mask)
             guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header, mask=gmask)
         else:
             logger.info("no good fit from convolved guess, using the moment guess for the full-res refit instead")
@@ -669,7 +668,7 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
 
         # mask out residual with SNR values over the cut threshold
         mask_res = res_main_hf_snr > res_snr_cut
-        mask_res = dilation(mask_res)
+        mask_res = binary_dilation(mask_res)
 
         cube_res_masked = cube_res.with_mask(~mask_res)
     else:
