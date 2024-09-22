@@ -14,6 +14,7 @@ import gc
 from scipy.signal import medfilt2d
 from skimage.morphology import dilation, square
 from time import ctime
+from datetime import timezone, datetime
 import warnings
 
 from . import UltraCube as UCube
@@ -57,6 +58,15 @@ class Region(object):
 
         # for convolving cube
         self.cnv_factor = cnv_factor
+        self.progress_log_name = "{}/{}_progress_log.csv".format(self.ucube.paraDir, self.ucube.paraNameRoot)
+
+        try:
+            from pandas import read_csv
+            self.progress_log = read_csv(self.progress_log_name)
+            #could use a checking mechanism to ensure the logfile is the right format
+        except FileNotFoundError:
+            from pandas import DataFrame
+            self.progress_log = DataFrame(columns=['process', 'last complete'])
 
 
     def get_convolved_cube(self, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None, multicore=True):
@@ -85,6 +95,27 @@ class Region(object):
 
     def standard_2comp_fit(self, planemask=None):
         standard_2comp_fit(self, planemask=planemask)
+
+    def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds'):
+        # log the time when a process is finished
+        if mark_start:
+            time_info = "unfinished"
+        else:
+            timestemp = datetime.now()
+            time_info = timestemp.isoformat(timespec=timespec)
+
+        if process_name in self.progress_log['process'].values:
+            # replace the previous entry if the process has been logged
+            mask = self.progress_log['process'] == process_name
+            self.progress_log.loc[mask, 'last complete'] = time_info
+        else:
+            # add an new entry otherwise
+            info = {'process':process_name, 'last complete':time_info}
+            self.progress_log = self.progress_log.append(info, ignore_index=True)
+
+        if save:
+            # write the log as an csv file
+            self.progress_log.to_csv(self.progress_log_name, index=False)
 
 #=======================================================================================================================
 
@@ -143,16 +174,20 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
 
     if refit_bad_pix:
-        refit_bad_2comp(reg.ucube, snr_min=snr_min, lnk_thresh=-20, multicore=multicore)
+        refit_bad_2comp(reg, snr_min=snr_min, lnk_thresh=-20, multicore=multicore)
 
     if recover_wide:
         refit_2comp_wide(reg, snr_min=snr_min, multicore=multicore)
+
     save_best_2comp_fit(reg, multicore=multicore)
 
     return reg
 
 
 def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True):
+    proc_name = 'iter_2comp_fit'
+    reg.log_progress(process_name=proc_name, mark_start=True)
+
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
@@ -175,12 +210,17 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
 
+    reg.log_progress(process_name=proc_name, mark_start=False)
 
-def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20, multicore=True):
+
+def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     '''
     refit pixels where 2 component fits are substantially worse than good one components
     default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
     '''
+    proc_name = 'refit_bad_2comp'
+    reg.log_progress(process_name=proc_name, mark_start=True)
+    ucube = reg.ucube
 
     from astropy.convolution import Gaussian2DKernel, convolve
 
@@ -210,6 +250,8 @@ def refit_bad_2comp(ucube, snr_min=3, lnk_thresh=-20, multicore=True):
     gc.collect()
     # re-fit and save the updated model
     replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=True, multicore=multicore)
+
+    reg.log_progress(process_name=proc_name, mark_start=False)
 
 
 def refit_swap_2comp(reg, snr_min=3):
@@ -255,6 +297,9 @@ def refit_swap_2comp(reg, snr_min=3):
 
 
 def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicore=True):
+
+    proc_name = 'refit_2comp_wide'
+    reg.log_progress(process_name=proc_name, mark_start=True)
 
     logger.info("Begin wide component recovery")
     multicore = validate_n_cores(multicore)
@@ -324,6 +369,8 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
     replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit, multicore=multicore)
 
+    reg.log_progress(process_name=proc_name, mark_start=False)
+
 
 def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, multicore=True):
     # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
@@ -351,9 +398,10 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
-
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
+    proc_name = 'standard_2comp_fit'
+    reg.log_progress(process_name=proc_name, mark_start=True)
     ncomp = [1,2]
 
     # only use the moment maps for the fits
@@ -364,6 +412,7 @@ def standard_2comp_fit(reg, planemask=None, snr_min=3):
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc],fittype=reg.fittype, **kwargs)
 
+    reg.log_progress(process_name=proc_name, mark_start=False)
 
 def save_updated_paramaps(ucube, ncomps):
     # save the updated parameter cubes
