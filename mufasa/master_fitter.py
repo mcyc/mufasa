@@ -397,15 +397,29 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, mask)
+            good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
             logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
 
+        print("good mask size: {}".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
+        replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
 
         # save the updated results
         save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
+
+def replace_pixesl(ucube, ucube_rep, ncomp, mask):
+
+    attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
+
+    for attr in attrs:
+        print(attr)
+        data = getattr(ucube, attr)[ncomp]
+        data_rep = getattr(ucube_rep, attr)[ncomp]
+        data[mask] = data_rep[mask].copy()
+
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
