@@ -792,16 +792,17 @@ def get_best_2comp_model(reg):
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
+    from copy import deepcopy
 
     # replace values in masked pixels with the reference values
-    pcube_ref = pcube_ref.copy('deep')
-    pcube.parcube[:,mask] = pcube_ref.parcube[:,mask]
-    pcube.errcube[:,mask] = pcube_ref.errcube[:,mask]
+    #pcube_ref = pcube_ref.copy()
+    pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
+    pcube.errcube[:,mask] = deepcopy(pcube_ref.errcube[:,mask])
 
     if pcube._modelcube is not None:
         multicore = validate_n_cores(multicore)
         newmod = pcube_ref.get_modelcube(multicore=multicore)
-        pcube._modelcube[:, mask] = newmod[:, mask]
+        pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
 
 
 def get_skyheader(cube_header):
