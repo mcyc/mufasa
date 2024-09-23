@@ -121,7 +121,6 @@ class UltraCube(object):
                 self.include_model_mask(mod_mask)
             gc.collect()
 
-
     def include_model_mask(self, mask):
         # update the mask that shows were all the models are non-zero
 
@@ -200,19 +199,15 @@ class UltraCube(object):
 
 
     def get_AICc(self, ncomp, update=True, **kwargs):
-
-        compID = str(ncomp)
-        if not compID in self.chisq_maps:
+        # recalculate AICc fresh if update is True
+        if update or not compID in self.chisq_maps:
+            # start the calculation fresh
+            compID = str(ncomp)
+            # note that zero component is assumed to have no free-parameter (i.e., no fitting)
+            p = ncomp * 4
             self.get_rss(ncomp, **kwargs)
-
-        # note that zero component is assumed to have no free-parameter (i.e., no fitting)
-        p = ncomp*4
-
-        AICc_map = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
-
-        if update:
-            self.AICc_maps[compID] = AICc_map
-        return AICc_map
+            self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
+        return self.AICc_maps[compID]
 
 
     def get_AICc_likelihood(self, ncomp1, ncomp2):
@@ -368,6 +363,31 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
     return get_chisq(cube, modcube, expand=20, reduced=reduced, usemask=usemask, mask=mask)
 
 
+def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
+    # calculate AICc value withouth change the internal ucube data
+
+    if isinstance(compID, int):
+        p = compID * 4
+        compID = str(compID)
+    elif isinstance(compID, str):
+        p = int(compID) * 4
+
+    if compID == '0':
+        # the zero component model is just a y = 0 baseline
+        modcube = np.zeros(cube.shape)
+    else:
+        modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
+
+    # get the rss value and sample size
+    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
+    AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
+
+    if return_NSamp:
+        return AICc_map, NSamp
+    else:
+        return AICc_map
+
+
 def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
     # return the log likelihood of the A model relative to the B model
 
@@ -375,8 +395,8 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
         # if a second UCube is provide for model comparison, use their common mask and calculate AICc values
         # without storing/updating them in the UCubes
         mask = np.logical_or(ucube.master_model_mask, ucube_B.master_model_mask)
-        AICc_A = ucube.get_AICc(ncomp_A, update=False, mask=mask)
-        AICc_B = ucube_B.get_AICc(ncomp_B, update=False, mask=mask)
+        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, mask_plane=None, return_NSamp=False)
+        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, mask_plane=None, return_NSamp=False)
         return aic.likelihood(AICc_A, AICc_B)
 
     if not str(ncomp_A) in ucube.NSamp_maps:
@@ -390,6 +410,7 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
 
     if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
         logger.warning("Number of samples do not match. Recalculating AICc values")
+        #ucube.master_model_mask = None # rest the master_model_mask first?
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
