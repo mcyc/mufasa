@@ -11,6 +11,7 @@ from spectral_cube import SpectralCube
 # prevent any spectral-cube related warnings from being displayed.
 from spectral_cube.utils import SpectralCubeWarning
 warnings.filterwarnings(action='ignore', category=SpectralCubeWarning, append=True)
+from copy import copy
 
 import pyspeckit
 import gc
@@ -183,9 +184,13 @@ class UltraCube(object):
         # note: a mechanism is needed to make sure NSamp is consistient across the models
         self.rss_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
             calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True)
+
         # only include pixels with samples
-        mask = self.NSamp_maps[str(ncomp)] == 0
+        mask = self.NSamp_maps[str(ncomp)] < 1
         self.NSamp_maps[str(ncomp)][mask] = np.nan
+
+        # only if rss value is valid
+        mask = np.logical_or(mask, self.rss_maps[str(ncomp)] <= 0)
         self.rss_maps[str(ncomp)][mask] = np.nan
 
     def get_Tpeak(self, ncomp):
@@ -433,13 +438,16 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True):
         ucube.get_AICc(ncomp_B)
 
     gc.collect()
-    return aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
+    lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
+    # ensure the likihood map doesn't include where there are no samples
+    # lnk[np.isnan(ucube.NSamp_maps[str(ncomp_A)])] = np.nan
+    return lnk
 
 
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False):
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False, include_nosamp=True):
     '''
     Calculate residual sum of squares (RSS)
 
@@ -455,9 +463,24 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
 
     if usemask:
         if mask is None:
+            # may want to change this for future models that includes absorptions
             mask = model > 0
     else:
         mask = ~np.isnan(model)
+
+    if include_nosamp:
+        # if there no mask in a given pixel, fill it in with combined spectral mask
+        nsamp_map = np.nansum(mask, axis=0)
+        mm = nsamp_map <= 0
+        try:
+            max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
+            spec_mask_fill = copy(mask[:,max_y[0], max_x[0]])
+        except:
+            spec_mask_fill = np.any(mask, axis=(1,2))
+        mask[:, mm] = spec_mask_fill[:, np.newaxis]
+
+    # assume flat-baseline model even if no model exists
+    model[np.isnan(model)] = 0
 
     residual = get_residual(cube, model)
 
