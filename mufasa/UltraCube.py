@@ -183,7 +183,10 @@ class UltraCube(object):
         # note: a mechanism is needed to make sure NSamp is consistient across the models
         self.rss_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
             calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True)
-
+        # only include pixels with samples
+        mask = self.NSamp_maps[str(ncomp)] == 0
+        self.NSamp_maps[str(ncomp)][mask] = np.nan
+        self.rss_maps[str(ncomp)][mask] = np.nan
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -390,6 +393,10 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
 
     # get the rss value and sample size
     rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
+    # ensure AICc is only calculated where models exits
+    nmask = NSamp_map == 0
+    NSamp_map[nmask] = np.nan
+    rss_map[nmask] = np.nan
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
