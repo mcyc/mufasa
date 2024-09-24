@@ -129,13 +129,13 @@ class UltraCube(object):
         else:
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
 
-    def reset_model_mask(self, ncomps):
+    def reset_model_mask(self, ncomps, multicore=True):
         #reset and re-generate master_model_mask for all the components in ncomps
         self.master_model_mask = None
         for nc in ncomps:
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=kwargs['multicore']) > 0
+                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=multicore) > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -398,7 +398,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
         return AICc_map
 
 
-def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
+def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True):
     # return the log likelihood of the A model relative to the B model
 
     if not ucube_B is None:
@@ -421,7 +421,7 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
     if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
         logger.warning("Number of samples do not match. Recalculating AICc values")
         #reset the master component mask first
-        ucube.reset_model_mask(ncomps=[comp_A, ncomp_B])
+        ucube.reset_model_mask(ncomps=[comp_A, ncomp_B], multicore=multicore)
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
