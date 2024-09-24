@@ -409,15 +409,16 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
-def replace_pixesl(ucube, ucube_rep, ncomp, mask):
+def replace_pixesl(ucube, ucube_ref, ncomp, mask):
 
     attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
-
     for attr in attrs:
-        print(attr)
         data = getattr(ucube, attr)[ncomp]
-        data_rep = getattr(ucube_rep, attr)[ncomp]
-        data[mask] = data_rep[mask].copy()
+        try:
+            data_rep = getattr(ucube_ref, attr)[ncomp]
+            data[mask] = data_rep[mask].copy()
+        except KeyError:
+            logger.debug("{} does not have the following key: {}".format(attr, ncomp))
 
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
