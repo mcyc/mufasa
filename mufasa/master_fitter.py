@@ -260,7 +260,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
 
     gc.collect()
     # re-fit and save the updated model
-    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=True, multicore=multicore)
+    replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore)
 
     reg.log_progress(process_name=proc_name, mark_start=False)
 
@@ -392,8 +392,6 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
-
-        return lnk_NvsO
 
         if lnk21 is not None:
             # mask over where one comp fit is more robust
