@@ -238,6 +238,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
+    ucube.reset_model_mask(ncomps=[1,2], multicore=True)
     lnk21 = ucube.get_AICc_likelihood(2, 1)
     lnk10 = ucube.get_AICc_likelihood(1, 0)
 
@@ -385,6 +386,11 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
 def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, multicore=True):
     # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+
+    if lnk21 is not None:
+        message = "[WARNING] The lnk21 argument will be deprecated in a future update."
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+
     if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile,fittype=ucube.fittype)
         # fit using simpfit (and take the provided guesses as they are)
@@ -393,22 +399,23 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
 
-        if lnk21 is not None:
+        #if lnk21 is not None:
+        if False:
             # mask over where one comp fit is more robust
             good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, mask)
-            good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
-            logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
 
-        print("good mask size: {}".format(good_mask.sum()))
+        logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
-        replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
+        #ucube.get_rss('2', mask=None, update=True)
+        ucube.get_AICc(2, update=True)
+        # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
 
         # save the updated results
-        save_updated_paramaps(ucube, ncomps=[2, 1])
+        #save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
@@ -796,17 +803,17 @@ def get_best_2comp_model(reg):
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
-    from copy import deepcopy
 
     # replace values in masked pixels with the reference values
-    #pcube_ref = pcube_ref.copy()
     pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
     pcube.errcube[:,mask] = deepcopy(pcube_ref.errcube[:,mask])
+    pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
 
-    if pcube._modelcube is not None:
-        multicore = validate_n_cores(multicore)
-        newmod = pcube_ref.get_modelcube(multicore=multicore)
-        pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
+    multicore = validate_n_cores(multicore)
+    newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
+    pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
+
+    #pcube._modelcube = pcube.get_modelcube(update=True, multicore=multicore)
 
 
 def get_skyheader(cube_header):

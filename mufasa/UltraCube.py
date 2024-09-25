@@ -136,7 +136,8 @@ class UltraCube(object):
         for nc in ncomps:
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=multicore) > 0
+                self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                mod_mask = self.pcubes[str(nc)]._modelcube > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -177,13 +178,13 @@ class UltraCube(object):
         return self.rms_maps[compID]
 
 
-    def get_rss(self, ncomp, mask=None):
+    def get_rss(self, ncomp, mask=None, update=True):
         # residual sum of squares
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
         self.rss_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
-            calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True)
+            calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update)
 
         # only include pixels with samples
         mask = self.NSamp_maps[str(ncomp)] < 1
@@ -218,18 +219,18 @@ class UltraCube(object):
 
     def get_AICc(self, ncomp, update=True, **kwargs):
         # recalculate AICc fresh if update is True
-        if update or not compID in self.chisq_maps:
+        if update or not compID in self.AICc_maps:
             # start the calculation fresh
             compID = str(ncomp)
             # note that zero component is assumed to have no free-parameter (i.e., no fitting)
             p = ncomp * 4
-            self.get_rss(ncomp, **kwargs)
+            self.get_rss(ncomp, update=update, **kwargs)
             self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
         return self.AICc_maps[compID]
 
 
-    def get_AICc_likelihood(self, ncomp1, ncomp2):
-        return calc_AICc_likelihood(self, ncomp1, ncomp2)
+    def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
+        return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
 
     def get_best_residual(self, cubetype=None):
@@ -346,7 +347,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
 #======================================================================================================================#
 # UltraCube based methods
 
-def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True):
+def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cube=True):
     # calculate residual sum of squares
 
     if isinstance(compID, int):
@@ -358,7 +359,8 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True):
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
+        ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
+        modcube = ucube.pcubes[compID]._modelcube
 
     gc.collect()
     return get_rss(cube, modcube, expand=20, usemask=usemask, mask=mask, return_size=return_size)
@@ -394,7 +396,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
+        modcube = ucube.pcubes[compID].get_modelcube(update=True, multicore=ucube.n_cores)
 
     # get the rss value and sample size
     rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
@@ -433,7 +435,6 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True):
     if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
         logger.warning("Number of samples do not match. Recalculating AICc values")
         #reset the master component mask first
-        ucube.reset_model_mask(ncomps=[comp_A, ncomp_B], multicore=multicore)
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
