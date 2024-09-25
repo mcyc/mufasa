@@ -462,6 +462,7 @@ def save_best_2comp_fit(reg, multicore=True):
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
 
     # make the 2-comp para maps with the best fit model
+    reg_final.ucube.reset_model_mask(ncomps=[2,1], multicore=multicore)
     lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
     logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
