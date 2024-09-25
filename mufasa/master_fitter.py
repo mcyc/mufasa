@@ -8,11 +8,11 @@ import numpy as np
 import multiprocessing
 from spectral_cube import SpectralCube
 from astropy import units as u
-from skimage.morphology import dilation
+from skimage.morphology import binary_dilation, square
 import astropy.io.fits as fits
+from copy import copy, deepcopy
 import gc
 from scipy.signal import medfilt2d
-from skimage.morphology import dilation, square
 from time import ctime
 from datetime import timezone, datetime
 import warnings
@@ -237,6 +237,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
+    ucube.reset_model_mask(ncomps=[1,2], multicore=True)
     lnk21 = ucube.get_AICc_likelihood(2, 1)
     lnk10 = ucube.get_AICc_likelihood(1, 0)
 
@@ -246,19 +247,20 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     mask_size = np.sum(mask)
     logger.debug("refit mask size for bad_2comp: {}".format(mask_size))
 
-    guesses = ucube.pcubes['2'].parcube.copy()
-    # remove the bad pixels
+    guesses = copy(ucube.pcubes['2'].parcube)
+    guesses[guesses==0] = np.nan
+    # remove the bad pixels from the fitted parameters
     guesses[:,mask] = np.nan
 
     # use astropy convolution to interpolate guesses (we assume bad fits are usually well surrounded by good fits)
-    kernel = Gaussian2DKernel(2)
+    kernel = Gaussian2DKernel(2.5/2.355)
     for i, gmap in enumerate(guesses):
         gmap[mask] = np.nan
         guesses[i] = convolve(gmap, kernel, boundary='extend')
 
     gc.collect()
     # re-fit and save the updated model
-    replace_bad_pix(ucube, mask, snr_min, guesses, lnk21, simpfit=True, multicore=multicore)
+    replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore)
 
     reg.log_progress(process_name=proc_name, mark_start=False)
 
@@ -334,7 +336,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         # a second componet that is found in wide seperation)
         lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
         mask = lnk21 < 5
-        mask = dilation(mask)
+        mask = binary_dilation(mask)
 
         # combine the mask with where 1 component model is better fitted than the noise to save some computational time
         lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
@@ -383,6 +385,11 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
 def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, multicore=True):
     # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+
+    if lnk21 is not None:
+        message = "[WARNING] The lnk21 argument will be deprecated in a future update."
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+
     if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile,fittype=ucube.fittype)
         # fit using simpfit (and take the provided guesses as they are)
@@ -391,21 +398,39 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
 
-        if lnk21 is not None:
+        #if lnk21 is not None:
+        if False:
             # mask over where one comp fit is more robust
             good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, mask)
-            logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
 
+        logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
+        #ucube.get_rss('2', mask=None, update=True)
+        ucube.get_AICc(2, update=True)
+        # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
+
 
         # save the updated results
-        save_updated_paramaps(ucube, ncomps=[2, 1])
+        #save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
+
+     
+def replace_pixesl(ucube, ucube_ref, ncomp, mask):
+
+    attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
+    for attr in attrs:
+        data = getattr(ucube, attr)[ncomp]
+        try:
+            data_rep = getattr(ucube_ref, attr)[ncomp]
+            data[mask] = data_rep[mask].copy()
+        except KeyError:
+            logger.debug("{} does not have the following key: {}".format(attr, ncomp))
+
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
@@ -458,6 +483,7 @@ def save_best_2comp_fit(reg, multicore=True):
     pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
 
     # make the 2-comp para maps with the best fit model
+    reg_final.ucube.reset_model_mask(ncomps=[2,1], multicore=multicore)
     lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
     logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
@@ -614,7 +640,7 @@ def get_2comp_wide_guesses(reg):
             preguess[:, ~aic1v0_mask] = np.nan
 
             # use the dialated mask as a footprint to interpolate the guesses
-            gmask = dilation(aic1v0_mask)
+            gmask = binary_dilation(aic1v0_mask)
             guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header, mask=gmask)
         else:
             logger.info("no good fit from convolved guess, using the moment guess for the full-res refit instead")
@@ -727,7 +753,7 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
 
         # mask out residual with SNR values over the cut threshold
         mask_res = res_main_hf_snr > res_snr_cut
-        mask_res = dilation(mask_res)
+        mask_res = binary_dilation(mask_res)
 
         cube_res_masked = cube_res.with_mask(~mask_res)
     else:
@@ -778,16 +804,18 @@ def get_best_2comp_model(reg):
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
+    from copy import deepcopy
 
     # replace values in masked pixels with the reference values
-    pcube_ref = pcube_ref.copy('deep')
-    pcube.parcube[:,mask] = pcube_ref.parcube[:,mask]
-    pcube.errcube[:,mask] = pcube_ref.errcube[:,mask]
+    pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
+    pcube.errcube[:,mask] = deepcopy(pcube_ref.errcube[:,mask])
+    pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
 
-    if pcube._modelcube is not None:
-        multicore = validate_n_cores(multicore)
-        newmod = pcube_ref.get_modelcube(multicore=multicore)
-        pcube._modelcube[:, mask] = newmod[:, mask]
+    multicore = validate_n_cores(multicore)
+    newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
+    pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
+
+    #pcube._modelcube = pcube.get_modelcube(update=True, multicore=multicore)
 
 
 def get_skyheader(cube_header):
