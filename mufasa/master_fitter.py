@@ -10,6 +10,7 @@ from spectral_cube import SpectralCube
 from astropy import units as u
 from skimage.morphology import dilation
 import astropy.io.fits as fits
+from copy import copy, deepcopy
 import gc
 from scipy.signal import medfilt2d
 from skimage.morphology import dilation, square
@@ -246,12 +247,13 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     mask_size = np.sum(mask)
     logger.debug("refit mask size for bad_2comp: {}".format(mask_size))
 
-    guesses = ucube.pcubes['2'].parcube.copy()
-    # remove the bad pixels
+    guesses = copy(ucube.pcubes['2'].parcube)
+    guesses[guesses==0] = np.nan
+    # remove the bad pixels from the fitted parameters
     guesses[:,mask] = np.nan
 
     # use astropy convolution to interpolate guesses (we assume bad fits are usually well surrounded by good fits)
-    kernel = Gaussian2DKernel(2)
+    kernel = Gaussian2DKernel(2.5/2.355)
     for i, gmap in enumerate(guesses):
         gmap[mask] = np.nan
         guesses[i] = convolve(gmap, kernel, boundary='extend')
@@ -390,6 +392,8 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
+
+        return lnk_NvsO
 
         if lnk21 is not None:
             # mask over where one comp fit is more robust
