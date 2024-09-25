@@ -399,15 +399,30 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
             good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, mask)
+            good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
             logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
 
+        print("good mask size: {}".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
+        replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
 
         # save the updated results
         save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
+
+def replace_pixesl(ucube, ucube_ref, ncomp, mask):
+
+    attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
+    for attr in attrs:
+        data = getattr(ucube, attr)[ncomp]
+        try:
+            data_rep = getattr(ucube_ref, attr)[ncomp]
+            data[mask] = data_rep[mask].copy()
+        except KeyError:
+            logger.debug("{} does not have the following key: {}".format(attr, ncomp))
+
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
@@ -781,16 +796,17 @@ def get_best_2comp_model(reg):
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
+    from copy import deepcopy
 
     # replace values in masked pixels with the reference values
-    pcube_ref = pcube_ref.copy('deep')
-    pcube.parcube[:,mask] = pcube_ref.parcube[:,mask]
-    pcube.errcube[:,mask] = pcube_ref.errcube[:,mask]
+    #pcube_ref = pcube_ref.copy()
+    pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
+    pcube.errcube[:,mask] = deepcopy(pcube_ref.errcube[:,mask])
 
     if pcube._modelcube is not None:
         multicore = validate_n_cores(multicore)
         newmod = pcube_ref.get_modelcube(multicore=multicore)
-        pcube._modelcube[:, mask] = newmod[:, mask]
+        pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
 
 
 def get_skyheader(cube_header):
