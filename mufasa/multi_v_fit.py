@@ -31,11 +31,15 @@ class MetaModel(object):
         self.fittype = fittype
         self.adoptive_snr_masking = True
 
+        # a place holder for if the window becomes line specific
+        self.main_hf_moments = momgue.window_moments
+
         if self.fittype is 'nh3_multi_v':
             from pyspeckit.spectrum.models.ammonia_constants import freq_dict
             from pyspeckit.spectrum.models import ammonia
             from .spec_models import ammonia_multiv as ammv
 
+            self.linetype = 'nh3'
             # the current implementation only fits the 1-1 lines
             self.linenames = ["oneone"]
 
@@ -54,24 +58,12 @@ class MetaModel(object):
             self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
-            self.main_hf_moments = momgue.window_moments
-
-            # define a nh3-specific moment guess function
-            def mom_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None):
-                kwargs = dict(moment1=moment1, moment2=moment2, ncomp=ncomp, sigmin=sigmin, tex_guess=tex_guess,
-                              tau_guess=tau_guess, moment0=moment0, linetype='nh3')
-                return momgue.moment_guesses(**kwargs)
-
-            self.moment_guesses = mom_guesses
-
 
         elif self.fittype is 'n2hp_multi_v':
-            '''
-            For Julian to fill in for the N2H+ model
-            '''
             from .spec_models.n2hp_constants import freq_dict
             from .spec_models import n2hp_multiv as n2hpmv
 
+            self.linetype = 'n2hp'
             # the current implementation only fits the 1-0 lines
             self.linenames = ["onezero"]
 
@@ -85,13 +77,10 @@ class MetaModel(object):
             self.Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
             self.sigmin = 0.07  # km/s
             self.sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-            # taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
             self.taumax = 40.0  # when the satellite hyperfine lines becomes optically thick
             self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
-            self.main_hf_moments = momgue.window_moments
-            self.moment_guesses = momgue.moment_guesses
         else:
             raise Exception("{} is an invalid fittype".format(fittype))
 
@@ -208,12 +197,6 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     else:
         maskmap = planemask * footprint_mask
 
-    if 'start_from_point' not in kwargs:
-        indx_g = np.argwhere(maskmap)
-        start_from_point = (indx_g[0,1], indx_g[0,0])
-        logger.info("starting point: {}".format(start_from_point))
-        kwargs['start_from_point'] = start_from_point
-
     if 'signal_cut' not in kwargs:
         kwargs['signal_cut'] = 0.0
 
@@ -248,6 +231,13 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     impose_lim(guesses[1::4], sigmin, sigmax, eps)
     impose_lim(guesses[2::4], Texmin, Texmax, eps)
     impose_lim(guesses[3::4], taumin, taumax, eps)
+
+    valid = np.logical_and(maskmap, np.all(np.isfinite(guesses),axis=0))
+    if 'start_from_point' not in kwargs:
+        indx_g = np.argwhere(maskmap)
+        start_from_point = (indx_g[0,1], indx_g[0,0])
+        logger.info("starting point: {}".format(start_from_point))
+        kwargs['start_from_point'] = start_from_point
 
     # add all the pcube.fiteach kwargs)
     kwargs['multicore'] = multicore
@@ -490,7 +480,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
-    gg = mod_info.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0)
+    gg = momgue.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0, linetype=mod_info.linetype)
 
     if guesses is None:
         guesses = gg
