@@ -8,12 +8,11 @@ import numpy as np
 import multiprocessing
 from spectral_cube import SpectralCube
 from astropy import units as u
-from skimage.morphology import dilation
+from skimage.morphology import binary_dilation, square
 import astropy.io.fits as fits
 from copy import copy, deepcopy
 import gc
 from scipy.signal import medfilt2d
-from skimage.morphology import dilation, square
 from time import ctime
 from datetime import timezone, datetime
 import warnings
@@ -337,7 +336,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         # a second componet that is found in wide seperation)
         lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
         mask = lnk21 < 5
-        mask = dilation(mask)
+        mask = binary_dilation(mask)
 
         # combine the mask with where 1 component model is better fitted than the noise to save some computational time
         lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
@@ -414,11 +413,13 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         ucube.get_AICc(2, update=True)
         # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
 
+
         # save the updated results
         #save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
+     
 def replace_pixesl(ucube, ucube_ref, ncomp, mask):
 
     attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
@@ -639,7 +640,7 @@ def get_2comp_wide_guesses(reg):
             preguess[:, ~aic1v0_mask] = np.nan
 
             # use the dialated mask as a footprint to interpolate the guesses
-            gmask = dilation(aic1v0_mask)
+            gmask = binary_dilation(aic1v0_mask)
             guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header, mask=gmask)
         else:
             logger.info("no good fit from convolved guess, using the moment guess for the full-res refit instead")
@@ -752,7 +753,7 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
 
         # mask out residual with SNR values over the cut threshold
         mask_res = res_main_hf_snr > res_snr_cut
-        mask_res = dilation(mask_res)
+        mask_res = binary_dilation(mask_res)
 
         cube_res_masked = cube_res.with_mask(~mask_res)
     else:
@@ -803,6 +804,7 @@ def get_best_2comp_model(reg):
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
+    from copy import deepcopy
 
     # replace values in masked pixels with the reference values
     pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
