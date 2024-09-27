@@ -312,6 +312,7 @@ def refit_swap_2comp(reg, snr_min=3):
 
 
 def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicore=True):
+    # if plane mask isn't provided, only try to recover pixels where the 2-comp fit is worse than the one component fit
 
     proc_name = 'refit_2comp_wide'
     reg.log_progress(process_name=proc_name, mark_start=True)
