@@ -20,7 +20,10 @@ from astropy.stats import mad_std
 
 from . import moment_guess as momgue
 from .utils.multicore import validate_n_cores
+from .utils import interpolate
+
 #=======================================================================================================================
+
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
 
@@ -456,8 +459,22 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     logger.debug("median velocity: {:3f}".format(v_median))
 
-    # remove the nana values to allow np.nanargmax(m0) to operate smoothly
-    m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
+
+    # quality control - remove pixels with mom0 that seems to be below the rms threshold
+    def q_mask(m0):
+        # estimate the noise level
+        std_m0 = mad_std(m0[np.isfinite(m0)])
+        # estimate again with the signals "removed"
+        qmask = np.logical_or(np.isfinite(m0), m0 > std_m0)
+        std_m0 = mad_std(m0[qmask])
+        return m0 < std_m0
+
+    qmask = q_mask(m0)
+    m0[qmask] = np.nan
+    m1[qmask] = np.nan
+    m2[qmask] = np.nan
+
+    #return m0, m1, m2
 
     # define acceptable v range based on the provided or determined median velocity
     vmax = v_median + v_peak_hwidth
@@ -470,13 +487,21 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     if v_1p - sigmax < vmin:
         vmin = v_1p - sigmax
 
+    mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask * footprint_mask)
+    m0, m1, m2 = mmm[0], mmm[1], mmm[2]
+
     logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
 
     # find the location of the peak signal (to determine the first pixel to fit if nearest neighbour method is used)
     if "start_from_point" not in kwargs:
+        # remove the nana values to allow np.nanargmax(m0) to operate smoothly
+        mask_nan = np.isnan(m0)
+        m0[mask_nan] = -np.inf  # I'm not sure if this is a good way to get around the sum vs nansum issue
         peakloc = np.nanargmax(m0)
         ymax, xmax = np.unravel_index(peakloc, m0.shape)
         kwargs['start_from_point'] = (xmax, ymax)
+        m0[mask_nan] = np.nan
+        del mask_nan
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
