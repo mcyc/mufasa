@@ -140,6 +140,7 @@ def _ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background
 
         lines = (1-voff_lines/ckms)*freq_dict[linename]/1e9
         tau_wts = tau_wts / (tau_wts).sum()
+        if width == 0: width = (xarr[1] - xarr[0]).value # width shouldn't be 0, saves from divide by 0 on line 150
         nuwidth = np.abs(width/ckms*lines)
         nuoff = xoff_v/ckms*lines
 
@@ -161,6 +162,8 @@ def _ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background
                        + runspec)
 
         else:
+            if tex < TCMB: 
+                tex = TCMB # tex shouldn't be < TCMB unless we're looking at absorption?, also removes a divide by zero warning
             runspec = ((T0/(np.exp(T0/tex)-1)*(1-np.exp(-tauprof)) +
                         background_ta*np.exp(-tauprof))*fillingfraction
                        + runspec)

@@ -6,28 +6,53 @@ from astropy import units as u
 from spectral_cube import SpectralCube
 
 import pyspeckit
-from pyspeckit.spectrum.models.ammonia_constants import freq_dict, voff_lines_dict
 from pyspeckit.spectrum.models.ammonia_constants import (ckms, h, kb)
 from astropy.stats import mad_std
 
 from .utils import map_divide
 import multiprocessing
+from .utils.multicore import validate_n_cores
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
 #=======================================================================================================================
 
-# define max and min values of tex and tau to use for the test
-# a spectrum with tex and tau values both below the specified minima has an intensity below the expected GAS rms
-tex_max = 8.0
-tau_max = 1.0
-tex_min = 3.1
-tau_min = 0.3
+
+class LineSetup(object):
+    def __init__(self, linetype='nh3'):
+
+        if linetype is 'nh3':
+            from pyspeckit.spectrum.models.ammonia_constants import voff_lines_dict
+
+            voff = voff_lines_dict['oneone']
+
+            # define max and min values of tex and tau to use for the test
+            # a spectrum with tex and tau values both below the specified minima has an intensity below the expected GAS rms
+            self.tex_max = 8.0
+            self.tau_max = 1.0
+            self.tex_min = 3.1
+            self.tau_min = 0.3
+
+        elif linetype is 'n2hp':
+            '''
+            For Julian to fill in for the N2H+ model
+            '''
+            from .spec_models.n2hp_constants import voff_lines_dict
+
+            voff = voff_lines_dict['onezero']
+
+            # define max and min values of tex and tau to use for the test
+            self.tex_max = 8.0
+            self.tau_max = 1.0
+            self.tex_min = 3.1
+            self.tau_min = 0.3
+        else:
+            raise Exception("{} is an invalid linetype".format(linetype))
 
 #=======================================================================================================================
 
 def master_guess(spectrum, ncomp, sigmin=0.07, v_peak_hwidth=3.0, v_atpeak=None, widewVSep=False, snr_cut=3,
-                 signal_mask=None):
+                 signal_mask=None, linetype='nh3'):
 
     m0, m1, m2 = window_moments(spectrum, window_hwidth=v_peak_hwidth, v_atpeak=v_atpeak, signal_mask=signal_mask)
 
@@ -47,18 +72,20 @@ def master_guess(spectrum, ncomp, sigmin=0.07, v_peak_hwidth=3.0, v_atpeak=None,
         if m0_b > snr_cut*rms:
             # if the residual spectrum has m0 that is 3 sigma above the rms noise, treat both moment as individual
             # one component parts
-            gg_a = moment_guesses(np.array([m1]), np.array([m2]), ncomp=1, sigmin=sigmin, moment0=np.array([m0]))
-            gg_b = moment_guesses(np.array([m1_b]), np.array([m2_b]), ncomp=1, sigmin=sigmin, moment0=np.array([m0_b]))
+            gg_a = moment_guesses(np.array([m1]), np.array([m2]), ncomp=1, sigmin=sigmin, moment0=np.array([m0]),
+                                  linetype=linetype)
+            gg_b = moment_guesses(np.array([m1_b]), np.array([m2_b]), ncomp=1, sigmin=sigmin, moment0=np.array([m0_b]),
+                                  linetype=linetype)
             gg = np.zeros((ncomp * 4,) + np.array([m1]).shape)
             gg[:4,:] = gg_a[:]
             gg[4:,:] = gg_b[:]
 
         else:
-            gg = moment_guesses(np.array([m1]), np.array([m2]), ncomp, sigmin=sigmin, moment0=np.array([m0]))
+            gg = moment_guesses(np.array([m1]), np.array([m2]), ncomp, sigmin=sigmin, moment0=np.array([m0]), linetype=linetype)
 
     else:
         # get the guesses based on moment maps based on "traditional" recipe
-        gg = moment_guesses(np.array([m1]), np.array([m2]), ncomp, sigmin=sigmin, moment0=np.array([m0]))
+        gg = moment_guesses(np.array([m1]), np.array([m2]), ncomp, sigmin=sigmin, moment0=np.array([m0]), linetype=linetype)
 
     return gg
 
@@ -173,9 +200,7 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
             the velociy or a map of velocities to center the spectral window on
         '''
 
-        if multicore is None:
-            # use all the cores minus one
-            multicore = multiprocessing.cpu_count() - 1
+        multicore = validate_n_cores(multicore)
 
         def get_win_moms(pcube, v_atpeak):
             # get window moments when v_atpeak is given
@@ -220,10 +245,10 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
                 mask = mask*signal_mask
             tot_spec = np.nansum(maskcube._data[:,]*mask, axis=(1,2))
             idx_peak = np.nanargmax(tot_spec)
-            logger.info("Getting window moments of SpectralCube")
-            logger.info("peak T_B: {0}".format(np.nanmax(tot_spec)))
+            logger.debug("Getting window moments of SpectralCube")
+            logger.debug("peak T_B: {0}".format(np.nanmax(tot_spec)))
             v_atpeak = maskcube.spectral_axis[idx_peak].to(u.km/u.s).value
-            logger.info("v_atpeak: {0}".format(v_atpeak))
+            logger.debug("v_atpeak: {0}".format(v_atpeak))
 
         vmax = v_atpeak + window_hwidth
         vmin = v_atpeak - window_hwidth
@@ -247,9 +272,8 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
 
     elif isinstance(spec, SpectralCube):
         # currently cannot handle v_atpeak as a map
-        if not hasattr(v_atpeak, 'ndim'):
+        if hasattr(v_atpeak, 'ndim') and v_atpeak.ndim>0: # numpy floats have ndim=0
             logger.error("the method that handles SpectralCube cannot currently handle v_atpeak as a map, please use single value v_atpeak instead")
-            # TODO: investigate why I get this all the time
         return moments_spectralcube(spec, window_hwidth, v_atpeak, signal_mask)
 
     else:
@@ -275,7 +299,7 @@ def noisemask_moment(sp, m1, m2, mask_sigma=4, noise_rms = None, **kwargs):
     return window_moments(sp_m, **kwargs)
 
 
-def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None):
+def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None, linetype='nh3'):
     '''
     Make reasonable guesses for the multiple component fits
     :param moment1:
@@ -287,6 +311,13 @@ def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_gues
     :param tau_guess:
     :return:
     '''
+
+    # setup different limits based on the line specie
+    line_setup = LineSetup(linetype)
+    tex_max = line_setup.tex_max
+    tau_max = line_setup.tau_max
+    tex_min = line_setup.tex_min
+    tau_min = line_setup.tau_min
 
     if moment0 is not None:
         #print "[WARNING]: moment0 map is provided, thus the user-provided tex and tau will not be used"
@@ -416,9 +447,7 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=Non
     f_tau = 0.5 # weight of the tau for the "equal-weight" guesses
     f_sig = 0.5 # weight of the linewidth for all guesses
 
-    if multicore is None:
-        # use all the cores minus one
-        multicore = multiprocessing.cpu_count() - 1
+    multicore = validate_n_cores(multicore)
 
     if isinstance(spec, pyspeckit.spectrum.classes.Spectrum):
         spec.xarr.velocity_convention = 'radio'
@@ -535,17 +564,18 @@ def mom_guess_wide_sep(spec, vpeak=None, rms=None, planemask=None, multicore=Non
 #=======================================================================================================================
 # utility functions
 
-def get_rms_prefit(spectrum, window_hwidth, v_atpeak):
+def get_rms_prefit(spectrum, window_hwidth, v_atpeak, linetype='nh3'):
 
     s = spectrum
+    line_setup = LineSetup(linetype)
 
     vsys = v_atpeak*u.km/u.s
     throw = window_hwidth*u.km/u.s
-    voff11 = voff_lines_dict['oneone']
+    voff = line_setup.voff
 
     mask = np.ones(s.shape[0], dtype=np.bool)
 
-    for deltav in voff11:
+    for deltav in voff:
         mask *= (np.abs(s.xarr - (deltav * u.km / u.s + vsys)) > throw)
 
     d_rms = s.data.copy()
@@ -553,7 +583,7 @@ def get_rms_prefit(spectrum, window_hwidth, v_atpeak):
     return mad_std(d_rms[mask])
 
 
-def adoptive_moment_maps(maskcube, seeds, window_hwidth, weights=None, signal_mask=None):
+def adaptive_moment_maps(maskcube, seeds, window_hwidth, weights=None, signal_mask=None):
     # split the cube up into different regions and make mosaic moment maps from moments of each individual regions
 
     labels, n_labs = map_divide.dist_divide(seeds, weights=weights, return_nmarkers=True)

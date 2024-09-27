@@ -4,11 +4,16 @@ __author__ = 'mcychen'
 
 #======================================================================================================================#
 import os
+import warnings
 import numpy as np
 
 from spectral_cube import SpectralCube
+# prevent any spectral-cube related warnings from being displayed.
+from spectral_cube.utils import SpectralCubeWarning
+warnings.filterwarnings(action='ignore', category=SpectralCubeWarning, append=True)
+from copy import copy
+
 import pyspeckit
-import multiprocessing
 import gc
 from astropy import units as u
 import scipy.ndimage as nd
@@ -16,7 +21,7 @@ import scipy.ndimage as nd
 from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
-
+from .utils.multicore import validate_n_cores
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -24,7 +29,7 @@ logger = get_logger(__name__)
 
 class UltraCube(object):
 
-    def __init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
         '''
         # a data frame work to handel multiple component fits and their results
         Parameters
@@ -46,7 +51,8 @@ class UltraCube(object):
         self.master_model_mask = None
         self.snr_min = 0.0
         self.cnv_factor = cnv_factor
-        self.n_cores = multiprocessing.cpu_count()
+        self.n_cores = validate_n_cores(n_cores)
+        self.fittype = fittype
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -99,21 +105,22 @@ class UltraCube(object):
 
         if not 'snr_min' in kwargs:
             kwargs['snr_min'] = self.snr_min
-
-        from collections.abc import Iterable
+        try:
+            from collections import Iterable
+        except ImportError:
+            # for backwards compatibility
+            from collections.abc import Iterable
         if not isinstance(ncomp, Iterable):
             ncomp = [ncomp]
 
         for nc in ncomp:
-            #self.pcubes[str(nc)] = mvf.cubefit_gen(self.cube, ncomp=nc, **kwargs)
-            self.pcubes[str(nc)] = fit_cube(self.cube, simpfit=simpfit, ncomp=nc, **kwargs)
+            self.pcubes[str(nc)] = fit_cube(self.cube, fittype=self.fittype, simpfit=simpfit, ncomp=nc, **kwargs)
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=self.n_cores) > 0
+                mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=kwargs['multicore']) > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
-
 
     def include_model_mask(self, mask):
         # update the mask that shows were all the models are non-zero
@@ -122,6 +129,17 @@ class UltraCube(object):
             self.master_model_mask = mask
         else:
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
+
+    def reset_model_mask(self, ncomps, multicore=True):
+        #reset and re-generate master_model_mask for all the components in ncomps
+        self.master_model_mask = None
+        for nc in ncomps:
+            if hasattr(self.pcubes[str(nc)],'parcube'):
+                # update model mask if any fit has been performed
+                self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                mod_mask = self.pcubes[str(nc)]._modelcube > 0
+                self.include_model_mask(mod_mask)
+            gc.collect()
 
 
     def save_fit(self, savename, ncomp):
@@ -132,16 +150,18 @@ class UltraCube(object):
             logger.warning("no fit was performed and thus no file will be saved")
 
 
-    def load_model_fit(self, filename, ncomp):
-        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp)
+    def load_model_fit(self, filename, ncomp, multicore=None):
+        if multicore is None: multicore = self.n_cores
+        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp,self.fittype)
         # update model mask
         mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
-        logger.info("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
+        logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
         gc.collect()
         self.include_model_mask(mod_mask)
 
 
-    def get_residual(self, ncomp):
+    def get_residual(self, ncomp, multicore=None):
+        if multicore is None: multicore = self.n_cores
         compID = str(ncomp)
         model = self.pcubes[compID].get_modelcube(multicore=self.n_cores)
         self.residual_cubes[compID] = get_residual(self.cube, model)
@@ -158,14 +178,21 @@ class UltraCube(object):
         return self.rms_maps[compID]
 
 
-    def get_rss(self, ncomp, mask=None):
+    def get_rss(self, ncomp, mask=None, update=True):
         # residual sum of squares
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
         self.rss_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
-            calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True)
+            calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update)
 
+        # only include pixels with samples
+        mask = self.NSamp_maps[str(ncomp)] < 1
+        self.NSamp_maps[str(ncomp)][mask] = np.nan
+
+        # only if rss value is valid
+        mask = np.logical_or(mask, self.rss_maps[str(ncomp)] <= 0)
+        self.rss_maps[str(ncomp)][mask] = np.nan
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -191,23 +218,19 @@ class UltraCube(object):
 
 
     def get_AICc(self, ncomp, update=True, **kwargs):
-
-        compID = str(ncomp)
-        if not compID in self.chisq_maps:
-            self.get_rss(ncomp, **kwargs)
-
-        # note that zero component is assumed to have no free-parameter (i.e., no fitting)
-        p = ncomp*4
-
-        AICc_map = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
-
-        if update:
-            self.AICc_maps[compID] = AICc_map
-        return AICc_map
+        # recalculate AICc fresh if update is True
+        if update or not compID in self.AICc_maps:
+            # start the calculation fresh
+            compID = str(ncomp)
+            # note that zero component is assumed to have no free-parameter (i.e., no fitting)
+            p = ncomp * 4
+            self.get_rss(ncomp, update=update, **kwargs)
+            self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
+        return self.AICc_maps[compID]
 
 
-    def get_AICc_likelihood(self, ncomp1, ncomp2):
-        return calc_AICc_likelihood(self, ncomp1, ncomp2)
+    def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
+        return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
 
     def get_best_residual(self, cubetype=None):
@@ -216,11 +239,11 @@ class UltraCube(object):
 
 class UCubePlus(UltraCube):
     # create a subclass of UltraCube that holds the directory information
-    #__init__(self, cubefile=None, cube=None, snr_min=None, rmsfile=None, cnv_factor=2)
 
-    def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None, **kwargs): # snr_min=None, rmsfile=None, cnv_factor=2):
+    def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None,fittype=None, **kwargs): # snr_min=None, rmsfile=None, cnv_factor=2):
         # super(UCube, self).__init__(cubefile=cubefile)
-        UltraCube.__init__(self, cubefile, cube, **kwargs) # snr_min, rmsfile, cnv_factor)
+
+        UltraCube.__init__(self, cubefile, cube, fittype, **kwargs) # snr_min, rmsfile, cnv_factor)
 
         self.cubeDir = os.path.dirname(cubefile)
 
@@ -243,7 +266,7 @@ class UCubePlus(UltraCube):
 
     def get_model_fit(self, ncomp, update=True, **kwargs):
         '''
-        load the model fits if it exist, else
+        load the model fits if it exists, else
 
         kwargs are passed to pyspeckit.Cube.fiteach (if update)
         '''
@@ -255,11 +278,22 @@ class UCubePlus(UltraCube):
         if update:
             # re-fit the cube
             for nc in ncomp:
+                if 'conv' in self.paraPaths[str(nc)]:
+                    logger.info(f'Fitting convolved cube for {nc} component(s)')
+                else:
+                    logger.info(f'Fitting cube for {nc} component(s)')
                 #if update or (not os.path.isfile(self.paraPaths[str(nc)])):
+                if 'multicore' not in kwargs:
+                    kwargs['multicore'] = self.n_cores
                 self.fit_cube(ncomp=[nc], **kwargs)
                 gc.collect()
                 self.save_fit(self.paraPaths[str(nc)], nc)
                 gc.collect()
+        else:
+            if 'conv' in self.paraPaths[str(nc)]:
+                logger.info(f'Loading convolved cube fits for {nc} component(s)')
+            else:
+                logger.info(f'Loading fits for {nc} component(s)')
 
         for nc in ncomp:
             path = self.paraPaths[str(nc)]
@@ -268,15 +302,15 @@ class UCubePlus(UltraCube):
 
 #======================================================================================================================#
 
-def fit_cube(cube, simpfit=False, **kwargs):
+def fit_cube(cube, fittype, simpfit=False, **kwargs):
     '''
     kwargs are those used for pyspeckit.Cube.fiteach
     '''
     if simpfit:
         # fit the cube with the provided guesses and masks with no pre-processing
-        return mvf.cubefit_simp(cube, **kwargs)
+        return mvf.cubefit_simp(cube, fittype=fittype, **kwargs)
     else:
-        return mvf.cubefit_gen(cube, **kwargs)
+        return mvf.cubefit_gen(cube, fittype=fittype, **kwargs)
 
 
 def save_fit(pcube, savename, ncomp):
@@ -284,19 +318,25 @@ def save_fit(pcube, savename, ncomp):
     mvf.save_pcube(pcube, savename, ncomp)
 
 
-def load_model_fit(cube, filename, ncomp):
+def load_model_fit(cube, filename, ncomp, fittype):
     # currently only loads ammonia multi-component model
     pcube = pyspeckit.Cube(cube=cube)
 
     # reigster fitter
-    linename = 'oneone'
-    from . import ammonia_multiv as ammv
+    if fittype == 'nh3_multi_v':
+        linename = 'oneone'
+        from .spec_models import ammonia_multiv as ammv
+        fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
 
-    fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
-    pcube.specfit.Registry.add_fitter('nh3_multi_v', fitter, fitter.npars)
+    elif fittype == 'n2hp_multi_v':
+        linename = 'onezero'
+        from .spec_models import n2hp_multiv as n2hpmv
+        fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
+
+    pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
     pcube.xarr.velocity_convention = 'radio'
 
-    pcube.load_model_fit(filename, npars=fitter.npars, fittype='nh3_multi_v')
+    pcube.load_model_fit(filename, npars=fitter.npars,fittype=fittype)
     gc.collect()
     return pcube
 
@@ -307,7 +347,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
 #======================================================================================================================#
 # UltraCube based methods
 
-def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True):
+def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cube=True):
     # calculate residual sum of squares
 
     if isinstance(compID, int):
@@ -319,7 +359,8 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True):
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
+        ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
+        modcube = ucube.pcubes[compID]._modelcube
 
     gc.collect()
     return get_rss(cube, modcube, expand=20, usemask=usemask, mask=mask, return_size=return_size)
@@ -342,15 +383,44 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
     return get_chisq(cube, modcube, expand=20, reduced=reduced, usemask=usemask, mask=mask)
 
 
-def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
+def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
+    # calculate AICc value withouth change the internal ucube data
+
+    if isinstance(compID, int):
+        p = compID * 4
+        compID = str(compID)
+    elif isinstance(compID, str):
+        p = int(compID) * 4
+
+    if compID == '0':
+        # the zero component model is just a y = 0 baseline
+        modcube = np.zeros(cube.shape)
+    else:
+        modcube = ucube.pcubes[compID].get_modelcube(update=True, multicore=ucube.n_cores)
+
+    # get the rss value and sample size
+    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
+    # ensure AICc is only calculated where models exits
+    nmask = NSamp_map == 0
+    NSamp_map[nmask] = np.nan
+    rss_map[nmask] = np.nan
+    AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
+
+    if return_NSamp:
+        return AICc_map, NSamp
+    else:
+        return AICc_map
+
+
+def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True):
     # return the log likelihood of the A model relative to the B model
 
     if not ucube_B is None:
         # if a second UCube is provide for model comparison, use their common mask and calculate AICc values
         # without storing/updating them in the UCubes
         mask = np.logical_or(ucube.master_model_mask, ucube_B.master_model_mask)
-        AICc_A = ucube.get_AICc(ncomp_A, update=False, mask=mask)
-        AICc_B = ucube_B.get_AICc(ncomp_B, update=False, mask=mask)
+        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, mask_plane=None, return_NSamp=False)
+        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, mask_plane=None, return_NSamp=False)
         return aic.likelihood(AICc_A, AICc_B)
 
     if not str(ncomp_A) in ucube.NSamp_maps:
@@ -359,31 +429,26 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None):
     if not str(ncomp_B) in ucube.NSamp_maps:
         ucube.get_AICc(ncomp_B)
 
-    NSampEqual = ucube.NSamp_maps[str(ncomp_A)] == ucube.NSamp_maps[str(ncomp_B)]
+    NSamp_mapA = ucube.NSamp_maps[str(ncomp_A)] # since (np.nan == np.nan) is False, this threw the below warning unnecessarily
+    NSamp_mapB = ucube.NSamp_maps[str(ncomp_B)]
 
-    if np.nansum(~NSampEqual) != 0:
-        logger.warning("Number of samples do not match. Recalculating AICc values") # TODO: investigate why I get this error
+    if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
+        logger.warning("Number of samples do not match. Recalculating AICc values")
+        #reset the master component mask first
         ucube.get_AICc(ncomp_A)
         ucube.get_AICc(ncomp_B)
 
     gc.collect()
-    return aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
+    lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
+    # ensure the likihood map doesn't include where there are no samples
+    # lnk[np.isnan(ucube.NSamp_maps[str(ncomp_A)])] = np.nan
+    return lnk
 
 
 #======================================================================================================================#
 # statistics tools
 
-'''
-def get_aic(chisq, p, N=None):
-    # calculate AIC or AICc values
-    if N is None:
-        return aic.AIC(chisq, p)
-    else:
-        return aic.AICc(chisq, p, N)
-'''
-
-
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False):
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False, include_nosamp=True):
     '''
     Calculate residual sum of squares (RSS)
 
@@ -399,9 +464,24 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
 
     if usemask:
         if mask is None:
+            # may want to change this for future models that includes absorptions
             mask = model > 0
     else:
         mask = ~np.isnan(model)
+
+    if include_nosamp:
+        # if there no mask in a given pixel, fill it in with combined spectral mask
+        nsamp_map = np.nansum(mask, axis=0)
+        mm = nsamp_map <= 0
+        try:
+            max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
+            spec_mask_fill = copy(mask[:,max_y[0], max_x[0]])
+        except:
+            spec_mask_fill = np.any(mask, axis=(1,2))
+        mask[:, mm] = spec_mask_fill[:, np.newaxis]
+
+    # assume flat-baseline model even if no model exists
+    model[np.isnan(model)] = 0
 
     residual = get_residual(cube, model)
 
@@ -459,7 +539,9 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
     if reduced:
         # assuming n_size >> n_parameters
-        chisq /= np.nansum(mask, axis=0)
+        reduction = np.nansum(mask, axis=0) # avoid division by zero
+        reduction[reduction == 0] = np.nan
+        chisq /= reduction
 
     rms = get_rms(residual)
     chisq /= rms ** 2
@@ -508,30 +590,12 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     mask_lowT[specmask, :] = True
     mask[:, ~mask_highT_2d] = mask_lowT[:, ~mask_highT_2d]
 
-    # get pixels that aren't modeled
-    #mask_s = np.zeros(mask.shape, dtype=bool)
-    #mask_s[: ~np.all(mask, axis=0)] =
-
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
 
     if expand > 0:
         mask = expand_mask(mask, expand)
     mask = mask.astype(float)
-
-    '''
-    # expand in all directions instead
-    #selem = np.ones(shape=(expand, expand, expand), dtype=bool)
-    #mask = nd.binary_dilation(mask, selem)
-    mask = nd.binary_dilation(mask, iterations=expand)
-
-    # pixels with less than expand number of spectral chanels
-    mask_s = np.zeros(mask.shape, dtype=bool)
-    mask_s[:, np.sum(mask, axis=0) < expand] = True
-    mask_s = expand_mask(mask_s, expand)
-
-    mask = np.logical_or(mask, mask_s)
-    '''
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -551,9 +615,7 @@ def expand_mask(mask, expand):
 def get_rms(residual):
     # get robust estimate of the rms from the fit residual
     diff = residual - np.roll(residual, 2, axis=0)
-    #print("finite diff cube size: {}".format(np.sum(np.isfinite(diff))))
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
-    #print("finite rms map size: {}".format(np.sum(np.isfinite(rms))))
     gc.collect()
     return rms
 

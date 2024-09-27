@@ -2,6 +2,8 @@ __author__ = 'mcychen'
 
 #=======================================================================================================================
 import numpy as np
+import warnings
+
 from astropy.stats import mad_std
 from astropy.wcs import WCS
 from skimage.morphology import remove_small_objects, dilation, disk, remove_small_holes
@@ -72,9 +74,10 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     # clean up the maps based on vlsr errors
     data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara)
     hdr_conv = get_celestial_hdr(header_cnv)
-    data_cnv[data_cnv == 0] = np.nan
-    data_cnv = data_cnv[0:npara*ncomp]
 
+    # remove the error component
+    data_cnv = data_cnv[0:npara*ncomp]
+    data_cnv[data_cnv == 0] = np.nan
 
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask)
@@ -127,8 +130,6 @@ def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
     tau_thin = 1.0      # where the main hyperfines of NH3 (1,1) starts to get optically thick
 
     # for when tau is less than tau_thresh
-    #texmap[isthin] = texmap[isthin]*taumap[isthin]/tau_thresh
-    #taumap[isthin] = tau_thresh
     texmap[isthin] = mmg.get_tex(TA_lowtau, tau=tau_thresh) #note: tex can be higher than at 40K at Ta~7K
     taumap[isthin] = tau_thresh
 
@@ -138,8 +139,6 @@ def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
     mask = TA_hightex < TA_ltau_thres # only renormalize high tex when Ta is less than the threshold
     mask = np.logical_and(mask, taumap[hightex] < tau_thin)
 
-    #texmap[hightex] = tex_thin
-    #taumap[hightex] = texmap[hightex]*taumap[hightex]/tex_thin
     texmap[hightex][mask] = tex_thin
     taumap[hightex][mask] = mmg.get_tau(TA_hightex[mask], tex=tex_thin, nu=23.722634)
 
@@ -227,7 +226,7 @@ def master_mask(pcube):
 
 def mask_cleaning(mask):
     # designed to clean a noisy map, with a footprint that is likely slightly larger
-    mask = remove_small_objects(mask, min_size=9)
+    #mask = remove_small_objects(mask, min_size=9) #pending investigation before removed permantly
     mask = dilation(mask, disk(1))
     mask = remove_small_holes(mask, 9)
     return mask
@@ -249,7 +248,7 @@ def regrid(image, header1, header2, dmask=None, method='cubic'):
     return griddata((X[mask],Y[mask]), image[mask], (grid1[1]*dmask, grid1[0]*dmask), method=method, fill_value=np.nan)
 
 
-def refine_guess(map, min=None, max=None, mask=None, disksize=1):
+def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpolate=False):
     # refine parameter maps by outlier-fitering, masking, and interpolating
     map = map.copy()
 
@@ -258,24 +257,33 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     if max is not None:
         map[map>max] = np.nan
 
-    if np.sum(np.isfinite(map)) == 0:
+    # check the number of finite pixels in the provided map
+    mask_finite = np.isfinite(map)
+    n_valid = np.sum(mask_finite)
+
+    # in case there are too few valid pixels in the provided map
+    if n_valid < 2:
+        # if there's a single pixel
+        if n_valid == 1:
+            map[:] = map[mask_finite][0]
+
         # if there are no valid pixel in the guesses, set it to one of the limits or zero
-        if min is not None:
-            map[:] = min
+        elif min is not None:
+            if max is None:
+                map[:] = min
+            else:
+                map[:] = (max + min) / 2
         elif max is not None:
             map[:] = max
         else:
             map[:] = 0.0
         return map
 
-    #map_med = median_filter(map, footprint=disk(disksize))
-    #if np.sum(np.isfinite(map_med)) == 0:
-
     kernel = Gaussian2DKernel(disksize)
     map = convolve(map, kernel, boundary='extend')
 
     if mask is None:
-        mask = np.isfinite(map)
+        mask = mask_finite
         mask = mask_cleaning(mask)
 
     def interpolate(map, mask):
@@ -293,12 +301,15 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
     def interpolate_via_cnv(map):
         kernel = Gaussian2DKernel(3)
         zi = convolve(map, kernel, boundary='extend')
-        # retrain the original median_filtered map over its original positions
-        map_finite = np.isfinite(map)
-        zi[map_finite] = map[map_finite]
+        # only populate pixels where the original map was finite
+        zi[mask_finite] = map[mask_finite]
         return zi
 
-    if np.sum(mask) >= 2:
+    if scipy_interpolate:
+        warn_msg = "The usage of scipy.interpolate for guess refine is deprecated and will be removed in a future version." \
+                   "The default going forward will be astropy's convovle method."
+        warnings.warn(warn_msg, DeprecationWarning, stacklevel=2)
+        logger.warning(warn_msg)
         try:
             # interpolate the mask
             zi = interpolate(map, mask)
@@ -311,7 +322,6 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1):
             zi = interpolate_via_cnv(map)
     else:
         zi = interpolate_via_cnv(map)
-
     return zi
 
 
@@ -321,7 +331,6 @@ def save_guesses(paracube, header, savename, ncomp=2):
     from astropy.io import fits
 
     npara = 4
-
     hdr_new = copy.deepcopy(header)
 
     # write the header information for each plane (i.e., map)

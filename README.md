@@ -8,10 +8,10 @@ Please cite the following paper when using the code:
 
 ## Installation
 
-To install the latest version of ```MUFASA``` from this repository, run:
+To install the latest version of ```MUFASA```, clone this repository and run the following in your local directory:
 
 ```
-python setup.py install
+pip install -e .
 ```
 
 To pip install a 'stable' release, run:
@@ -34,20 +34,27 @@ pip install mufasa
 
 - ```FITS_tools > v0.2```
 
+If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` and  ```FITS_tools``` directly from their respective GitHub repository. 
 
 ## Getting Started
 
 ### Minimum Working Example
 
-To perform a two-component NH<sub>3</sub> (1,1) fit automatically, simply run the following: 
+To perform an NH<sub>3</sub> (1,1) fit automatically, up to two components, simply run the following: 
 
 ```
 from mufasa import master_fitter as mf
-uReg = mf.Region(cubePath, paraNameRoot, paraDir)
-uReg.master_2comp_fit(snr_min=0)
+reg = mf.Region(cubePath, paraNameRoot, paraDir, fittype='nh3_multi_v')
+reg.master_2comp_fit(snr_min=0)
 ```
 
-In the example above, ```cubePath``` is the path to the FITS data cube, ```paraNameRoot``` is the commmon 'root' name to all the outputfiles, and ```paraDir``` is the directory of all the outputfiles. If one wishes to fit pixels only above a certain signal-to-noise-ratio (SNR) threshold, use ```snr_min``` to set such a threshold.
+In the example above, ```cubePath``` is the path to the FITS data cube, ```paraNameRoot``` is the common 'root' name to all the output files, ```paraDir``` is the directory of all the outputfiles, and ```fittype``` is the name of the line model to be fitted. 
+
+```MUFASA``` currently offers two spectral line models, specified by the ```fittype``` argument:
+- ```nh3_multi_v```: multi-component NH<sub>3</sub> (1,1) model
+- ```n2hp_multi_v```: multi-component N<sub>2</sub>H<sup>+</sup> (1-0) model
+
+If one wishes to fit pixels only above a specific signal-to-noise-ratio (SNR) threshold, one can specify such a threshold using the ```snr_min``` argument.
 
 
 
