@@ -14,45 +14,53 @@ from FITS_tools.hcongrid import get_pixel_mapping
 from astropy.convolution import Gaussian2DKernel, convolve
 
 from scipy.spatial.qhull import QhullError
+
+from .utils import interpolate
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
 #=======================================================================================================================
 
 
-def quick_2comp_sort(data_cnv, filtsize=2):
+def quick_2comp_sort(data_cnv, filtsize=2, method="tautex"):
     # use median filtered vlsr & sigma maps as a velocity reference to sort the two components
 
-    # arange the maps so the component with the least vlsr errors is the first component
-    swapmask = data_cnv[8] > data_cnv[12]
-    data_cnv = mask_swap_2comp(data_cnv, swapmask)
+    if method == "chen2020":
+        # arange the maps so the component with the least vlsr errors is the first component
+        swapmask = data_cnv[8] > data_cnv[12]
+        data_cnv = mask_swap_2comp(data_cnv, swapmask)
 
-    # the use the vlsr error in the first component as the reference and sort the component based on their similarities
-    # to this reference (similary bright structures should have similar errors)
-    ref = median_filter(data_cnv[8], size=(filtsize, filtsize))
-    swapmask = np.abs(data_cnv[8] - ref) > np.abs(data_cnv[12] - ref)
-    data_cnv = mask_swap_2comp(data_cnv, swapmask)
+        # the use the vlsr error in the first component as the reference and sort the component based on their similarities
+        # to this reference (similary bright structures should have similar errors)
+        ref = median_filter(data_cnv[8], size=(filtsize, filtsize))
+        swapmask = np.abs(data_cnv[8] - ref) > np.abs(data_cnv[12] - ref)
+        data_cnv = mask_swap_2comp(data_cnv, swapmask)
 
-    def dist_metric(p1, p2):
-        # use the first map (the one that should have the smallest error, hense more reliable) to compute
-        #  distance metric based on their similarities to the median filtered quantity
-        p_refa = median_filter(p1, size=(filtsize, filtsize))
-        #p_refb = median_filter(p2, size=(filtsize, filtsize))
+        def dist_metric(p1, p2):
+            # use the first map (the one that should have the smallest error, hense more reliable) to compute
+            #  distance metric based on their similarities to the median filtered quantity
+            p_refa = median_filter(p1, size=(filtsize, filtsize))
+            #p_refb = median_filter(p2, size=(filtsize, filtsize))
 
-        # distance of the current arangment to the median
-        del_pa = np.abs(p1 - p_refa)
+            # distance of the current arangment to the median
+            del_pa = np.abs(p1 - p_refa)
 
-        # distance of the swapped arangment to the median
-        del_pb = np.abs(p2 - p_refa)
-        return del_pa, del_pb
+            # distance of the swapped arangment to the median
+            del_pb = np.abs(p2 - p_refa)
+            return del_pa, del_pb
 
-    dist_va, dist_vb = dist_metric(data_cnv[0], data_cnv[4])
-    dist_siga, dist_sigb = dist_metric(data_cnv[1], data_cnv[5])
+        dist_va, dist_vb = dist_metric(data_cnv[0], data_cnv[4])
+        dist_siga, dist_sigb = dist_metric(data_cnv[1], data_cnv[5])
 
-    # use both the vlsr and the sigma as a distance metric
-    swapmask = np.hypot(dist_va, dist_siga) > np.hypot(dist_vb, dist_sigb)
+        # use both the vlsr and the sigma as a distance metric
+        swapmask = np.hypot(dist_va, dist_siga) > np.hypot(dist_vb, dist_sigb)
+        data_cnv= mask_swap_2comp(data_cnv, swapmask)
 
-    data_cnv= mask_swap_2comp(data_cnv, swapmask)
+    elif method == "tautex":
+        Tb0_a = data_cnv[3]*data_cnv[4]
+        Tb0_b = data_cnv[6]*data_cnv[7]
+        swapmask = Tb0_b > Tb0_a
+        data_cnv = mask_swap_2comp(data_cnv, swapmask)
 
     return data_cnv
 
@@ -72,43 +80,56 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
 
     data_cnv = data_cnv.copy()
     # clean up the maps based on vlsr errors
-    data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara, std_thres=3)
-    hdr_conv = get_celestial_hdr(header_cnv)
-
+    if ncomp == 1:
+        std_thres = 3
+    else:
+        std_thres = 1
+    data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara, std_thres=std_thres)
     # remove the error component
     data_cnv = data_cnv[0:npara*ncomp]
     data_cnv[data_cnv == 0] = np.nan
+
+    if ncomp == 2:
+        data_cnv = quick_2comp_sort(data_cnv, filtsize=2, method="tautex")
 
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask, tau_thresh=tau_thresh)
 
     # regrid the guess back to that of the original data
+    hdr_conv = get_celestial_hdr(header_cnv)
     hdr_final = get_celestial_hdr(header_target)
-
-    kernel = Gaussian2DKernel(1)
 
     guesses_final = []
 
+    newmask = np.any(np.isfinite(data_cnv), axis=0)
+    newmask = remove_small_holes(newmask, 25)
+
     # regrid the guesses
     for gss in data_cnv:
-        newmask = np.isfinite(gss)
-        # removal holes with areas that smaller than a 5 by 5 square
-        newmask = remove_small_holes(newmask, 25)
-        # create a mask to regrid over
-        newmask = regrid(newmask, hdr_conv, hdr_final, dmask=None, method='nearest')
-        newmask = newmask.astype('bool')
+        if False:
+            newmask = np.isfinite(gss)
+            # removal holes with areas that smaller than a 5 by 5 square
+            newmask = remove_small_holes(newmask, 25)
+            # create a mask to regrid over
+            newmask = regrid(newmask, hdr_conv, hdr_final, dmask=None, method='nearest')
+            newmask = newmask.astype('bool')
 
-        new_guess = regrid(gss, hdr_conv, hdr_final, dmask=newmask)
+            new_guess = regrid(gss, hdr_conv, hdr_final, dmask=newmask)
 
-        # expand the interpolation a bit, since regridding can often miss some pixels due to aliasing
-        newmask_l = dilation(newmask)
-        newmask_l = dilation(newmask_l)
-        new_guess_cnv = convolve(new_guess, kernel, boundary='extend')
+            # expand the interpolation a bit, since regridding can often miss some pixels due to aliasing
+            newmask_l = dilation(newmask)
+            newmask_l = dilation(newmask_l)
 
-        new_guess_cnv[~newmask_l] = np.nan
-        # retrain the originally interpolataed values within the original mask
-        mask_finite = np.isfinite(new_guess)
-        new_guess_cnv[mask_finite] = new_guess[mask_finite]
+            kernel = Gaussian2DKernel(1)
+            new_guess_cnv = convolve(new_guess, kernel, boundary='extend')
+            new_guess_cnv[~newmask_l] = np.nan
+            # retrain the originally interpolataed values within the original mask
+            mask_finite = np.isfinite(new_guess)
+            new_guess_cnv[mask_finite] = new_guess[mask_finite]
+        else:
+            new_guess_cnv = interpolate.iter_expand(gss, mask=newmask)
+            new_guess_cnv = regrid(new_guess_cnv, hdr_conv, hdr_final, dmask=None)
+
         guesses_final.append(new_guess_cnv)
 
     return np.array(guesses_final)
