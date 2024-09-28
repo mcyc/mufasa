@@ -203,7 +203,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     ncomp = [1,2] # ensure this is a two component fitting method
 
     # convolve the cube and fit it
-    get_convolved_fits(reg, ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
+    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
 
     # use the result from the convolved cube as guesses for the full resolution fits
     for nc in ncomp:
@@ -480,9 +480,8 @@ def save_best_2comp_fit(reg, multicore=True):
             logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
             reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
 
-    pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
-
-    # make the 2-comp para maps with the best fit model
+    '''
+    pcube_final = deepcopy(reg_final.ucube.pcubes['2'])
     reg_final.ucube.reset_model_mask(ncomps=[2,1], multicore=multicore)
     lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
     mask = lnk21 > 5
@@ -496,6 +495,13 @@ def save_best_2comp_fit(reg, multicore=True):
     mask = lnk10 > 5
     pcube_final.parcube[:, ~mask] = np.nan
     pcube_final.errcube[:, ~mask] = np.nan
+    '''
+    # make the 2-comp para maps with the best fit model
+    pcube_final = reg_final.ucube.pcubes['2']
+    kwargs = dict(multicore=multicore, lnk21_thres=5, lnk10_thres=5, return_lnks=True)
+    parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
+    pcube_final.parcube = parcube
+    pcube_final.errcube = errcube
 
     # use the default file formate to save the finals
     nc = 2
