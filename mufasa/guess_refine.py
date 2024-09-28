@@ -114,7 +114,7 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     return np.array(guesses_final)
 
 
-def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
+def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0, nu=23.722634):
     from . import moment_guess as mmg
 
     # attempt to re-normalize the tau & text values at the optically thin regime (where the two are degenerate)
@@ -140,7 +140,7 @@ def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0):
     mask = np.logical_and(mask, taumap[hightex] < tau_thin)
 
     texmap[hightex][mask] = tex_thin
-    taumap[hightex][mask] = mmg.get_tau(TA_hightex[mask], tex=tex_thin, nu=23.722634)
+    taumap[hightex][mask] = mmg.get_tau(TA_hightex[mask], tex=tex_thin, nu=nu)
 
     # note, tau values that are too low will be taken care of by refine_each_comp()
     return taumap, texmap
