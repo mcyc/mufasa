@@ -65,14 +65,14 @@ def mask_swap_2comp(data_cnv, swapmask):
     return data_cnv
 
 
-def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
+def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thresh=0.99):
     # a wrapper to make guesses based on the parameters fitted to the convolved data
     npara = 4
     ncomp = int(data_cnv.shape[0]/npara/2)
 
     data_cnv = data_cnv.copy()
     # clean up the maps based on vlsr errors
-    data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara)
+    data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara, std_thres=3)
     hdr_conv = get_celestial_hdr(header_cnv)
 
     # remove the error component
@@ -80,7 +80,7 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None):
     data_cnv[data_cnv == 0] = np.nan
 
     for i in range (0, ncomp):
-        data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask)
+        data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask, tau_thresh=tau_thresh)
 
     # regrid the guess back to that of the original data
     hdr_final = get_celestial_hdr(header_target)
@@ -146,7 +146,7 @@ def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0, nu=23.72
     return taumap, texmap
 
 
-def refine_each_comp(guess_comp, mask=None, v_range=None, sig_range=None):
+def refine_each_comp(guess_comp, mask=None, v_range=None, sig_range=None, tau_thresh=0.1):
     # refine guesses for each component, with values outside ranges specified below removed
 
     Tex_min = 3.0
@@ -176,7 +176,7 @@ def refine_each_comp(guess_comp, mask=None, v_range=None, sig_range=None):
     guess_comp[1] = refine_guess(guess_comp[1], min=sigmin, max=sigmax, mask=mask, disksize=disksize)
 
     # re-normalize the degenerated tau & text for the purpose of estimate guesses
-    guess_comp[3], guess_comp[2] = tautex_renorm(guess_comp[3], guess_comp[2], tau_thresh = 0.1)
+    guess_comp[3], guess_comp[2] = tautex_renorm(guess_comp[3], guess_comp[2], tau_thresh = tau_thresh)
 
     # place a more "strict" limits for Tex and Tau guessing than the fitting itself
     guess_comp[2] = refine_guess(guess_comp[2], min=Tex_min, max=Tex_max, mask=mask, disksize=disksize)
@@ -184,13 +184,12 @@ def refine_each_comp(guess_comp, mask=None, v_range=None, sig_range=None):
     return guess_comp
 
 
-def simple_para_clean(pmaps, ncomp, npara=4):
+def simple_para_clean(pmaps, ncomp, npara=4, std_thres = 2):
     # clean parameter maps based on their error values
 
     pmaps=pmaps.copy()
 
     # remove component with vlsrErr that is number of sigma off from the median as specified below
-    std_thres = 2
 
     pmaps[pmaps == 0] = np.nan
 
@@ -279,8 +278,8 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpola
             map[:] = 0.0
         return map
 
-    kernel = Gaussian2DKernel(disksize)
-    map = convolve(map, kernel, boundary='extend')
+    #kernel = Gaussian2DKernel(disksize)
+    #map = convolve(map, kernel, boundary='extend')
 
     if mask is None:
         mask = mask_finite
@@ -299,7 +298,8 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpola
         return zi
 
     def interpolate_via_cnv(map):
-        kernel = Gaussian2DKernel(3)
+        mask_finite = np.isfinite(map)
+        kernel = Gaussian2DKernel(2.5/2.355)
         zi = convolve(map, kernel, boundary='extend')
         # only populate pixels where the original map was finite
         zi[mask_finite] = map[mask_finite]
