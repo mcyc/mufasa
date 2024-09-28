@@ -13,7 +13,7 @@ def expand_interpolate(data, ker_sig=1):
         qmask = np.isnan(data)
         data[qmask] = data_smooth[qmask]
 
-    elif data.dim == 3:
+    elif data.ndim == 3:
         for i, gsm in enumerate(data_smooth):
             data_smooth[i] = convolve(data[i], kernel, boundary='extend')
             qmask = np.isnan(data[i])
