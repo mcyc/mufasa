@@ -232,6 +232,12 @@ class UltraCube(object):
     def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
         return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
+    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True):
+        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask)
+
+    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk10_thres=5, return_lnks=True):
+        kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=return_lnks)
+        return get_best_2c_parcube(self, **kwargs)
 
     def get_best_residual(self, cubetype=None):
         return None
@@ -444,6 +450,47 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True):
     # lnk[np.isnan(ucube.NSamp_maps[str(ncomp_A)])] = np.nan
     return lnk
 
+def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
+    if rest_model_mask:
+        ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
+
+    lnk10 = ucube.get_AICc_likelihood(1, 0)
+
+    if ncomp_max <=1:
+        return lnk10
+
+    lnk20 = ucube.get_AICc_likelihood(2, 0)
+    lnk21 = ucube.get_AICc_likelihood(2, 1)
+
+    if ncomp_max <= 2:
+        return lnk10, lnk20, lnk21
+
+    else:
+        pass
+
+def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk10_thres=5, return_lnks=True):
+    # get the best 2c model justified by AICc lnk
+
+    lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore)
+
+    parcube = copy(ucube.pcubes['2'].parcube)
+    errcube = copy(ucube.pcubes['2'].errcube)
+
+    mask = lnk21 > lnk21_thres
+    # logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
+    parcube[:4, ~mask] = copy(ucube.pcubes['1'].parcube[:4, ~mask])
+    errcube[:4, ~mask] = copy(ucube.pcubes['1'].errcube[:4, ~mask])
+    parcube[4:8, ~mask] = np.nan
+    errcube[4:8, ~mask] = np.nan
+
+    mask = lnk10 > lnk10_thres
+    parcube[:, ~mask] = np.nan
+    errcube[:, ~mask] = np.nan
+
+    if return_lnks:
+        return parcube, errcube, lnk10, lnk20, lnk21
+    else:
+        return parcube, errcube
 
 #======================================================================================================================#
 # statistics tools
