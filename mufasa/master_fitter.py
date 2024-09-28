@@ -209,7 +209,6 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     for nc in ncomp:
         pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
         if nc == 2:
-            #para_cnv = gss_rf.quick_2comp_sort(para_cnv, filtsize=3)
             # clean up the fits with lnk maps
             parcube, errcube = reg.ucube_cnv.get_best_2c_parcube(multicore=True, lnk21_thres=5, lnk10_thres=5, return_lnks=False)
             para_cnv = np.append(parcube, errcube, axis=0)
@@ -417,10 +416,6 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         #ucube.get_rss('2', mask=None, update=True)
         ucube.get_AICc(2, update=True)
         # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
-
-
-        # save the updated results
-        #save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
@@ -485,22 +480,6 @@ def save_best_2comp_fit(reg, multicore=True):
             logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
             reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
 
-    '''
-    pcube_final = deepcopy(reg_final.ucube.pcubes['2'])
-    reg_final.ucube.reset_model_mask(ncomps=[2,1], multicore=multicore)
-    lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
-    mask = lnk21 > 5
-    logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
-    pcube_final.parcube[:4, ~mask] = reg_final.ucube.pcubes['1'].parcube[:4, ~mask].copy()
-    pcube_final.errcube[:4, ~mask] = reg_final.ucube.pcubes['1'].errcube[:4, ~mask].copy()
-    pcube_final.parcube[4:8, ~mask] = np.nan
-    pcube_final.errcube[4:8, ~mask] = np.nan
-
-    lnk10 = reg_final.ucube.get_AICc_likelihood(1, 0)
-    mask = lnk10 > 5
-    pcube_final.parcube[:, ~mask] = np.nan
-    pcube_final.errcube[:, ~mask] = np.nan
-    '''
     # make the 2-comp para maps with the best fit model
     pcube_final = reg_final.ucube.pcubes['2']
     kwargs = dict(multicore=multicore, lnk21_thres=5, lnk10_thres=5, return_lnks=True)
@@ -544,7 +523,6 @@ def save_best_2comp_fit(reg, multicore=True):
     logger.info('{} saved.'.format(savename))
 
     # create and save the lnk20 map for reference:
-    lnk20 = reg_final.ucube.get_AICc_likelihood(2, 0)
     savename = make_save_name(paraRoot, paraDir, "lnk20")
     save_map(lnk20, hdr2D, savename)
     logger.info('{} saved.'.format(savename))

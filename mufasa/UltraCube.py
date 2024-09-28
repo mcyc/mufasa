@@ -183,16 +183,16 @@ class UltraCube(object):
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
-        self.rss_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
-            calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update)
+        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update)
 
         # only include pixels with samples
-        mask = self.NSamp_maps[str(ncomp)] < 1
-        self.NSamp_maps[str(ncomp)][mask] = np.nan
-
+        mask = nsamp < 1
+        nsamp[mask] = np.nan
         # only if rss value is valid
-        mask = np.logical_or(mask, self.rss_maps[str(ncomp)] <= 0)
-        self.rss_maps[str(ncomp)][mask] = np.nan
+        mask = np.logical_or(mask, rrs <= 0)
+        rrs[mask] = np.nan
+        self.rss_maps[str(ncomp)] = rrs
+        self.NSamp_maps[str(ncomp)] = nsamp
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -200,14 +200,12 @@ class UltraCube(object):
         self.Tpeak_maps[compID] = get_Tpeak(model)
         return self.Tpeak_maps[compID]
 
-
     def get_chisq(self, ncomp, mask=None):
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across
         self.chisq_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
             calc_chisq(self, ncomp, reduced=False, usemask=True, mask=mask)
-
 
     def get_reduced_chisq(self, ncomp):
         # no mask is passed insnr_mask, and thus is not meant for model comparision
@@ -407,7 +405,8 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
     # get the rss value and sample size
     rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
     # ensure AICc is only calculated where models exits
-    nmask = NSamp_map == 0
+    nmask = np.isnan(rss_map)
+    nmask = np.logical_or(NSamp_map == 0)
     NSamp_map[nmask] = np.nan
     rss_map[nmask] = np.nan
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
@@ -541,11 +540,14 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
 
     # note: using nan-sum may walk over some potential bad pixel cases
     rss = np.nansum((residual * mask)**2, axis=0)
+    rss[rss == 0] = np.nan
 
     returns = (rss,)
 
     if return_size:
-        returns += (np.nansum(mask, axis=0),)
+        nsamp = np.nansum(mask, axis=0)
+        nsamp[np.isnan(rss)] = np.nan
+        returns += (nsamp,)
     if return_mask:
         returns += mask
     return returns
