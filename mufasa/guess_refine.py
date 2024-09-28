@@ -15,14 +15,20 @@ from astropy.convolution import Gaussian2DKernel, convolve
 
 from scipy.spatial.qhull import QhullError
 
+from pyspeckit.spectrum.models.ammonia_constants import freq_dict
+from astropy import units as u
+nu0_nh3 = freq_dict['oneone'] * u.Hz
+nu0_nh3 = nu0_nh3.to("GHz").value
+
 from .utils import interpolate
+from . import moment_guess as mmg
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
 #=======================================================================================================================
 
 
-def quick_2comp_sort(data_cnv, filtsize=2, method="tautex"):
+def quick_2comp_sort(data_cnv, filtsize=2, method="tautex", nu=nu0_nh3):
     # use median filtered vlsr & sigma maps as a velocity reference to sort the two components
 
     if method == "chen2020":
@@ -57,8 +63,9 @@ def quick_2comp_sort(data_cnv, filtsize=2, method="tautex"):
         data_cnv= mask_swap_2comp(data_cnv, swapmask)
 
     elif method == "tautex":
-        Tb0_a = data_cnv[3]*data_cnv[4]
-        Tb0_b = data_cnv[6]*data_cnv[7]
+        f_tau = 0.5 # minimic the expected tau of the main hyperfines
+        Tb0_a = mmg.peakT(data_cnv[3], data_cnv[4]*f_tau, nu=nu) #data_cnv[3]*data_cnv[4]
+        Tb0_b = mmg.peakT(data_cnv[6], data_cnv[7]*f_tau, nu=nu)
         swapmask = Tb0_b > Tb0_a
         data_cnv = mask_swap_2comp(data_cnv, swapmask)
 
@@ -73,7 +80,7 @@ def mask_swap_2comp(data_cnv, swapmask):
     return data_cnv
 
 
-def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thresh=0.99):
+def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thresh=1):
     # a wrapper to make guesses based on the parameters fitted to the convolved data
     npara = 4
     ncomp = int(data_cnv.shape[0]/npara/2)
@@ -135,28 +142,29 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
     return np.array(guesses_final)
 
 
-def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0, nu=23.722634):
-    from . import moment_guess as mmg
+def tautex_renorm(taumap, texmap, tau_thresh = 0.21, tex_thresh = 15.0, nu=nu0_nh3):
 
     # attempt to re-normalize the tau & text values at the optically thin regime (where the two are degenerate)
     # note, the latest recipe also works for the optically thick regime in principle
     # only emission with lower amplitude than TA_ltau_thres and tau < tau_thin will have tex > tex_thresh recalculated
     #  (i.e., expected to be optically thin
 
+    f_tau = 0.5 # a factor to minic the effecitve tau of the main hyperfines
+
     isthin = np.logical_and(taumap < tau_thresh, np.isfinite(taumap))
-    TA_lowtau = mmg.peakT(texmap[isthin], taumap[isthin])
+    TA_lowtau = mmg.peakT(texmap[isthin], taumap[isthin]*f_tau, nu=nu)
     TA_ltau_thres = 0.5 # where tau ~1 for Tex = 3.5; tau with Ta above this diverges quickly
     # assume a fixed Tex for low TA
     tex_thin = 3.5      # note: at Tk = 30K, n = 1e3, N = 1e13, & sig = 0.2 km.s --> Tex = 3.49 K, tau = 0.8
-    tau_thin = 1.0      # where the main hyperfines of NH3 (1,1) starts to get optically thick
+    tau_thin = tau_thresh#1.0      # where the main hyperfines of NH3 (1,1) starts to get optically thick
 
     # for when tau is less than tau_thresh
-    texmap[isthin] = mmg.get_tex(TA_lowtau, tau=tau_thresh) #note: tex can be higher than at 40K at Ta~7K
+    texmap[isthin] = mmg.get_tex(TA_lowtau, tau=tau_thresh*f_tau) #note: tex can be higher than at 40K at Ta~7K
     taumap[isthin] = tau_thresh
 
     # optically thin gas are also unlikely to have high spatial density and thus high Tex
     hightex = np.logical_and(texmap > tex_thresh, np.isfinite(texmap))
-    TA_hightex = mmg.peakT(texmap[hightex], taumap[hightex])
+    TA_hightex = mmg.peakT(texmap[hightex], taumap[hightex]*f_tau, nu=nu)
     mask = TA_hightex < TA_ltau_thres # only renormalize high tex when Ta is less than the threshold
     mask = np.logical_and(mask, taumap[hightex] < tau_thin)
 
