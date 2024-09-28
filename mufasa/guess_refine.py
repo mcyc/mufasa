@@ -28,10 +28,21 @@ logger = get_logger(__name__)
 #=======================================================================================================================
 
 
-def quick_2comp_sort(data_cnv, filtsize=2, method="tautex", nu=nu0_nh3):
+def quick_2comp_sort(data_cnv, filtsize=2, method="tautex", nu=nu0_nh3, f_tau=0.5):
     # use median filtered vlsr & sigma maps as a velocity reference to sort the two components
+    # f_tau is the factor to down scale tau to minimic the effective tau of the main hyperfines
 
-    if method == "chen2020":
+    if method == "tautex":
+        # sort by the peak brigthness temperature using the tau & tax parameter
+        # the brigther component is placed as the first component (the further away from the observer)
+        Tb0_a = mmg.peakT(data_cnv[3], data_cnv[4]*f_tau, nu=nu)
+        Tb0_b = mmg.peakT(data_cnv[6], data_cnv[7]*f_tau, nu=nu)
+        swapmask = Tb0_b > Tb0_a
+        data_cnv = mask_swap_2comp(data_cnv, swapmask)
+
+    elif method == "chen2020":
+        # this is the method used by Chen+ 2020 ApJ
+
         # arange the maps so the component with the least vlsr errors is the first component
         swapmask = data_cnv[8] > data_cnv[12]
         data_cnv = mask_swap_2comp(data_cnv, swapmask)
@@ -61,13 +72,6 @@ def quick_2comp_sort(data_cnv, filtsize=2, method="tautex", nu=nu0_nh3):
         # use both the vlsr and the sigma as a distance metric
         swapmask = np.hypot(dist_va, dist_siga) > np.hypot(dist_vb, dist_sigb)
         data_cnv= mask_swap_2comp(data_cnv, swapmask)
-
-    elif method == "tautex":
-        f_tau = 0.5 # minimic the expected tau of the main hyperfines
-        Tb0_a = mmg.peakT(data_cnv[3], data_cnv[4]*f_tau, nu=nu) #data_cnv[3]*data_cnv[4]
-        Tb0_b = mmg.peakT(data_cnv[6], data_cnv[7]*f_tau, nu=nu)
-        swapmask = Tb0_b > Tb0_a
-        data_cnv = mask_swap_2comp(data_cnv, swapmask)
 
     return data_cnv
 
@@ -306,9 +310,6 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpola
         else:
             map[:] = 0.0
         return map
-
-    #kernel = Gaussian2DKernel(disksize)
-    #map = convolve(map, kernel, boundary='extend')
 
     if mask is None:
         mask = mask_finite
