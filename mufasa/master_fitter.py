@@ -208,11 +208,16 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     # use the result from the convolved cube as guesses for the full resolution fits
     for nc in ncomp:
         pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
-        para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
         if nc == 2:
-            para_cnv = gss_rf.quick_2comp_sort(para_cnv, filtsize=3)
+            #para_cnv = gss_rf.quick_2comp_sort(para_cnv, filtsize=3)
+            # clean up the fits with lnk maps
+            parcube, errcube = reg.ucube_cnv.get_best_2c_parcube(multicore=True, lnk21_thres=5, lnk10_thres=5, return_lnks=False)
+            para_cnv = np.append(parcube, errcube, axis=0)
+        else:
+            para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
 
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header)
+
         # update is set to True to save the fits
         kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min, 'multicore':multicore}
         if planemask is not None:
