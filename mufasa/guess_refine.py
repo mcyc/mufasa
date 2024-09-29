@@ -28,11 +28,16 @@ logger = get_logger(__name__)
 #=======================================================================================================================
 
 
-def quick_2comp_sort(data_cnv, filtsize=2, method="Tpeak", nu=nu0_nh3, f_tau=0.5):
+def quick_2comp_sort(data_cnv, filtsize=2, method="error_v", nu=nu0_nh3, f_tau=0.5):
     # use median filtered vlsr & sigma maps as a velocity reference to sort the two components
     # f_tau is the factor to down scale tau to minimic the effective tau of the main hyperfines
 
-    if method == "Tpeak":
+    if method == "error_v":
+        # arange the maps so the component with the least vlsr errors is the first component
+        swapmask = data_cnv[8] > data_cnv[12]
+        data_cnv = mask_swap_2comp(data_cnv, swapmask)
+
+    elif method == "Tpeak":
         # sort by the peak brigthness temperature using the tau & tax parameter
         # the brigther component is placed as the first component (the further away from the observer)
         Tb0_a = mmg.peakT(data_cnv[3], data_cnv[4]*f_tau, nu=nu)
@@ -40,8 +45,16 @@ def quick_2comp_sort(data_cnv, filtsize=2, method="Tpeak", nu=nu0_nh3, f_tau=0.5
         swapmask = Tb0_b > Tb0_a
         data_cnv = mask_swap_2comp(data_cnv, swapmask)
 
+    elif method == "tautex":
+        # sort by the relative emission brightness proxy
+        # the brigther component is placed as the first component (the further away from the observer)
+        Tb0_a = data_cnv[3]*data_cnv[4]
+        Tb0_b = data_cnv[6]*data_cnv[7]
+        swapmask = Tb0_b > Tb0_a
+        data_cnv = mask_swap_2comp(data_cnv, swapmask)
 
-    if method == "tau":
+
+    elif method == "tau":
         # placing the optically thicker component in the back (1st component)
         # would only recommend if the degeneracy between tau and tex has been somewhat addressed already
         swapmask = data_cnv[7] > data_cnv[4]
@@ -92,7 +105,7 @@ def mask_swap_2comp(data_cnv, swapmask):
     return data_cnv
 
 
-def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thresh=1, pre_clean=True):
+def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thresh=1, clean_map=True):
     # a wrapper to make guesses based on the parameters fitted to the convolved data
     npara = 4
     ncomp = int(data_cnv.shape[0]/npara/2)
@@ -104,20 +117,17 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
     else:
         std_thres = 1
 
-    if pre_clean:
+    if ncomp == 2:
+        data_cnv = quick_2comp_sort(data_cnv, filtsize=2, method="error_v")
+
+    if clean_map:
         data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara, std_thres=std_thres)
     # remove the error component
     data_cnv = data_cnv[0:npara*ncomp]
     data_cnv[data_cnv == 0] = np.nan
 
-    if ncomp == 2:
-        data_cnv = quick_2comp_sort(data_cnv, filtsize=2, method="Tpeak")
-
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask, tau_thresh=tau_thresh)
-
-    if ncomp ==2:
-        data_cnv = quick_2comp_sort(data_cnv, filtsize=2, method="tau")
 
     # regrid the guess back to that of the original data
     hdr_conv = get_celestial_hdr(header_cnv)

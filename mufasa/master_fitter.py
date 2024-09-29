@@ -213,12 +213,10 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
             parcube, errcube = reg.ucube_cnv.get_best_2c_parcube(multicore=multicore, lnk21_thres=0, lnk20_thres=0,
                                                                  lnk10_thres=-20, return_lnks=False)
             para_cnv = np.append(parcube, errcube, axis=0)
-            pre_clean = True
         else:
             para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
-            pre_clean = True
 
-        guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header, pre_clean=pre_clean)
+        guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header, clean_map=True)
 
         # update is set to True to save the fits
         kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min, 'multicore':multicore}
