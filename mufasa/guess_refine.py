@@ -6,7 +6,7 @@ import warnings
 
 from astropy.stats import mad_std
 from astropy.wcs import WCS
-from skimage.morphology import remove_small_objects, dilation, disk, remove_small_holes
+from skimage.morphology import remove_small_objects, binary_dilation, disk, remove_small_holes
 from scipy.ndimage.filters import median_filter
 from scipy.interpolate import CloughTocher2DInterpolator as intp
 from scipy.interpolate import griddata
@@ -28,17 +28,25 @@ logger = get_logger(__name__)
 #=======================================================================================================================
 
 
-def quick_2comp_sort(data_cnv, filtsize=2, method="tautex", nu=nu0_nh3, f_tau=0.5):
+def quick_2comp_sort(data_cnv, filtsize=2, method="Tpeak", nu=nu0_nh3, f_tau=0.5):
     # use median filtered vlsr & sigma maps as a velocity reference to sort the two components
     # f_tau is the factor to down scale tau to minimic the effective tau of the main hyperfines
 
-    if method == "tautex":
+    if method == "Tpeak":
         # sort by the peak brigthness temperature using the tau & tax parameter
         # the brigther component is placed as the first component (the further away from the observer)
         Tb0_a = mmg.peakT(data_cnv[3], data_cnv[4]*f_tau, nu=nu)
         Tb0_b = mmg.peakT(data_cnv[6], data_cnv[7]*f_tau, nu=nu)
         swapmask = Tb0_b > Tb0_a
         data_cnv = mask_swap_2comp(data_cnv, swapmask)
+
+
+    if method == "tau":
+        # placing the optically thicker component in the back (1st component)
+        # would only recommend if the degeneracy between tau and tex has been somewhat addressed already
+        swapmask = data_cnv[7] > data_cnv[4]
+        data_cnv = mask_swap_2comp(data_cnv, swapmask)
+
 
     elif method == "chen2020":
         # this is the method used by Chen+ 2020 ApJ
@@ -84,7 +92,7 @@ def mask_swap_2comp(data_cnv, swapmask):
     return data_cnv
 
 
-def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thresh=1):
+def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thresh=1, pre_clean=True):
     # a wrapper to make guesses based on the parameters fitted to the convolved data
     npara = 4
     ncomp = int(data_cnv.shape[0]/npara/2)
@@ -95,16 +103,21 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
         std_thres = 3
     else:
         std_thres = 1
-    data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara, std_thres=std_thres)
+
+    if pre_clean:
+        data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara, std_thres=std_thres)
     # remove the error component
     data_cnv = data_cnv[0:npara*ncomp]
     data_cnv[data_cnv == 0] = np.nan
 
     if ncomp == 2:
-        data_cnv = quick_2comp_sort(data_cnv, filtsize=2, method="tautex")
+        data_cnv = quick_2comp_sort(data_cnv, filtsize=2, method="Tpeak")
 
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask, tau_thresh=tau_thresh)
+
+    if ncomp ==2:
+        data_cnv = quick_2comp_sort(data_cnv, filtsize=2, method="tau")
 
     # regrid the guess back to that of the original data
     hdr_conv = get_celestial_hdr(header_cnv)
@@ -114,6 +127,11 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
 
     newmask = np.any(np.isfinite(data_cnv), axis=0)
     newmask = remove_small_holes(newmask, 25)
+
+    # expand the interpolation a bit, since regridding can often miss some pixels due to aliasing
+    #newmask_l = binary_dilation(newmask, disk(3))
+    #newmask_l = regrid(newmask_l, hdr_conv, hdr_final, dmask=None)
+
 
     # regrid the guesses
     for gss in data_cnv:
@@ -128,8 +146,8 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
             new_guess = regrid(gss, hdr_conv, hdr_final, dmask=newmask)
 
             # expand the interpolation a bit, since regridding can often miss some pixels due to aliasing
-            newmask_l = dilation(newmask)
-            newmask_l = dilation(newmask_l)
+            newmask_l = binary_dilation(newmask)
+            newmask_l = binary_dilation(newmask_l)
 
             kernel = Gaussian2DKernel(1)
             new_guess_cnv = convolve(new_guess, kernel, boundary='extend')
@@ -140,6 +158,11 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
         else:
             new_guess_cnv = interpolate.iter_expand(gss, mask=newmask)
             new_guess_cnv = regrid(new_guess_cnv, hdr_conv, hdr_final, dmask=None)
+
+            # insure the footprint wasn't made smaller due to regriding
+            mask_l = np.isfinite(new_guess_cnv)
+            mask_l = binary_dilation(mask_l, disk(2))
+            new_guess_cnv = interpolate.iter_expand(new_guess_cnv, mask=mask_l)
 
         guesses_final.append(new_guess_cnv)
 
@@ -259,7 +282,7 @@ def master_mask(pcube):
 def mask_cleaning(mask):
     # designed to clean a noisy map, with a footprint that is likely slightly larger
     #mask = remove_small_objects(mask, min_size=9) #pending investigation before removed permantly
-    mask = dilation(mask, disk(1))
+    mask = binary_dilation(mask, disk(1))
     mask = remove_small_holes(mask, 9)
     return mask
 

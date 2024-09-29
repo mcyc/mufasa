@@ -233,8 +233,9 @@ class UltraCube(object):
     def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True):
         return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask)
 
-    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk10_thres=5, return_lnks=True):
-        kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=return_lnks)
+    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True):
+        kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk20_thres=lnk20_thres,
+                      lnk10_thres=lnk10_thres, return_lnks=return_lnks)
         return get_best_2c_parcube(self, **kwargs)
 
     def get_best_residual(self, cubetype=None):
@@ -405,10 +406,10 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
     # get the rss value and sample size
     rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
     # ensure AICc is only calculated where models exits
-    nmask = np.isnan(rss_map)
-    nmask = np.logical_or(NSamp_map == 0)
-    NSamp_map[nmask] = np.nan
-    rss_map[nmask] = np.nan
+    #nmask = np.isnan(rss_map)
+    #nmask = np.logical_or(NSamp_map == 0)
+    #NSamp_map[nmask] = np.nan
+    #rss_map[nmask] = np.nan
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
@@ -467,7 +468,7 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
     else:
         pass
 
-def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk10_thres=5, return_lnks=True):
+def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True, include_1c=True):
     # get the best 2c model justified by AICc lnk
 
     lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore)
@@ -475,12 +476,17 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk10_thres=5, ret
     parcube = copy(ucube.pcubes['2'].parcube)
     errcube = copy(ucube.pcubes['2'].errcube)
 
-    mask = lnk21 > lnk21_thres
+    mask = np.logical_and(lnk21 > lnk21_thres, lnk20 > lnk20_thres)
     # logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
-    parcube[:4, ~mask] = copy(ucube.pcubes['1'].parcube[:4, ~mask])
-    errcube[:4, ~mask] = copy(ucube.pcubes['1'].errcube[:4, ~mask])
-    parcube[4:8, ~mask] = np.nan
-    errcube[4:8, ~mask] = np.nan
+    if include_1c:
+        parcube[:4, ~mask] = copy(ucube.pcubes['1'].parcube[:4, ~mask])
+        errcube[:4, ~mask] = copy(ucube.pcubes['1'].errcube[:4, ~mask])
+        parcube[4:8, ~mask] = np.nan
+        errcube[4:8, ~mask] = np.nan
+
+    else:
+        parcube[:, ~mask] = np.nan
+        errcube[:, ~mask] = np.nan
 
     mask = lnk10 > lnk10_thres
     parcube[:, ~mask] = np.nan
