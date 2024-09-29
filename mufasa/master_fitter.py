@@ -242,7 +242,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
 
     from astropy.convolution import Gaussian2DKernel, convolve
 
-    logger.info("begin re-fitting bad 2-comp pixels")
+    logger.info("Begin re-fitting bad 2-comp pixels")
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
@@ -254,7 +254,11 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
     mask = np.logical_and(mask, np.isfinite(lnk10))
     mask_size = np.sum(mask)
-    logger.debug("refit mask size for bad_2comp: {}".format(mask_size))
+    if mask_size > 0:
+        logger.info("Attempting to refit over {} pixels to recover bad 2-comp. fits".format(mask_size))
+    else:
+        logger.info("No pixel was used in attempt to recover bad 2-comp. fits")
+        pass
 
     guesses = copy(ucube.pcubes['2'].parcube)
     guesses[guesses==0] = np.nan
@@ -356,14 +360,6 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         # set lnk21 to None, so refit doesn't care about wether or not the one-componet fit is good or not
         lnk21 = None
 
-    mask_size = np.sum(mask)
-    logger.debug("wide recovery refit mask size: {}".format(mask_size))
-
-
-    if mask_size ==0:
-        logger.debug("no pixels in the recovery mask, no fit is performed")
-        return None
-
     if method == 'residual':
         logger.debug("recovering second component from residual")
         wide_comp_guess = get_2comp_wide_guesses(reg)
@@ -385,7 +381,11 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         raise Exception("the following method specified is invalid: {}".format(method))
 
     mask_size = np.sum(mask)
-    logger.debug("final wide recovery refit mask size: {}".format(mask_size))
+    if mask_size > 0:
+        logger.info("Attempting wide recovery over {} pixels".format(mask_size))
+    else:
+        logger.info("No pixel was used in attempt to recover wide component")
+        pass
 
     replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit, multicore=multicore)
 
