@@ -247,11 +247,13 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     logger.debug(f'Using {multicore} cores.')
 
     ucube.reset_model_mask(ncomps=[1,2], multicore=True)
-    lnk21 = ucube.get_AICc_likelihood(2, 1)
-    lnk10 = ucube.get_AICc_likelihood(1, 0)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
+    #lnk21 = ucube.get_AICc_likelihood(2, 1)
+    #lnk10 = ucube.get_AICc_likelihood(1, 0)
 
     # where the fits are poor
     mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
+    mask = np.logical_or(mask, lnk20 < 5)
     mask = np.logical_and(mask, np.isfinite(lnk10))
     mask_size = np.sum(mask)
     if mask_size > 0:
@@ -424,15 +426,16 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
+        # ensure model mask is reset to make sure AICc calculation aren't effected down the line
         ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
         #ucube.get_rss('2', mask=None, update=True)
         #ucube.get_AICc(2, update=True)
-        # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
+        # replace_pixels(ucube, ucube_new, ncomp='2', mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
      
-def replace_pixesl(ucube, ucube_ref, ncomp, mask):
+def replace_pixels(ucube, ucube_ref, ncomp, mask):
 
     attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
     for attr in attrs:
@@ -783,9 +786,7 @@ def get_best_2comp_snr_mod(reg):
 
 def get_best_2comp_model(reg):
     # get the log-likelihood between the fits
-    lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
-    lnk20 = reg.ucube.get_AICc_likelihood(2, 0)
-    lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
 
     mod1 = reg.ucube.pcubes['1'].get_modelcube()
     mod2 = reg.ucube.pcubes['2'].get_modelcube()
