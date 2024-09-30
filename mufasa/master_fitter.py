@@ -193,7 +193,7 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     return reg
 
 
-def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True):
+def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False):
     proc_name = 'iter_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
 
@@ -203,16 +203,25 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     ncomp = [1,2] # ensure this is a two component fitting method
 
     # convolve the cube and fit it
-    get_convolved_fits(reg, ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
+    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
 
     # use the result from the convolved cube as guesses for the full resolution fits
     for nc in ncomp:
         pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
-        para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
-        if nc == 2:
-            para_cnv = gss_rf.quick_2comp_sort(para_cnv, filtsize=3)
+        if nc == 2 and use_cnv_lnk:
+            # clean up the fits with lnk maps
+            parcube, errcube, lnk10, lnk20, lnk21 =\
+                reg.ucube_cnv.get_best_2c_parcube(multicore=multicore, lnk21_thres=5, lnk20_thres=5,
+                                                  lnk10_thres=-20, return_lnks=True)
+            para_cnv = np.append(parcube, errcube, axis=0)
+            clean_map = False
+        else:
+            para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
+            clean_map = True
 
-        guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header)
+        guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header,
+                                            clean_map=clean_map, tau_thresh=1)
+
         # update is set to True to save the fits
         kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min, 'multicore':multicore}
         if planemask is not None:
@@ -412,10 +421,6 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         #ucube.get_rss('2', mask=None, update=True)
         ucube.get_AICc(2, update=True)
         # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
-
-
-        # save the updated results
-        #save_updated_paramaps(ucube, ncomps=[2, 1])
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
@@ -480,22 +485,12 @@ def save_best_2comp_fit(reg, multicore=True):
             logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
             reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
 
-    pcube_final = reg_final.ucube.pcubes['2'].copy('deep')
-
     # make the 2-comp para maps with the best fit model
-    reg_final.ucube.reset_model_mask(ncomps=[2,1], multicore=multicore)
-    lnk21 = reg_final.ucube.get_AICc_likelihood(2, 1)
-    mask = lnk21 > 5
-    logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
-    pcube_final.parcube[:4, ~mask] = reg_final.ucube.pcubes['1'].parcube[:4, ~mask].copy()
-    pcube_final.errcube[:4, ~mask] = reg_final.ucube.pcubes['1'].errcube[:4, ~mask].copy()
-    pcube_final.parcube[4:8, ~mask] = np.nan
-    pcube_final.errcube[4:8, ~mask] = np.nan
-
-    lnk10 = reg_final.ucube.get_AICc_likelihood(1, 0)
-    mask = lnk10 > 5
-    pcube_final.parcube[:, ~mask] = np.nan
-    pcube_final.errcube[:, ~mask] = np.nan
+    pcube_final = reg_final.ucube.pcubes['2']
+    kwargs = dict(multicore=multicore, lnk21_thres=5, lnk10_thres=5, return_lnks=True)
+    parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
+    pcube_final.parcube = parcube
+    pcube_final.errcube = errcube
 
     # use the default file formate to save the finals
     nc = 2
@@ -533,7 +528,6 @@ def save_best_2comp_fit(reg, multicore=True):
     logger.info('{} saved.'.format(savename))
 
     # create and save the lnk20 map for reference:
-    lnk20 = reg_final.ucube.get_AICc_likelihood(2, 0)
     savename = make_save_name(paraRoot, paraDir, "lnk20")
     save_map(lnk20, hdr2D, savename)
     logger.info('{} saved.'.format(savename))
