@@ -246,8 +246,8 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
-    ucube.reset_model_mask(ncomps=[1,2], multicore=True)
-    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
+    #ucube.reset_model_mask(ncomps=[1,2], multicore=True)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True, multicore=multicore)
     #lnk21 = ucube.get_AICc_likelihood(2, 1)
     #lnk10 = ucube.get_AICc_likelihood(1, 0)
 
@@ -361,7 +361,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
 
         if planemask is None:
-            mask10 = lnk10 < 5
+            mask10 = lnk10 > 5
             mask = np.logical_and(lnk21 < -5, lnk10 > 5)
         else:
             mask10 = planemask
@@ -369,10 +369,12 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
         c1_guess = copy(reg.ucube.pcubes['1'].parcube)
-        c1_guess[:, mask10] = np.nan
+        #c1_guess[:, ~mask10] = np.nan
         c1_guess = gss_rf.refine_each_comp(c1_guess)
 
         wide_comp_guess = get_2comp_wide_guesses(reg)
+        # reduce the linewidth guess to avoid overestimation
+        #wide_comp_guess[1] = wide_comp_guess[1] / 2
         wide_comp_guess[:, ~mask] = np.nan
 
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
@@ -423,26 +425,24 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         else:
             good_mask = np.logical_and(lnk_NvsO > 0, mask)
 
-        logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
+        logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
         # ensure model mask is reset to make sure AICc calculation aren't effected down the line
-        ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
         #ucube.get_rss('2', mask=None, update=True)
+        #ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
         #ucube.get_AICc(2, update=True)
-        # replace_pixels(ucube, ucube_new, ncomp='2', mask=good_mask)
+        #replace_pixels(ucube, ucube_new, ncomp='2', mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
      
 def replace_pixels(ucube, ucube_ref, ncomp, mask):
 
-    attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
+    attrs = ['rss_maps', 'NSamp_maps', 'AICc_maps']
     for attr in attrs:
-        data = getattr(ucube, attr)[ncomp]
         try:
-            data_rep = getattr(ucube_ref, attr)[ncomp]
-            data[mask] = copy(data_rep[mask])
+            getattr(ucube, attr)[ncomp][mask] = copy(getattr(ucube_ref, attr)[ncomp][mask])
         except KeyError:
             logger.debug("{} does not have the following key: {}".format(attr, ncomp))
 
@@ -816,7 +816,13 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
     pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
 
+
+
     #pcube._modelcube = pcube.get_modelcube(update=True, multicore=multicore)
+    #multicore = validate_n_cores(multicore)
+    #newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
+    #pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
+
 
 
 def get_skyheader(cube_header):
