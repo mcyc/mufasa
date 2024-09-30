@@ -19,8 +19,12 @@ from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
 from . import moment_guess as momgue
+from . import guess_refine as g_refine
 from .utils.multicore import validate_n_cores
+from .utils import interpolate
+
 #=======================================================================================================================
+
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
 
@@ -361,6 +365,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         return (planemask)
 
     if 'maskmap' in kwargs:
+        logger.debug("using user specified mask as a base")
         planemask = kwargs['maskmap']
     elif mask_function is None:
         planemask = default_masking(peaksnr, snr_min=snr_min)
@@ -456,8 +461,39 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     logger.debug("median velocity: {:3f}".format(v_median))
 
-    # remove the nana values to allow np.nanargmax(m0) to operate smoothly
-    m0[np.isnan(m0)] = 0.0 # I'm not sure if this is a good way to get around the sum vs nansum issue
+    # use the median value of the mom0 pixels with snr < 3 as an estimation for the mom0 baseline
+    # this will be used for moment guesses
+    try:
+        fmask = peaksnr < 3
+        if np.sum(fmask*np.isfinite(m0)) > 3:
+            mom0_floor = np.nanmedian(m0[fmask])
+        else:
+            mom0_floor = np.nanmin(m0)
+            if mom0_floor < 0:
+                mom0_floor = None
+    except:
+        mom0_floor = None
+
+    # quality control - remove pixels with mom0 that seems to be below the rms threshold
+    def q_mask(m0):
+        # estimate the noise level, starting with pixels with peaksnr < 3
+        qmask = np.logical_and(np.isfinite(m0), peaksnr < 3)
+        #qmask = np.isfinite(m0)
+        std_m0 = mad_std(m0[qmask])
+        # estimate again with the signals "removed"
+        qmask = np.logical_or(qmask, m0 > std_m0)
+        std_m0 = mad_std(m0[qmask])
+        return m0 < std_m0
+
+    qmask = q_mask(m0)
+    # make sure we don't remove pixles with snr > 10
+    qmask = np.logical_and(qmask, peaksnr < 10)
+
+    if np.sum(np.logical_and(~qmask, footprint_mask)) > 25:
+        # only apply the quality cut if there are more than 25 pixels remaining
+        m0[qmask] = np.nan
+        m1[qmask] = np.nan
+        m2[qmask] = np.nan
 
     # define acceptable v range based on the provided or determined median velocity
     vmax = v_median + v_peak_hwidth
@@ -470,17 +506,15 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     if v_1p - sigmax < vmin:
         vmin = v_1p - sigmax
 
+    mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask * footprint_mask)
+    m0, m1, m2 = mmm[0], mmm[1], mmm[2]
+
     logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
 
-    # find the location of the peak signal (to determine the first pixel to fit if nearest neighbour method is used)
-    if "start_from_point" not in kwargs:
-        peakloc = np.nanargmax(m0)
-        ymax, xmax = np.unravel_index(peakloc, m0.shape)
-        kwargs['start_from_point'] = (xmax, ymax)
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
-    gg = momgue.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0, linetype=mod_info.linetype)
+    gg = momgue.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0, linetype=mod_info.linetype, mom0_floor=mom0_floor)
 
     if guesses is None:
         guesses = gg
@@ -512,6 +546,9 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         logger.debug("provided guesses accepted")
 
+    # re-normalize the degenerated tau & text for the purpose of estimate guesses
+    guesses[3::4], guesses[2::4] = g_refine.tautex_renorm(guesses[3::4], guesses[2::4], tau_thresh=taumin,
+                                                          nu=mod_info.rest_value.to("GHz").value)
 
     # The guesses should be fine in the first case, but just in case, make sure the guesses are confined within the
     # appropriate limits
@@ -553,11 +590,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         kwargs['signal_cut'] = 2 # Note: cubefit_simp has this as 0
 
     # Now fit the cube. (Note: the function inputs are consistent with GAS DR1 whenever possible)
-
-    # use SNR masking if not provided
-    if not 'maskmap' in kwargs:
-        logger.debug("mask not included in kwargs, generating mask")
-        kwargs['maskmap'] = planemask * footprint_mask
+    kwargs['maskmap'] = planemask * footprint_mask
 
     if np.sum(kwargs['maskmap']) < 1:
         logger.warning("maskmap has no pixels, no fitting will be performed")
@@ -569,6 +602,11 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     multicore = validate_n_cores(multicore)
 
     kwargs = set_pyspeckit_verbosity(**kwargs)
+
+    #get the start point
+    if "start_from_point" in kwargs:
+        logger.warning("user start point will not be used")
+    kwargs['start_from_point'] = get_start_point(kwargs['maskmap'])
 
     pcube.fiteach (fittype=fittype, guesses=guesses,
                   use_neighbor_as_guess=False,
@@ -653,4 +691,10 @@ def get_vstats(velocities, signal_mask=None):
     v_99p = np.percentile(m1_good, 99)
     v_1p = np.percentile(m1_good, 1)
     return v_median, v_99p, v_1p
+
+def get_start_point(maskmap):
+    indx_g = np.argwhere(maskmap)
+    start_from_point = (indx_g[0,1], indx_g[0,0])
+    logger.info("starting point: {}".format(start_from_point))
+    return start_from_point
 

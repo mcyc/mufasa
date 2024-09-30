@@ -183,16 +183,16 @@ class UltraCube(object):
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
-        self.rss_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
-            calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update)
+        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update)
 
         # only include pixels with samples
-        mask = self.NSamp_maps[str(ncomp)] < 1
-        self.NSamp_maps[str(ncomp)][mask] = np.nan
-
+        mask = nsamp < 1
+        nsamp[mask] = np.nan
         # only if rss value is valid
-        mask = np.logical_or(mask, self.rss_maps[str(ncomp)] <= 0)
-        self.rss_maps[str(ncomp)][mask] = np.nan
+        mask = np.logical_or(mask, rrs <= 0)
+        rrs[mask] = np.nan
+        self.rss_maps[str(ncomp)] = rrs
+        self.NSamp_maps[str(ncomp)] = nsamp
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -200,14 +200,12 @@ class UltraCube(object):
         self.Tpeak_maps[compID] = get_Tpeak(model)
         return self.Tpeak_maps[compID]
 
-
     def get_chisq(self, ncomp, mask=None):
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across
         self.chisq_maps[str(ncomp)], self.NSamp_maps[str(ncomp)] = \
             calc_chisq(self, ncomp, reduced=False, usemask=True, mask=mask)
-
 
     def get_reduced_chisq(self, ncomp):
         # no mask is passed insnr_mask, and thus is not meant for model comparision
@@ -232,6 +230,13 @@ class UltraCube(object):
     def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
         return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
+    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True):
+        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask)
+
+    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True):
+        kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk20_thres=lnk20_thres,
+                      lnk10_thres=lnk10_thres, return_lnks=return_lnks)
+        return get_best_2c_parcube(self, **kwargs)
 
     def get_best_residual(self, cubetype=None):
         return None
@@ -401,9 +406,10 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
     # get the rss value and sample size
     rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
     # ensure AICc is only calculated where models exits
-    nmask = NSamp_map == 0
-    NSamp_map[nmask] = np.nan
-    rss_map[nmask] = np.nan
+    #nmask = np.isnan(rss_map)
+    #nmask = np.logical_or(NSamp_map == 0)
+    #NSamp_map[nmask] = np.nan
+    #rss_map[nmask] = np.nan
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
@@ -444,6 +450,52 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True):
     # lnk[np.isnan(ucube.NSamp_maps[str(ncomp_A)])] = np.nan
     return lnk
 
+def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
+    if rest_model_mask:
+        ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
+
+    lnk10 = ucube.get_AICc_likelihood(1, 0)
+
+    if ncomp_max <=1:
+        return lnk10
+
+    lnk20 = ucube.get_AICc_likelihood(2, 0)
+    lnk21 = ucube.get_AICc_likelihood(2, 1)
+
+    if ncomp_max <= 2:
+        return lnk10, lnk20, lnk21
+
+    else:
+        pass
+
+def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True, include_1c=True):
+    # get the best 2c model justified by AICc lnk
+
+    lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore)
+
+    parcube = copy(ucube.pcubes['2'].parcube)
+    errcube = copy(ucube.pcubes['2'].errcube)
+
+    mask = np.logical_and(lnk21 > lnk21_thres, lnk20 > lnk20_thres)
+    # logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
+    if include_1c:
+        parcube[:4, ~mask] = copy(ucube.pcubes['1'].parcube[:4, ~mask])
+        errcube[:4, ~mask] = copy(ucube.pcubes['1'].errcube[:4, ~mask])
+        parcube[4:8, ~mask] = np.nan
+        errcube[4:8, ~mask] = np.nan
+
+    else:
+        parcube[:, ~mask] = np.nan
+        errcube[:, ~mask] = np.nan
+
+    mask = lnk10 > lnk10_thres
+    parcube[:, ~mask] = np.nan
+    errcube[:, ~mask] = np.nan
+
+    if return_lnks:
+        return parcube, errcube, lnk10, lnk20, lnk21
+    else:
+        return parcube, errcube
 
 #======================================================================================================================#
 # statistics tools
@@ -494,11 +546,14 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
 
     # note: using nan-sum may walk over some potential bad pixel cases
     rss = np.nansum((residual * mask)**2, axis=0)
+    rss[rss == 0] = np.nan
 
     returns = (rss,)
 
     if return_size:
-        returns += (np.nansum(mask, axis=0),)
+        nsamp = np.nansum(mask, axis=0)
+        nsamp[np.isnan(rss)] = np.nan
+        returns += (nsamp,)
     if return_mask:
         returns += mask
     return returns
