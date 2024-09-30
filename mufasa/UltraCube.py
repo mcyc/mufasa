@@ -133,10 +133,14 @@ class UltraCube(object):
     def reset_model_mask(self, ncomps, multicore=True):
         #reset and re-generate master_model_mask for all the components in ncomps
         self.master_model_mask = None
+        self.rss_maps = {}
+        self.NSamp_maps = {}
+        self.AICc_maps = {}
         for nc in ncomps:
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                #self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
@@ -215,11 +219,11 @@ class UltraCube(object):
         return self.rchisq_maps[compID]
 
 
-    def get_AICc(self, ncomp, update=True, **kwargs):
+    def get_AICc(self, ncomp, update=False, **kwargs):
         # recalculate AICc fresh if update is True
+        compID = str(ncomp)
         if update or not compID in self.AICc_maps:
             # start the calculation fresh
-            compID = str(ncomp)
             # note that zero component is assumed to have no free-parameter (i.e., no fitting)
             p = ncomp * 4
             self.get_rss(ncomp, update=update, **kwargs)
@@ -230,8 +234,8 @@ class UltraCube(object):
     def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
         return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
-    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True):
-        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask)
+    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True, multicore=True):
+        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask, multicore=multicore)
 
     def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True):
         kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk20_thres=lnk20_thres,
@@ -364,8 +368,9 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
-        modcube = ucube.pcubes[compID]._modelcube
+        #ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
+        #modcube = ucube.pcubes[compID]._modelcube
+        modcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
 
     gc.collect()
     return get_rss(cube, modcube, expand=20, usemask=usemask, mask=mask, return_size=return_size)
@@ -410,6 +415,8 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
     #nmask = np.logical_or(NSamp_map == 0)
     #NSamp_map[nmask] = np.nan
     #rss_map[nmask] = np.nan
+    #ucube.rss_maps[str(ncomp)] = rss_map
+    #ucube.NSamp_maps[str(ncomp)] = NSamp_map
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
@@ -454,15 +461,14 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
     if rest_model_mask:
         ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
 
-    lnk10 = ucube.get_AICc_likelihood(1, 0)
-
     if ncomp_max <=1:
+        lnk10 = ucube.get_AICc_likelihood(1, 0)
         return lnk10
 
-    lnk20 = ucube.get_AICc_likelihood(2, 0)
-    lnk21 = ucube.get_AICc_likelihood(2, 1)
-
     if ncomp_max <= 2:
+        lnk21 = ucube.get_AICc_likelihood(2, 1)
+        lnk20 = ucube.get_AICc_likelihood(2, 0)
+        lnk10 = ucube.get_AICc_likelihood(1, 0)
         return lnk10, lnk20, lnk21
 
     else:
