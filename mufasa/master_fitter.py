@@ -296,7 +296,7 @@ def refit_swap_2comp(reg, snr_min=3):
     gc.collect()
 
     # swap the parameter of the two slabs and use it as the initial guesses
-    guesses = reg.ucube.pcubes['2'].parcube.copy()
+    guesses = copy(reg.ucube.pcubes['2'].parcube)
 
     for i in range(4):
         guesses[i], guesses[i+4] = guesses[i+4], guesses[i]
@@ -345,28 +345,33 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
             else:
                 reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype, multicore=multicore)
 
-    if planemask is None:
-        # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
-        # a second componet that is found in wide seperation)
-        lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
-        mask = lnk21 < 5
-        mask = binary_dilation(mask)
-
-        # combine the mask with where 1 component model is better fitted than the noise to save some computational time
-        lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
-        mask = np.logical_and(mask, lnk10 > 5)
-
-    else:
-        mask = planemask
-        # set lnk21 to None, so refit doesn't care about wether or not the one-componet fit is good or not
-        lnk21 = None
-
     if method == 'residual':
         logger.debug("recovering second component from residual")
-        wide_comp_guess = get_2comp_wide_guesses(reg)
+        # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
+        # a second componet that is found in wide seperation)
+        #lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
+        #mask = lnk21 < 5
+        #mask = binary_dilation(mask)
+
+        # combine the mask with where 1 component model is better fitted than the noise to save some computational time
+        #lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
+        #mask = np.logical_and(mask, lnk10 > 5)
+        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
+
+        if planemask is None:
+            mask10 = lnk10 < 5
+            mask = np.logical_and(lnk21 < -5, lnk10 > 5)
+        else:
+            mask10 = planemask
+            mask = planemask
+
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
-        c1_guess = reg.ucube.pcubes['1'].parcube
+        c1_guess = copy(reg.ucube.pcubes['1'].parcube)
+        c1_guess[:, mask10] = np.nan
         c1_guess = gss_rf.refine_each_comp(c1_guess)
+
+        wide_comp_guess = get_2comp_wide_guesses(reg)
+        wide_comp_guess[:, ~mask] = np.nan
 
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
         mask = np.logical_and(mask, np.all(np.isfinite(final_guess), axis=0))
@@ -388,7 +393,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         logger.info("No pixel was used in attempt to recover wide component")
         pass
 
-    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit, multicore=multicore)
+    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21=None, simpfit=simpfit, multicore=multicore)
 
     reg.log_progress(process_name=proc_name, mark_start=False)
 
@@ -419,8 +424,9 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
+        ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
         #ucube.get_rss('2', mask=None, update=True)
-        ucube.get_AICc(2, update=True)
+        #ucube.get_AICc(2, update=True)
         # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
@@ -433,7 +439,7 @@ def replace_pixesl(ucube, ucube_ref, ncomp, mask):
         data = getattr(ucube, attr)[ncomp]
         try:
             data_rep = getattr(ucube_ref, attr)[ncomp]
-            data[mask] = data_rep[mask].copy()
+            data[mask] = copy(data_rep[mask])
         except KeyError:
             logger.debug("{} does not have the following key: {}".format(attr, ncomp))
 
@@ -541,8 +547,8 @@ def save_best_2comp_fit(reg, multicore=True):
 
     # create moment0 map
     modbest = get_best_2comp_model(reg_final)
-    cube_mod = SpectralCube(data=modbest, wcs=reg_final.ucube.pcubes['2'].wcs.copy(),
-                            header=reg_final.ucube.pcubes['2'].header.copy())
+    cube_mod = SpectralCube(data=modbest, wcs=copy(reg_final.ucube.pcubes['2'].wcs),
+                            header=copy(reg_final.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
     mom0_mod = cube_mod.moment0()
@@ -629,7 +635,7 @@ def get_2comp_wide_guesses(reg):
             logger.info("number of good fits to convolved residual: {}".format(np.sum(aic1v0_mask)))
             # if there are at least one well fitted pixel to the residual
             data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
-            preguess = data_cnv.copy()
+            preguess = copy(data_cnv)
 
             # set pixels that are better modelled as noise to nan
             preguess[:, ~aic1v0_mask] = np.nan
@@ -723,8 +729,8 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
 
     res_cube = get_best_2comp_residual(reg)
     best_res = res_cube._data
-    cube_res = SpectralCube(data=best_res, wcs=reg.ucube.pcubes['2'].wcs.copy(),
-                            header=reg.ucube.pcubes['2'].header.copy())
+    cube_res = SpectralCube(data=best_res, wcs=copy(reg.ucube.pcubes['2'].wcs),
+                            header=copy(reg.ucube.pcubes['2'].header))
 
     if masked and res_snr_cut > 0:
         best_rms = UCube.get_rms(res_cube._data)
@@ -785,7 +791,7 @@ def get_best_2comp_model(reg):
     mod2 = reg.ucube.pcubes['2'].get_modelcube()
 
     # get the best model based on the calculated likelihood
-    modbest = mod1.copy()
+    modbest = copy(mod1)
     modbest[:] = 0.0
 
     mask = lnk10 > 5
@@ -799,7 +805,6 @@ def get_best_2comp_model(reg):
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
-    from copy import deepcopy
 
     # replace values in masked pixels with the reference values
     pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
