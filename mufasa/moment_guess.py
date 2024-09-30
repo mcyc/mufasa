@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 
 class LineSetup(object):
-    def __init__(self, linetype='nh3'):
+    def __init__(self, linetype='nh3', new_recipe=True):
 
         if linetype is 'nh3':
             from pyspeckit.spectrum.models.ammonia_constants import voff_lines_dict
@@ -28,10 +28,17 @@ class LineSetup(object):
 
             # define max and min values of tex and tau to use for the test
             # a spectrum with tex and tau values both below the specified minima has an intensity below the expected GAS rms
-            self.tex_max = 8.0
-            self.tau_max = 1.0
-            self.tex_min = 3.1
-            self.tau_min = 0.3
+
+            if new_recipe:
+                self.tex_max = 8.0
+                self.tau_max = 5.0
+                self.tex_min = 3.0
+                self.tau_min = 0.1
+            else:
+                self.tex_max = 8.0
+                self.tau_max = 1.0
+                self.tex_min = 3.1
+                self.tau_min = 0.3
 
         elif linetype is 'n2hp':
             '''
@@ -42,10 +49,16 @@ class LineSetup(object):
             voff = voff_lines_dict['onezero']
 
             # define max and min values of tex and tau to use for the test
-            self.tex_max = 8.0
-            self.tau_max = 1.0
-            self.tex_min = 3.1
-            self.tau_min = 0.3
+            if new_recipe:
+                self.tex_max = 8.0
+                self.tau_max = 5.0
+                self.tex_min = 3.0
+                self.tau_min = 0.1
+            else:
+                self.tex_max = 8.0
+                self.tau_max = 1.0
+                self.tex_min = 3.1
+                self.tau_min = 0.3
         else:
             raise Exception("{} is an invalid linetype".format(linetype))
 
@@ -299,7 +312,7 @@ def noisemask_moment(sp, m1, m2, mask_sigma=4, noise_rms = None, **kwargs):
     return window_moments(sp_m, **kwargs)
 
 
-def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None, linetype='nh3'):
+def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None, linetype='nh3', mom0_floor=None):
     '''
     Make reasonable guesses for the multiple component fits
     :param moment1:
@@ -326,9 +339,14 @@ def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_gues
         norm_ref = 99.73
         mom0high = np.percentile(moment0[np.isfinite(moment0)], norm_ref)
         # may want to modify this normalization to be something a little simpler or physical (i.e., 99.73/100 ~ 1)
-        m0Norm = moment0.copy()*norm_ref/100.0/mom0high
-        tex_guess = m0Norm*tex_max
-        tau_guess = m0Norm*tau_max
+        if mom0_floor is None:
+            m0Norm = moment0.copy()*norm_ref/100.0/mom0high
+            tex_guess = m0Norm*tex_max
+            tau_guess = m0Norm*tau_max
+        else:
+            m0Norm = moment0.copy() * norm_ref / 100.0 / (mom0high - mom0_floor)
+            tex_guess = m0Norm * (tex_max - tex_min) + tex_min
+            tau_guess = m0Norm * (tau_max - tau_min) + tau_min
 
     m1 = moment1
     m2 = moment2
