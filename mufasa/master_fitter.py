@@ -246,8 +246,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
-    #ucube.reset_model_mask(ncomps=[1,2], multicore=True)
-    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True, multicore=multicore)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False, multicore=multicore)
     #lnk21 = ucube.get_AICc_likelihood(2, 1)
     #lnk10 = ucube.get_AICc_likelihood(1, 0)
 
@@ -351,14 +350,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         logger.debug("recovering second component from residual")
         # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
         # a second componet that is found in wide seperation)
-        #lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
-        #mask = lnk21 < 5
-        #mask = binary_dilation(mask)
-
-        # combine the mask with where 1 component model is better fitted than the noise to save some computational time
-        #lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
-        #mask = np.logical_and(mask, lnk10 > 5)
-        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
+        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False)
 
         if planemask is None:
             mask10 = lnk10 > 5
@@ -416,35 +408,31 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
+        #lnk_N2vsO1 = UCube.calc_AICc_likelihood(ucube_new, 2, 1, ucube_B=ucube)
 
-        #if lnk21 is not None:
-        if False:
-            # mask over where one comp fit is more robust
-            good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
-            good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
-        else:
-            good_mask = np.logical_and(lnk_NvsO > 0, mask)
+        good_mask = np.logical_and(lnk_NvsO > 0, mask)
 
         logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
-        # ensure model mask is reset to make sure AICc calculation aren't effected down the line
-        #ucube.get_rss('2', mask=None, update=True)
-        #ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
-        #ucube.get_AICc(2, update=True)
-        #replace_pixels(ucube, ucube_new, ncomp='2', mask=good_mask)
+        replace_rss(ucube, ucube_new, ncomp=2, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
      
-def replace_pixels(ucube, ucube_ref, ncomp, mask):
+def replace_rss(ucube, ucube_ref, ncomp, mask):
+
+    compID = str(ncomp)
 
     attrs = ['rss_maps', 'NSamp_maps', 'AICc_maps']
     for attr in attrs:
-        try:
-            getattr(ucube, attr)[ncomp][mask] = copy(getattr(ucube_ref, attr)[ncomp][mask])
-        except KeyError:
-            logger.debug("{} does not have the following key: {}".format(attr, ncomp))
+        if attr !='AICc_maps':
+            try:
+                getattr(ucube, attr)[compID][mask] = copy(getattr(ucube_ref, attr)[compID][mask])
+            except KeyError:
+                logger.debug("{} does not have the following key: {}".format(attr, compID))
+        else:
+            ucube.get_AICc(ncomp=ncomp, update=True, planemask=mask)
 
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
