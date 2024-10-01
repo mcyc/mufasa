@@ -253,8 +253,8 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=Tr
     #lnk10 = ucube.get_AICc_likelihood(1, 0)
 
     # where the fits are poor
-    mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
-    mask = np.logical_or(mask, lnk20 < 5)
+    mask = np.logical_or(lnk21 < lnk_thresh, lnk20 < 5)
+    mask = np.logical_and(mask, lnk10 > 5)
     mask = np.logical_and(mask, np.isfinite(lnk10))
     mask_size = np.sum(mask)
     if mask_size > 0:
