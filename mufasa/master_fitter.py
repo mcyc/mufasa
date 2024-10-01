@@ -193,7 +193,7 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     return reg
 
 
-def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False):
+def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False, save_para=True):
     proc_name = 'iter_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
 
@@ -228,10 +228,12 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
 
+    if save_para:
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
     reg.log_progress(process_name=proc_name, mark_start=False)
 
 
-def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
+def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=True):
     '''
     refit pixels where 2 component fits are substantially worse than good one components
     default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
@@ -275,6 +277,9 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     gc.collect()
     # re-fit and save the updated model
     replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore)
+
+    if save_para:
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
     reg.log_progress(process_name=proc_name, mark_start=False)
 
@@ -321,7 +326,7 @@ def refit_swap_2comp(reg, snr_min=3):
     save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
 
-def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicore=True):
+def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicore=True, save_para=True):
     # if plane mask isn't provided, only try to recover pixels where the 2-comp fit is worse than the one component fit
 
     proc_name = 'refit_2comp_wide'
@@ -390,6 +395,9 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         pass
 
     replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21=None, simpfit=simpfit, multicore=multicore)
+
+    if save_para:
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
     reg.log_progress(process_name=proc_name, mark_start=False)
 
@@ -460,28 +468,34 @@ def save_updated_paramaps(ucube, ncomps):
             ucube.save_fit(ucube.paraPaths[str(nc)], nc)
 
 
-def save_best_2comp_fit(reg, multicore=True):
+def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
     # should be renamed to determine_best_2comp_fit or something along that line
     # currently use np.nan for pixels with no models
 
-    ncomp = [1, 2]
-
+    ncomps = [1, 2]
     multicore = validate_n_cores(multicore)
 
-    # ideally, a copy function should be in place of reloading
+    # ensure the latest results were saved
+    save_updated_paramaps(reg.ucube, ncomps=ncomps)
 
-    # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
-    reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
+    if from_saved_para:
+        # ideally, a copy function should be in place of reloading
 
-    # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
-    # load the file based on the passed in reg, rather than the default
-    for nc in ncomp:
-        if not str(nc) in reg.ucube.pcubes:
-            reg_final.load_fits(ncomp=[nc])
-        else:
-            # load files using paths from reg if they exist
-            logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
-            reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
+        # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
+        reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
+
+        # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
+        # load the file based on the passed in reg, rather than the default
+        for nc in ncomps:
+            if not str(nc) in reg.ucube.pcubes:
+                reg_final.load_fits(ncomp=[nc])
+            else:
+                # load files using paths from reg if they exist
+                logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
+                reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
+
+    else:
+        reg_final = reg
 
     # make the 2-comp para maps with the best fit model
     pcube_final = reg_final.ucube.pcubes['2']
