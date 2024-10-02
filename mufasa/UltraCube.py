@@ -133,10 +133,14 @@ class UltraCube(object):
     def reset_model_mask(self, ncomps, multicore=True):
         #reset and re-generate master_model_mask for all the components in ncomps
         self.master_model_mask = None
+        #self.rss_maps = {}
+        #self.NSamp_maps = {}
+        #self.AICc_maps = {}
         for nc in ncomps:
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                #self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
@@ -178,12 +182,12 @@ class UltraCube(object):
         return self.rms_maps[compID]
 
 
-    def get_rss(self, ncomp, mask=None, update=True):
+    def get_rss(self, ncomp, mask=None, planemask=None, update=True):
         # residual sum of squares
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
-        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update)
+        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update, planemask=planemask)
 
         # only include pixels with samples
         mask = nsamp < 1
@@ -191,8 +195,12 @@ class UltraCube(object):
         # only if rss value is valid
         mask = np.logical_or(mask, rrs <= 0)
         rrs[mask] = np.nan
-        self.rss_maps[str(ncomp)] = rrs
-        self.NSamp_maps[str(ncomp)] = nsamp
+        if planemask is None:
+            self.rss_maps[str(ncomp)] = rrs
+            self.NSamp_maps[str(ncomp)] = nsamp
+        else:
+            self.rss_maps[str(ncomp)][planemask] = rrs
+            self.NSamp_maps[str(ncomp)][planemask] = nsamp
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -215,23 +223,26 @@ class UltraCube(object):
         return self.rchisq_maps[compID]
 
 
-    def get_AICc(self, ncomp, update=True, **kwargs):
+    def get_AICc(self, ncomp, update=False, planemask=None, **kwargs):
         # recalculate AICc fresh if update is True
+        compID = str(ncomp)
         if update or not compID in self.AICc_maps:
             # start the calculation fresh
-            compID = str(ncomp)
             # note that zero component is assumed to have no free-parameter (i.e., no fitting)
             p = ncomp * 4
-            self.get_rss(ncomp, update=update, **kwargs)
-            self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
+            self.get_rss(ncomp, update=update, planemask=planemask, **kwargs)
+            if planemask is None or not compID in self.AICc_maps:
+                self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
+            else:
+                self.AICc_maps[compID][planemask] = aic.AICc(rss=self.rss_maps[compID][planemask], p=p, N=self.NSamp_maps[compID][planemask])
         return self.AICc_maps[compID]
 
 
     def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
         return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
-    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True):
-        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask)
+    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True, multicore=True):
+        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask, multicore=multicore)
 
     def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True):
         kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk20_thres=lnk20_thres,
@@ -352,7 +363,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
 #======================================================================================================================#
 # UltraCube based methods
 
-def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cube=True):
+def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cube=False, planemask=None):
     # calculate residual sum of squares
 
     if isinstance(compID, int):
@@ -364,11 +375,12 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
-        modcube = ucube.pcubes[compID]._modelcube
+        #ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
+        #modcube = ucube.pcubes[compID]._modelcube
+        modcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
 
     gc.collect()
-    return get_rss(cube, modcube, expand=20, usemask=usemask, mask=mask, return_size=return_size)
+    return get_rss(cube, modcube, expand=20, usemask=usemask, mask=mask, return_size=return_size, planemask=planemask)
 
 
 def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
@@ -410,6 +422,8 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
     #nmask = np.logical_or(NSamp_map == 0)
     #NSamp_map[nmask] = np.nan
     #rss_map[nmask] = np.nan
+    #ucube.rss_maps[str(ncomp)] = rss_map
+    #ucube.NSamp_maps[str(ncomp)] = NSamp_map
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
@@ -454,15 +468,14 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
     if rest_model_mask:
         ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
 
-    lnk10 = ucube.get_AICc_likelihood(1, 0)
-
     if ncomp_max <=1:
+        lnk10 = ucube.get_AICc_likelihood(1, 0)
         return lnk10
 
-    lnk20 = ucube.get_AICc_likelihood(2, 0)
-    lnk21 = ucube.get_AICc_likelihood(2, 1)
-
     if ncomp_max <= 2:
+        lnk21 = ucube.get_AICc_likelihood(2, 1)
+        lnk20 = ucube.get_AICc_likelihood(2, 0)
+        lnk10 = ucube.get_AICc_likelihood(1, 0)
         return lnk10, lnk20, lnk21
 
     else:
@@ -500,7 +513,7 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False, include_nosamp=True):
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False, include_nosamp=True, planemask=None):
     '''
     Calculate residual sum of squares (RSS)
 
@@ -535,18 +548,35 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
     # assume flat-baseline model even if no model exists
     model[np.isnan(model)] = 0
 
-    residual = get_residual(cube, model)
-
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
-
     if expand > 0:
         mask = expand_mask(mask, expand)
     mask = mask.astype(float)
 
-    # note: using nan-sum may walk over some potential bad pixel cases
-    rss = np.nansum((residual * mask)**2, axis=0)
-    rss[rss == 0] = np.nan
+    if planemask is None:
+        residual = get_residual(cube, model)
+
+        # note: using nan-sum may walk over some potential bad pixel cases
+        rss = np.nansum((residual * mask)**2, axis=0)
+        rss[rss == 0] = np.nan
+
+    else:
+        residual = get_residual(cube, model, planemask=planemask)
+        mask_temp = mask
+        mask = mask[:,planemask]
+
+        # note: using nan-sum may walk over some potential bad pixel cases
+        rss = np.nansum((residual * mask) ** 2, axis=0)
+        rss[rss == 0] = np.nan
+
+        '''
+        rss_temp = np.zeros(planemask.shape)
+        rss_temp[:] = np.nan
+        rss_temp[planemask] = rss
+        rss = rss_temp
+        mask = mask_temp
+        '''
 
     returns = (rss,)
 
@@ -675,9 +705,12 @@ def get_rms(residual):
     return rms
 
 
-def get_residual(cube, model):
+def get_residual(cube, model, planemask=None):
     # calculate the residual of the fit to the cube
-    residual = cube.filled_data[:].value - model
+    if planemask is None:
+        residual = cube.filled_data[:].value - model
+    else:
+        residual = cube.filled_data[:].value[:,planemask] - model[:,planemask]
     gc.collect()
     return residual
 

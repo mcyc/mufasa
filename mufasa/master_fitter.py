@@ -193,7 +193,7 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     return reg
 
 
-def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False):
+def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False, save_para=True):
     proc_name = 'iter_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
 
@@ -228,10 +228,12 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
 
+    if save_para:
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
     reg.log_progress(process_name=proc_name, mark_start=False)
 
 
-def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
+def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=True):
     '''
     refit pixels where 2 component fits are substantially worse than good one components
     default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
@@ -246,12 +248,13 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
-    ucube.reset_model_mask(ncomps=[1,2], multicore=True)
-    lnk21 = ucube.get_AICc_likelihood(2, 1)
-    lnk10 = ucube.get_AICc_likelihood(1, 0)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False, multicore=multicore)
+    #lnk21 = ucube.get_AICc_likelihood(2, 1)
+    #lnk10 = ucube.get_AICc_likelihood(1, 0)
 
     # where the fits are poor
-    mask = np.logical_and(lnk10 > 5, lnk21 < lnk_thresh)
+    mask = np.logical_or(lnk21 < lnk_thresh, lnk20 < 5)
+    mask = np.logical_and(mask, lnk10 > 5)
     mask = np.logical_and(mask, np.isfinite(lnk10))
     mask_size = np.sum(mask)
     if mask_size > 0:
@@ -275,6 +278,9 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True):
     # re-fit and save the updated model
     replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore)
 
+    if save_para:
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
+
     reg.log_progress(process_name=proc_name, mark_start=False)
 
 
@@ -296,7 +302,7 @@ def refit_swap_2comp(reg, snr_min=3):
     gc.collect()
 
     # swap the parameter of the two slabs and use it as the initial guesses
-    guesses = reg.ucube.pcubes['2'].parcube.copy()
+    guesses = copy(reg.ucube.pcubes['2'].parcube)
 
     for i in range(4):
         guesses[i], guesses[i+4] = guesses[i+4], guesses[i]
@@ -320,7 +326,8 @@ def refit_swap_2comp(reg, snr_min=3):
     save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
 
-def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicore=True):
+def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicore=True, save_para=True):
+    # if plane mask isn't provided, only try to recover pixels where the 2-comp fit is worse than the one component fit
 
     proc_name = 'refit_2comp_wide'
     reg.log_progress(process_name=proc_name, mark_start=True)
@@ -344,28 +351,28 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
             else:
                 reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype, multicore=multicore)
 
-    if planemask is None:
-        # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
-        # a second componet that is found in wide seperation)
-        lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
-        mask = lnk21 < 5
-        mask = binary_dilation(mask)
-
-        # combine the mask with where 1 component model is better fitted than the noise to save some computational time
-        lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
-        mask = np.logical_and(mask, lnk10 > 5)
-
-    else:
-        mask = planemask
-        # set lnk21 to None, so refit doesn't care about wether or not the one-componet fit is good or not
-        lnk21 = None
-
     if method == 'residual':
         logger.debug("recovering second component from residual")
-        wide_comp_guess = get_2comp_wide_guesses(reg)
+        # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
+        # a second componet that is found in wide seperation)
+        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False)
+
+        if planemask is None:
+            mask10 = lnk10 > 5
+            mask = np.logical_and(lnk21 < -5, lnk10 > 5)
+        else:
+            mask10 = planemask
+            mask = planemask
+
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
-        c1_guess = reg.ucube.pcubes['1'].parcube
+        c1_guess = copy(reg.ucube.pcubes['1'].parcube)
+        #c1_guess[:, ~mask10] = np.nan
         c1_guess = gss_rf.refine_each_comp(c1_guess)
+
+        wide_comp_guess = get_2comp_wide_guesses(reg)
+        # reduce the linewidth guess to avoid overestimation
+        #wide_comp_guess[1] = wide_comp_guess[1] / 2
+        wide_comp_guess[:, ~mask] = np.nan
 
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
         mask = np.logical_and(mask, np.all(np.isfinite(final_guess), axis=0))
@@ -387,7 +394,10 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         logger.info("No pixel was used in attempt to recover wide component")
         pass
 
-    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21, simpfit=simpfit, multicore=multicore)
+    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21=None, simpfit=simpfit, multicore=multicore)
+
+    if save_para:
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
     reg.log_progress(process_name=proc_name, mark_start=False)
 
@@ -406,35 +416,31 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
+        #lnk_N2vsO1 = UCube.calc_AICc_likelihood(ucube_new, 2, 1, ucube_B=ucube)
 
-        #if lnk21 is not None:
-        if False:
-            # mask over where one comp fit is more robust
-            good_mask = np.logical_and(lnk_NvsO > 0, lnk21 < 5)
-            good_mask = np.logical_and(good_mask, np.isfinite(lnk_NvsO))
-        else:
-            good_mask = np.logical_and(lnk_NvsO > 0, mask)
+        good_mask = np.logical_and(lnk_NvsO > 0, mask)
 
-        logger.debug("replace bad pix mask size: {}".format(good_mask.sum()))
+        logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
-        #ucube.get_rss('2', mask=None, update=True)
-        ucube.get_AICc(2, update=True)
-        # replace_pixesl(ucube, ucube_new, ncomp='2', mask=good_mask)
+        replace_rss(ucube, ucube_new, ncomp=2, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
      
-def replace_pixesl(ucube, ucube_ref, ncomp, mask):
+def replace_rss(ucube, ucube_ref, ncomp, mask):
 
-    attrs = ['rss_maps', 'NSamp_maps']#, 'AICc_maps']
+    compID = str(ncomp)
+
+    attrs = ['rss_maps', 'NSamp_maps', 'AICc_maps']
     for attr in attrs:
-        data = getattr(ucube, attr)[ncomp]
-        try:
-            data_rep = getattr(ucube_ref, attr)[ncomp]
-            data[mask] = data_rep[mask].copy()
-        except KeyError:
-            logger.debug("{} does not have the following key: {}".format(attr, ncomp))
+        if attr !='AICc_maps':
+            try:
+                getattr(ucube, attr)[compID][mask] = copy(getattr(ucube_ref, attr)[compID][mask])
+            except KeyError:
+                logger.debug("{} does not have the following key: {}".format(attr, compID))
+        else:
+            ucube.get_AICc(ncomp=ncomp, update=True, planemask=mask)
 
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
@@ -462,28 +468,34 @@ def save_updated_paramaps(ucube, ncomps):
             ucube.save_fit(ucube.paraPaths[str(nc)], nc)
 
 
-def save_best_2comp_fit(reg, multicore=True):
+def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
     # should be renamed to determine_best_2comp_fit or something along that line
     # currently use np.nan for pixels with no models
 
-    ncomp = [1, 2]
-
+    ncomps = [1, 2]
     multicore = validate_n_cores(multicore)
 
-    # ideally, a copy function should be in place of reloading
+    # ensure the latest results were saved
+    save_updated_paramaps(reg.ucube, ncomps=ncomps)
 
-    # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
-    reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
+    if from_saved_para:
+        # ideally, a copy function should be in place of reloading
 
-    # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
-    # load the file based on the passed in reg, rather than the default
-    for nc in ncomp:
-        if not str(nc) in reg.ucube.pcubes:
-            reg_final.load_fits(ncomp=[nc])
-        else:
-            # load files using paths from reg if they exist
-            logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
-            reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
+        # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
+        reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
+
+        # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
+        # load the file based on the passed in reg, rather than the default
+        for nc in ncomps:
+            if not str(nc) in reg.ucube.pcubes:
+                reg_final.load_fits(ncomp=[nc])
+            else:
+                # load files using paths from reg if they exist
+                logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
+                reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
+
+    else:
+        reg_final = reg
 
     # make the 2-comp para maps with the best fit model
     pcube_final = reg_final.ucube.pcubes['2']
@@ -540,8 +552,8 @@ def save_best_2comp_fit(reg, multicore=True):
 
     # create moment0 map
     modbest = get_best_2comp_model(reg_final)
-    cube_mod = SpectralCube(data=modbest, wcs=reg_final.ucube.pcubes['2'].wcs.copy(),
-                            header=reg_final.ucube.pcubes['2'].header.copy())
+    cube_mod = SpectralCube(data=modbest, wcs=copy(reg_final.ucube.pcubes['2'].wcs),
+                            header=copy(reg_final.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
     mom0_mod = cube_mod.moment0()
@@ -628,7 +640,7 @@ def get_2comp_wide_guesses(reg):
             logger.info("number of good fits to convolved residual: {}".format(np.sum(aic1v0_mask)))
             # if there are at least one well fitted pixel to the residual
             data_cnv = np.append(reg.ucube_res_cnv.pcubes['1'].parcube, reg.ucube_res_cnv.pcubes['1'].errcube, axis=0)
-            preguess = data_cnv.copy()
+            preguess = copy(data_cnv)
 
             # set pixels that are better modelled as noise to nan
             preguess[:, ~aic1v0_mask] = np.nan
@@ -722,8 +734,8 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
 
     res_cube = get_best_2comp_residual(reg)
     best_res = res_cube._data
-    cube_res = SpectralCube(data=best_res, wcs=reg.ucube.pcubes['2'].wcs.copy(),
-                            header=reg.ucube.pcubes['2'].header.copy())
+    cube_res = SpectralCube(data=best_res, wcs=copy(reg.ucube.pcubes['2'].wcs),
+                            header=copy(reg.ucube.pcubes['2'].header))
 
     if masked and res_snr_cut > 0:
         best_rms = UCube.get_rms(res_cube._data)
@@ -776,15 +788,13 @@ def get_best_2comp_snr_mod(reg):
 
 def get_best_2comp_model(reg):
     # get the log-likelihood between the fits
-    lnk21 = reg.ucube.get_AICc_likelihood(2, 1)
-    lnk20 = reg.ucube.get_AICc_likelihood(2, 0)
-    lnk10 = reg.ucube.get_AICc_likelihood(1, 0)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
 
     mod1 = reg.ucube.pcubes['1'].get_modelcube()
     mod2 = reg.ucube.pcubes['2'].get_modelcube()
 
     # get the best model based on the calculated likelihood
-    modbest = mod1.copy()
+    modbest = copy(mod1)
     modbest[:] = 0.0
 
     mask = lnk10 > 5
@@ -798,7 +808,6 @@ def get_best_2comp_model(reg):
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
-    from copy import deepcopy
 
     # replace values in masked pixels with the reference values
     pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
@@ -809,7 +818,13 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
     pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
 
+
+
     #pcube._modelcube = pcube.get_modelcube(update=True, multicore=multicore)
+    #multicore = validate_n_cores(multicore)
+    #newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
+    #pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
+
 
 
 def get_skyheader(cube_header):
