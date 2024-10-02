@@ -137,8 +137,7 @@ class UltraCube(object):
         for nc in ncomps:
             if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                #self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
-                self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                #self.pcubes[str(nc)].get_modelcube(update=False, multicore=multicore)
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
@@ -185,7 +184,7 @@ class UltraCube(object):
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
-        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update,
+        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=False,
                               planemask=planemask, expand=expand)
 
         # only include pixels with samples
@@ -374,7 +373,7 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        modcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
+        modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
     gc.collect()
     return get_rss(cube, modcube, expand=expand, usemask=usemask, mask=mask, return_size=return_size,
@@ -411,7 +410,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        modcube = ucube.pcubes[compID].get_modelcube(update=True, multicore=ucube.n_cores)
+        modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
     # get the rss value and sample size
     rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask, return_size=True, return_mask=False)

@@ -815,16 +815,8 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
 
     multicore = validate_n_cores(multicore)
-    newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
+    newmod = pcube_ref.get_modelcube(update=False, multicore=multicore)
     pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
-
-
-
-    #pcube._modelcube = pcube.get_modelcube(update=True, multicore=multicore)
-    #multicore = validate_n_cores(multicore)
-    #newmod = pcube_ref.get_modelcube(update=True, multicore=multicore)
-    #pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
-
 
 
 def get_skyheader(cube_header):
