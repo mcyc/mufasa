@@ -418,7 +418,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
         modcube = ucube.pcubes[compID].get_modelcube(update=True, multicore=ucube.n_cores)
 
     # get the rss value and sample size
-    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=None, return_size=True, return_mask=False)
+    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask, return_size=True, return_mask=False)
     # ensure AICc is only calculated where models exits
     #nmask = np.isnan(rss_map)
     #nmask = np.logical_or(NSamp_map == 0)
