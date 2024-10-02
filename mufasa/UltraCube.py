@@ -429,7 +429,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
-        return AICc_map, NSamp
+        return AICc_map, NSamp_map
     else:
         return AICc_map
 
