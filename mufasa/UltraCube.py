@@ -182,12 +182,13 @@ class UltraCube(object):
         return self.rms_maps[compID]
 
 
-    def get_rss(self, ncomp, mask=None, planemask=None, update=True):
+    def get_rss(self, ncomp, mask=None, planemask=None, update=True, expand=20):
         # residual sum of squares
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
-        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update, planemask=planemask)
+        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update,
+                              planemask=planemask, expand=expand)
 
         # only include pixels with samples
         mask = nsamp < 1
@@ -223,14 +224,14 @@ class UltraCube(object):
         return self.rchisq_maps[compID]
 
 
-    def get_AICc(self, ncomp, update=False, planemask=None, **kwargs):
+    def get_AICc(self, ncomp, update=False, planemask=None, expand=20, **kwargs):
         # recalculate AICc fresh if update is True
         compID = str(ncomp)
         if update or not compID in self.AICc_maps:
             # start the calculation fresh
             # note that zero component is assumed to have no free-parameter (i.e., no fitting)
             p = ncomp * 4
-            self.get_rss(ncomp, update=update, planemask=planemask, **kwargs)
+            self.get_rss(ncomp, update=update, planemask=planemask, expand=expand, **kwargs)
             if planemask is None or not compID in self.AICc_maps:
                 self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
             else:
@@ -363,7 +364,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
 #======================================================================================================================#
 # UltraCube based methods
 
-def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cube=False, planemask=None):
+def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cube=False, planemask=None, expand=20):
     # calculate residual sum of squares
 
     if isinstance(compID, int):
@@ -380,10 +381,11 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
         modcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
 
     gc.collect()
-    return get_rss(cube, modcube, expand=20, usemask=usemask, mask=mask, return_size=return_size, planemask=planemask)
+    return get_rss(cube, modcube, expand=expand, usemask=usemask, mask=mask, return_size=return_size,
+                   planemask=planemask)
 
 
-def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
+def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None, expand=20):
 
     if isinstance(compID, int):
         compID = str(compID)
@@ -397,10 +399,10 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None):
         modcube = ucube.pcubes[compID].get_modelcube(multicore=ucube.n_cores)
 
     gc.collect()
-    return get_chisq(cube, modcube, expand=20, reduced=reduced, usemask=usemask, mask=mask)
+    return get_chisq(cube, modcube, expand=expand, reduced=reduced, usemask=usemask, mask=mask)
 
 
-def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
+def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20):
     # calculate AICc value withouth change the internal ucube data
 
     if isinstance(compID, int):
@@ -416,7 +418,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
         modcube = ucube.pcubes[compID].get_modelcube(update=True, multicore=ucube.n_cores)
 
     # get the rss value and sample size
-    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=20, usemask=True, mask=None, return_size=True, return_mask=False)
+    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=None, return_size=True, return_mask=False)
     # ensure AICc is only calculated where models exits
     #nmask = np.isnan(rss_map)
     #nmask = np.logical_or(NSamp_map == 0)
@@ -432,15 +434,20 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True):
         return AICc_map
 
 
-def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True):
+def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0):
     # return the log likelihood of the A model relative to the B model
+    # currently, expand is only used if ucube_B is provided
 
     if not ucube_B is None:
         # if a second UCube is provide for model comparison, use their common mask and calculate AICc values
         # without storing/updating them in the UCubes
+        # reset model masks first
+        ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
+        ucube_B.reset_model_mask(ncomps=[2, 1], multicore=multicore)
+
         mask = np.logical_or(ucube.master_model_mask, ucube_B.master_model_mask)
-        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, mask_plane=None, return_NSamp=False)
-        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, mask_plane=None, return_NSamp=False)
+        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, mask_plane=None, return_NSamp=False, expand=expand)
+        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, mask_plane=None, return_NSamp=False, expand=expand)
         return aic.likelihood(AICc_A, AICc_B)
 
     if not str(ncomp_A) in ucube.NSamp_maps:
