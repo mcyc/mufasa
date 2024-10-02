@@ -2,7 +2,7 @@
 import numpy as np
 
 
-def maxref_neighbor_coords(mask, ref):
+def maxref_neighbor_coords(mask, ref, fill_coord=(0, 0)):
     # find pixel of a neighbour with the highest reference value
     highest_coords = []
 
@@ -18,7 +18,7 @@ def maxref_neighbor_coords(mask, ref):
             highest_neighbor = max(neighbors, key=lambda x: x[1])  # Find the highest neighbor
             highest_coord = highest_neighbor[0]  # Get the coordinates of the highest ref pixel
         else:
-            highest_coord = None
+            highest_coord = fill_coord
 
         highest_coords.append(highest_coord)
 

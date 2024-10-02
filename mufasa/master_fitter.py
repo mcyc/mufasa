@@ -233,7 +233,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     reg.log_progress(process_name=proc_name, mark_start=False)
 
 
-def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=True):
+def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=True, method='best_neighbour'):
     '''
     refit pixels where 2 component fits are substantially worse than good one components
     default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
@@ -268,11 +268,22 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=Tr
     # remove the bad pixels from the fitted parameters
     guesses[:,mask] = np.nan
 
-    # use astropy convolution to interpolate guesses (we assume bad fits are usually well surrounded by good fits)
-    kernel = Gaussian2DKernel(2.5/2.355)
-    for i, gmap in enumerate(guesses):
-        gmap[mask] = np.nan
-        guesses[i] = convolve(gmap, kernel, boundary='extend')
+    if method == 'convolved':
+        # use astropy convolution to interpolate guesses (we assume bad fits are usually well surrounded by good fits)
+        kernel = Gaussian2DKernel(2.5/2.355)
+        for i, gmap in enumerate(guesses):
+            gmap[mask] = np.nan
+            guesses[i] = convolve(gmap, kernel, boundary='extend')
+
+    elif method == 'best_neighbour':
+        from .utils import neighbours as nb
+        from importlib import reload
+        reload(nb)
+        # use the nearest neighbour with the highest lnk20 value for guesses
+        maxref_coords = nb.maxref_neighbor_coords(mask=mask, ref=lnk20, fill_coord=(0,0))
+        ys, xs = zip(*maxref_coords)
+        guesses[:, mask] = guesses[:, ys, xs]
+        mask = np.logical_and(mask, np.all(np.isfinite(guesses), axis=0))
 
     gc.collect()
     # re-fit and save the updated model
