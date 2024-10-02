@@ -11,7 +11,7 @@ def maxref_neighbor_coords(mask, ref):
 
     # For each pixel within the mask, find its valid neighbors
     for x, y in true_pixel_coords:
-        neighbors = nb.get_valid_neighbors(mask, ref, x, y)
+        neighbors = get_valid_neighbors(mask, ref, x, y)
 
         if neighbors:
             # Find the pixel with the highest reference value among the neighbors
