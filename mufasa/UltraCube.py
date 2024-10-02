@@ -137,7 +137,7 @@ class UltraCube(object):
         #self.NSamp_maps = {}
         #self.AICc_maps = {}
         for nc in ncomps:
-            if hasattr(self.pcubes[str(nc)],'parcube'):
+            if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
                 #self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
                 self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
