@@ -418,7 +418,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
         #lnk_N2vsO1 = UCube.calc_AICc_likelihood(ucube_new, 2, 1, ucube_B=ucube)
 
-        good_mask = np.logical_and(lnk_NvsO > 0, mask)
+        good_mask = np.logical_and(lnk_NvsO > 5, mask)
 
         logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
         # replace the values
