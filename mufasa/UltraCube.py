@@ -462,8 +462,9 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
     if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
         logger.warning("Number of samples do not match. Recalculating AICc values")
         #reset the master component mask first
-        ucube.get_AICc(ncomp_A)
-        ucube.get_AICc(ncomp_B)
+        ucube.reset_model_mask(ncomps=[ncomp_A, ncomp_B], multicore=multicore)
+        ucube.get_AICc(ncomp_A, update=True)
+        ucube.get_AICc(ncomp_B, update=True)
 
     gc.collect()
     lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
