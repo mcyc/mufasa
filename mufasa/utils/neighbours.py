@@ -2,6 +2,29 @@
 import numpy as np
 
 
+def maxref_neighbor_coords(mask, ref):
+    # find pixel of a neighbour with the highest reference value
+    highest_coords = []
+
+    # Get coordinates of mask
+    true_pixel_coords = np.argwhere(mask)
+
+    # For each pixel within the mask, find its valid neighbors
+    for x, y in true_pixel_coords:
+        neighbors = nb.get_valid_neighbors(mask, ref, x, y)
+
+        if neighbors:
+            # Find the pixel with the highest reference value among the neighbors
+            highest_neighbor = max(neighbors, key=lambda x: x[1])  # Find the highest neighbor
+            highest_coord = highest_neighbor[0]  # Get the coordinates of the highest ref pixel
+        else:
+            highest_coord = None
+
+        highest_coords.append(highest_coord)
+
+    return highest_coords
+
+'''
 def find_maxref_neighbor(mask, data, ref):
     # find pixel of a neighbour with the highest reference value
     nearest_refs = []
@@ -9,7 +32,7 @@ def find_maxref_neighbor(mask, data, ref):
     maxref_data = []
     highest_coords = []
 
-    # Step 1: Get coordinates of mask
+    # Get coordinates of mask
     true_pixel_coords = np.argwhere(mask)
 
     # Step 2: For each pixel within the mask, find its valid neighbors
@@ -41,6 +64,7 @@ def find_maxref_neighbor(mask, data, ref):
         maxref_data.append(maxref_value)
 
     return nearest_refs, highest_refs, maxref_data, highest_coords
+'''
 
 
 def get_valid_neighbors(mask, data, x, y):
