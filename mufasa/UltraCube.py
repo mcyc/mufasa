@@ -133,9 +133,7 @@ class UltraCube(object):
     def reset_model_mask(self, ncomps, multicore=True):
         #reset and re-generate master_model_mask for all the components in ncomps
         self.master_model_mask = None
-        #self.rss_maps = {}
-        #self.NSamp_maps = {}
-        #self.AICc_maps = {}
+
         for nc in ncomps:
             if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
@@ -376,8 +374,6 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        #ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
-        #modcube = ucube.pcubes[compID]._modelcube
         modcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
 
     gc.collect()
@@ -419,13 +415,6 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
 
     # get the rss value and sample size
     rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask, return_size=True, return_mask=False)
-    # ensure AICc is only calculated where models exits
-    #nmask = np.isnan(rss_map)
-    #nmask = np.logical_or(NSamp_map == 0)
-    #NSamp_map[nmask] = np.nan
-    #rss_map[nmask] = np.nan
-    #ucube.rss_maps[str(ncomp)] = rss_map
-    #ucube.NSamp_maps[str(ncomp)] = NSamp_map
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
@@ -468,8 +457,6 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
 
     gc.collect()
     lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
-    # ensure the likihood map doesn't include where there are no samples
-    # lnk[np.isnan(ucube.NSamp_maps[str(ncomp_A)])] = np.nan
     return lnk
 
 def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
@@ -577,14 +564,6 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
         # note: using nan-sum may walk over some potential bad pixel cases
         rss = np.nansum((residual * mask) ** 2, axis=0)
         rss[rss == 0] = np.nan
-
-        '''
-        rss_temp = np.zeros(planemask.shape)
-        rss_temp[:] = np.nan
-        rss_temp[planemask] = rss
-        rss = rss_temp
-        mask = mask_temp
-        '''
 
     returns = (rss,)
 
