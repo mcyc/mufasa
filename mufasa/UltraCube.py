@@ -442,8 +442,8 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
         # if a second UCube is provide for model comparison, use their common mask and calculate AICc values
         # without storing/updating them in the UCubes
         # reset model masks first
-        ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
-        ucube_B.reset_model_mask(ncomps=[2, 1], multicore=multicore)
+        ucube.reset_model_mask(ncomps=[ncomp_A], multicore=multicore)
+        ucube_B.reset_model_mask(ncomps=[ncomp_B], multicore=multicore)
 
         mask = np.logical_or(ucube.master_model_mask, ucube_B.master_model_mask)
         AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, mask_plane=None, return_NSamp=False, expand=expand)
