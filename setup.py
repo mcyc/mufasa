@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mufasa',
-    version='1.3.1',
+    version='1.4.0',
     description='MUlti-component Fitter for Astrophysical Spectral Applications',
     author='Michael Chun-Yuan Chen',
     author_email='mkid.chen@gmail.com',
