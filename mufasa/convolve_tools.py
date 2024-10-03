@@ -178,7 +178,6 @@ def regrid_mask(mask, header, header_targ, tightBin=True):
 
     if (maxratio <= 0.5) & tightBin:
         # erode the mask a bit to avoid binning artifacts when downsampling
-        #s = int(1/maxratio)
         s = 2
         kern = np.ones((s, s), dtype=bool)
         mask = nd.binary_erosion(mask, structure=kern)

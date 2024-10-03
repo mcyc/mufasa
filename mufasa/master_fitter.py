@@ -249,8 +249,6 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=Tr
     logger.debug(f'Using {multicore} cores.')
 
     lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False, multicore=multicore)
-    #lnk21 = ucube.get_AICc_likelihood(2, 1)
-    #lnk10 = ucube.get_AICc_likelihood(1, 0)
 
     # where the fits are poor
     mask = np.logical_or(lnk21 < lnk_thresh, lnk20 < 5)
@@ -377,12 +375,10 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
         # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
         c1_guess = copy(reg.ucube.pcubes['1'].parcube)
-        #c1_guess[:, ~mask10] = np.nan
         c1_guess = gss_rf.refine_each_comp(c1_guess)
 
         wide_comp_guess = get_2comp_wide_guesses(reg)
         # reduce the linewidth guess to avoid overestimation
-        #wide_comp_guess[1] = wide_comp_guess[1] / 2
         wide_comp_guess[:, ~mask] = np.nan
 
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
@@ -427,7 +423,6 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
-        #lnk_N2vsO1 = UCube.calc_AICc_likelihood(ucube_new, 2, 1, ucube_B=ucube)
 
         good_mask = np.logical_and(lnk_NvsO > 0, mask)
 
