@@ -397,7 +397,7 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None, expand=20
     return get_chisq(cube, modcube, expand=expand, reduced=reduced, usemask=usemask, mask=mask)
 
 
-def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20):
+def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20):
     # calculate AICc value withouth change the internal ucube data
 
     if isinstance(compID, int):
@@ -413,7 +413,8 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
         modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
     # get the rss value and sample size
-    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask, return_size=True, return_mask=False)
+    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask,
+                                 return_size=True, return_mask=False, planemask=planemask)
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
@@ -422,7 +423,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
         return AICc_map
 
 
-def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0):
+def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0, planemask=None):
     # return the log likelihood of the A model relative to the B model
     # currently, expand is only used if ucube_B is provided
 
@@ -434,8 +435,9 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
         ucube_B.reset_model_mask(ncomps=[ncomp_B], multicore=multicore)
 
         mask = np.logical_or(ucube.master_model_mask, ucube_B.master_model_mask)
-        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, mask_plane=None, return_NSamp=False, expand=expand)
-        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, mask_plane=None, return_NSamp=False, expand=expand)
+        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, planemask=planemask, return_NSamp=False, expand=expand)
+        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, planemask=planemask, return_NSamp=False, expand=expand)
+
         return aic.likelihood(AICc_A, AICc_B)
 
     if not str(ncomp_A) in ucube.NSamp_maps:
@@ -444,18 +446,27 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
     if not str(ncomp_B) in ucube.NSamp_maps:
         ucube.get_AICc(ncomp_B)
 
-    NSamp_mapA = ucube.NSamp_maps[str(ncomp_A)] # since (np.nan == np.nan) is False, this threw the below warning unnecessarily
+    NSamp_mapA = ucube.NSamp_maps[str(ncomp_A)]
     NSamp_mapB = ucube.NSamp_maps[str(ncomp_B)]
 
     if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
         logger.warning("Number of samples do not match. Recalculating AICc values")
         #reset the master component mask first
         ucube.reset_model_mask(ncomps=[ncomp_A, ncomp_B], multicore=multicore)
-        ucube.get_AICc(ncomp_A, update=True)
-        ucube.get_AICc(ncomp_B, update=True)
+
+        if planemask is None:
+            pmask = NSamp_mapA != NSamp_mapB
+        else:
+            pmask = np.logical_and(planemask, NSamp_mapA != NSamp_mapB)
+        ucube.get_AICc(ncomp_A, update=True, planemask=pmask)
+        ucube.get_AICc(ncomp_B, update=True, planemask=pmask)
 
     gc.collect()
-    lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
+
+    if planemask is None:
+        lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
+    else:
+        lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)][planemask], ucube.AICc_maps[str(ncomp_B)][planemask])
     return lnk
 
 def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
@@ -507,7 +518,8 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False, include_nosamp=True, planemask=None):
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False,
+            include_nosamp=True, planemask=None):
     '''
     Calculate residual sum of squares (RSS)
 
