@@ -1,8 +1,9 @@
 from __future__ import print_function
 from __future__ import absolute_import
+
 __author__ = 'mcychen'
 
-#=======================================================================================================================
+# =======================================================================================================================
 import os
 import numpy as np
 import multiprocessing
@@ -18,6 +19,7 @@ from datetime import timezone, datetime
 import warnings
 
 from pandas import DataFrame
+
 try:
     from pandas import concat
 except ImportError:
@@ -29,21 +31,26 @@ from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
 from .utils.multicore import validate_n_cores
-#=======================================================================================================================
+from .utils import neighbours
+# =======================================================================================================================
 from .utils.mufasa_log import init_logging, get_logger
+
 logger = get_logger(__name__)
-#=======================================================================================================================
+
+
+# =======================================================================================================================
 
 class Region(object):
 
-    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, initialize_logging=True, multicore=True, **kwargs):
+    def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, initialize_logging=True,
+                 multicore=True, **kwargs):
         """initialize region object
             :param cubePath (str): path to spectral cube
             :param paraNameRoot (str): string to prepend to output file names
             :param paraDir (str, optional): directory to output files. Defaults to None.
             :param cnv_factor (int, optional): nuber of beam-widths to convolve by. Defaults to 2.
             :param multicore (int, optional): number of cpu cores to use. Defaults to None.
-            
+
             kwargs are passed to init_logging:
                 :param logfile: file to save to (default mufasa.log)
                 :param console_level: minimum logging level to print to screen (default logging.INFO)
@@ -61,7 +68,8 @@ class Region(object):
             warnings.warn(message, DeprecationWarning, stacklevel=2)
 
         self.fittype = fittype
-        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor, fittype=self.fittype, n_cores=multicore)
+        self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor,
+                                     fittype=self.fittype, n_cores=multicore)
 
         # for convolving cube
         self.cnv_factor = cnv_factor
@@ -70,34 +78,29 @@ class Region(object):
         try:
             from pandas import read_csv
             self.progress_log = read_csv(self.progress_log_name)
-            #could use a checking mechanism to ensure the logfile is the right format
+            # could use a checking mechanism to ensure the logfile is the right format
         except FileNotFoundError:
             self.progress_log = DataFrame(columns=['process', 'last complete'])
 
-
-    def get_convolved_cube(self, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None, multicore=True):
+    def get_convolved_cube(self, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None,
+                           multicore=True):
         if paraDir is None:
             paraDir = self.paraDir
         get_convolved_cube(self, update=update, cnv_cubePath=cnv_cubePath, edgetrim_width=edgetrim_width,
                            paraNameRoot=paraNameRoot, paraDir=paraDir, multicore=multicore)
 
-
     def get_convolved_fits(self, ncomp, **kwargs):
         get_convolved_fits(self, ncomp, **kwargs)
 
-
     def get_fits(self, ncomp, **kwargs):
         get_fits(self, ncomp, **kwargs)
-
 
     def load_fits(self, ncomp):
         # basically the same as get_fits(), but with update set to False to ensure the fits aren't refitted
         get_fits(self, ncomp, update=False)
 
-
     def master_2comp_fit(self, snr_min=0.0, **kwargs):
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
-
 
     def standard_2comp_fit(self, planemask=None):
         standard_2comp_fit(self, planemask=planemask)
@@ -116,7 +119,7 @@ class Region(object):
             self.progress_log.loc[mask, 'last complete'] = time_info
         else:
             # add an new entry otherwise
-            info = {'process':process_name, 'last complete':time_info}
+            info = {'process': process_name, 'last complete': time_info}
             try:
                 self.progress_log = concat([self.progress_log, DataFrame([info])], ignore_index=True)
             except AttributeError:
@@ -126,17 +129,19 @@ class Region(object):
             # write the log as an csv file
             self.progress_log.to_csv(self.progress_log_name, index=False)
 
-#=======================================================================================================================
+
+# =======================================================================================================================
 
 
-def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None, multicore=True):
+def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None,
+                       multicore=True):
     if cnv_cubePath is None:
         root = "conv{0}Xbeam".format(int(np.rint(reg.cnv_factor)))
         reg.cnv_cubePath = "{0}_{1}.fits".format(os.path.splitext(reg.cubePath)[0], root)
     else:
         reg.cnv_cubePath = cnv_cubePath
 
-    reg.cnv_para_paths ={}
+    reg.cnv_para_paths = {}
 
     if update or (not os.path.isfile(reg.cnv_cubePath)):
         reg.ucube.convolve_cube(factor=reg.cnv_factor, savename=reg.cnv_cubePath, edgetrim_width=edgetrim_width)
@@ -148,7 +153,7 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
         paraDir = reg.paraDir
 
     reg.ucube_cnv = UCube.UCubePlus(cubefile=reg.cnv_cubePath, paraNameRoot=paraNameRoot,
-                                     paraDir=paraDir, cnv_factor=reg.cnv_factor,fittype=reg.fittype, n_cores=multicore)
+                                    paraDir=paraDir, cnv_factor=reg.cnv_factor, fittype=reg.fittype, n_cores=multicore)
 
     # MC: a mechanism is needed to make sure the convolved cube has the same resolution has the cnv_factor
 
@@ -172,11 +177,12 @@ def get_fits(reg, ncomp, **kwargs):
     reg.ucube.get_model_fit(ncomp, **kwargs)
 
 
-#=======================================================================================================================
+# =======================================================================================================================
 # functions specific to 2-component fits
 
 
-def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True, multicore=True):
+def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
+                     multicore=True):
     '''
     note: planemask supercedes snr-based mask
     '''
@@ -193,14 +199,15 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     return reg
 
 
-def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False, save_para=True):
+def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False,
+                   save_para=True):
     proc_name = 'iter_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
 
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
-    ncomp = [1,2] # ensure this is a two component fitting method
+    ncomp = [1, 2]  # ensure this is a two component fitting method
 
     # convolve the cube and fit it
     reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
@@ -210,7 +217,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
         pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
         if nc == 2 and use_cnv_lnk:
             # clean up the fits with lnk maps
-            parcube, errcube, lnk10, lnk20, lnk21 =\
+            parcube, errcube, lnk10, lnk20, lnk21 = \
                 reg.ucube_cnv.get_best_2c_parcube(multicore=multicore, lnk21_thres=5, lnk20_thres=5,
                                                   lnk10_thres=-20, return_lnks=True)
             para_cnv = np.append(parcube, errcube, axis=0)
@@ -223,7 +230,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
                                             clean_map=clean_map, tau_thresh=1)
 
         # update is set to True to save the fits
-        kwargs = {'update':True, 'guesses':guesses, 'snr_min':snr_min, 'multicore':multicore}
+        kwargs = {'update': True, 'guesses': guesses, 'snr_min': snr_min, 'multicore': multicore}
         if planemask is not None:
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], **kwargs)
@@ -259,26 +266,23 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=Tr
         logger.info("Attempting to refit over {} pixels to recover bad 2-comp. fits".format(mask_size))
     else:
         logger.info("No pixel was used in attempt to recover bad 2-comp. fits")
-        pass
+        return
 
     guesses = copy(ucube.pcubes['2'].parcube)
-    guesses[guesses==0] = np.nan
+    guesses[guesses == 0] = np.nan
     # remove the bad pixels from the fitted parameters
-    guesses[:,mask] = np.nan
+    guesses[:, mask] = np.nan
 
     if method == 'convolved':
         # use astropy convolution to interpolate guesses (we assume bad fits are usually well surrounded by good fits)
-        kernel = Gaussian2DKernel(2.5/2.355)
+        kernel = Gaussian2DKernel(2.5 / 2.355)
         for i, gmap in enumerate(guesses):
             gmap[mask] = np.nan
             guesses[i] = convolve(gmap, kernel, boundary='extend')
 
     elif method == 'best_neighbour':
-        from .utils import neighbours as nb
-        from importlib import reload
-        reload(nb)
         # use the nearest neighbour with the highest lnk20 value for guesses
-        maxref_coords = nb.maxref_neighbor_coords(mask=mask, ref=lnk20, fill_coord=(0,0))
+        maxref_coords = neighbours.maxref_neighbor_coords(mask=mask, ref=lnk20, fill_coord=(0, 0))
         ys, xs = zip(*maxref_coords)
         guesses[:, mask] = guesses[:, ys, xs]
         mask = np.logical_and(mask, np.all(np.isfinite(guesses), axis=0))
@@ -294,14 +298,13 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=Tr
 
 
 def refit_swap_2comp(reg, snr_min=3):
-
     ncomp = [1, 2]
 
     # load the fitted parameters
     for nc in ncomp:
         if not str(nc) in reg.ucube.pcubes:
             # no need to worry about wide seperation as they likley don't overlap in velocity space
-            reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype)
+            reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc, reg.fittype)
 
     # refit only over where two component models are already determined to be better
     # note: this may miss a few fits where the swapped two-comp may return a better result?
@@ -314,9 +317,9 @@ def refit_swap_2comp(reg, snr_min=3):
     guesses = copy(reg.ucube.pcubes['2'].parcube)
 
     for i in range(4):
-        guesses[i], guesses[i+4] = guesses[i+4], guesses[i]
+        guesses[i], guesses[i + 4] = guesses[i + 4], guesses[i]
 
-    ucube_new = UCube.UltraCube(reg.ucube.cubefile,fittype=reg.fittype)
+    ucube_new = UCube.UltraCube(reg.ucube.cubefile, fittype=reg.fittype)
     ucube_new.fit_cube(ncomp=[2], maskmap=mask, snr_min=snr_min, guesses=guesses)
 
     gc.collect()
@@ -351,14 +354,15 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
     for nc in ncomp:
         if not str(nc) in reg.ucube.pcubes:
             if not str(nc) in reg.ucube.paraPaths:
-                reg.ucube.paraPaths[str(nc)]= '{}/{}_{}vcomp.fits'.format(reg.ucube.paraDir, reg.ucube.paraNameRoot, nc)
+                reg.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(reg.ucube.paraDir, reg.ucube.paraNameRoot,
+                                                                           nc)
 
-            if nc==2 and not ('2_noWideDelV' in reg.ucube.paraPaths):
-                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype, multicore=multicore)
-                reg.ucube.pcubes['2_noWideDelV'] =\
+            if nc == 2 and not ('2_noWideDelV' in reg.ucube.paraPaths):
+                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc, reg.fittype, multicore=multicore)
+                reg.ucube.pcubes['2_noWideDelV'] = \
                     "{}_noWideDelV".format(os.path.splitext(reg.ucube.paraPaths[str(nc)])[0])
             else:
-                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc,reg.fittype, multicore=multicore)
+                reg.ucube.load_model_fit(reg.ucube.paraPaths[str(nc)], nc, reg.fittype, multicore=multicore)
 
     if method == 'residual':
         logger.debug("recovering second component from residual")
@@ -417,9 +421,10 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         warnings.warn(message, DeprecationWarning, stacklevel=2)
 
     if np.sum(mask) >= 1:
-        ucube_new = UCube.UltraCube(ucube.cubefile,fittype=ucube.fittype)
+        ucube_new = UCube.UltraCube(ucube.cubefile, fittype=ucube.fittype)
         # fit using simpfit (and take the provided guesses as they are)
-        ucube_new.fit_cube(ncomp=[2], simpfit=simpfit, maskmap=mask, snr_min=snr_min, guesses=guesses, multicore=multicore)
+        ucube_new.fit_cube(ncomp=[2], simpfit=simpfit, maskmap=mask, snr_min=snr_min, guesses=guesses,
+                           multicore=multicore)
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
@@ -433,14 +438,13 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
 
-     
-def replace_rss(ucube, ucube_ref, ncomp, mask):
 
+def replace_rss(ucube, ucube_ref, ncomp, mask):
     compID = str(ncomp)
 
     attrs = ['rss_maps', 'NSamp_maps', 'AICc_maps']
     for attr in attrs:
-        if attr !='AICc_maps':
+        if attr != 'AICc_maps':
             try:
                 getattr(ucube, attr)[compID][mask] = copy(getattr(ucube_ref, attr)[compID][mask])
             except KeyError:
@@ -453,17 +457,18 @@ def standard_2comp_fit(reg, planemask=None, snr_min=3):
     # two compnent fitting method using the moment map guesses method
     proc_name = 'standard_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
-    ncomp = [1,2]
+    ncomp = [1, 2]
 
     # only use the moment maps for the fits
     for nc in ncomp:
         # update is set to True to save the fits
-        kwargs = {'update':True, 'snr_min':snr_min}
+        kwargs = {'update': True, 'snr_min': snr_min}
         if planemask is not None:
             kwargs['maskmap'] = planemask
-        reg.ucube.get_model_fit([nc],fittype=reg.fittype, **kwargs)
+        reg.ucube.get_model_fit([nc], fittype=reg.fittype, **kwargs)
 
     reg.log_progress(process_name=proc_name, mark_start=False)
+
 
 def save_updated_paramaps(ucube, ncomps):
     # save the updated parameter cubes
@@ -513,12 +518,13 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
     # use the default file formate to save the finals
     nc = 2
     if not str(nc) in reg_final.ucube.paraPaths:
-        reg_final.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot, nc)
+        reg_final.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(reg_final.ucube.paraDir,
+                                                                         reg_final.ucube.paraNameRoot, nc)
 
     savename = "{}_final.fits".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
     UCube.save_fit(pcube_final, savename=savename, ncomp=2)
 
-    hdr2D =reg.ucube.cube.wcs.celestial.to_header()
+    hdr2D = reg.ucube.cube.wcs.celestial.to_header()
     hdr2D['HISTORY'] = 'Written by MUFASA {}'.format({str(ctime())})
 
     paraDir = reg_final.ucube.paraDir
@@ -598,14 +604,14 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
 
 def save_map(map, header, savename, overwrite=True):
     fits_map = fits.PrimaryHDU(data=map, header=header)
-    fits_map.writeto(savename,overwrite=overwrite)
+    fits_map.writeto(savename, overwrite=overwrite)
 
-#=======================================================================================================================
+
+# =======================================================================================================================
 # functions that facilitate
 
 
 def get_2comp_wide_guesses(reg):
-
     if not hasattr(reg, 'ucube_res_cnv'):
         # fit the residual with the one component model if this has not already been done.
         try:
@@ -618,14 +624,13 @@ def get_2comp_wide_guesses(reg):
                 logger.info(e)
                 pass
 
-
     def get_mom_guesses(reg):
         # get moment guesses from no masking
         cube_res = get_best_2comp_residual_SpectralCube(reg, masked=False, window_hwidth=3.5)
 
         # find moment around where one component has been fitted
         pcube1 = reg.ucube.pcubes['1']
-        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
+        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3)  # median smooth within a 3x3 square
         moms_res = mmg.vmask_moments(cube_res, vmap=vmap, window_hwidth=3.5)
         gg = mmg.moment_guesses_1c(moms_res[0], moms_res[1], moms_res[2])
         # make sure the guesses falls within the limits
@@ -634,7 +639,8 @@ def get_2comp_wide_guesses(reg):
         gg = gss_rf.refine_each_comp(gg, mask=mask)
         return gg
 
-    if ('1' not in reg.ucube_res_cnv.pcubes) or not hasattr(reg.ucube_res_cnv.pcubes['1'], 'parcube'):
+    if not hasattr(reg, 'ucube_res_cnv') or ('1' not in reg.ucube_res_cnv.pcubes) or not hasattr(
+            reg.ucube_res_cnv.pcubes['1'], 'parcube'):
         # if there were no successful fit to the convolved cube, get moment map from no masking
         return get_mom_guesses(reg)
 
@@ -653,7 +659,8 @@ def get_2comp_wide_guesses(reg):
 
             # use the dialated mask as a footprint to interpolate the guesses
             gmask = binary_dilation(aic1v0_mask)
-            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header, mask=gmask)
+            guesses_final = gss_rf.guess_from_cnvpara(preguess, reg.ucube_res_cnv.cube.header, reg.ucube.cube.header,
+                                                      mask=gmask)
         else:
             logger.info("no good fit from convolved guess, using the moment guess for the full-res refit instead")
             # get moment guesses without masking instead
@@ -677,7 +684,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     if not hasattr(reg, 'ucube_cnv'):
         # if convolved cube was not used to produce initial guesses, use the full resolution 1-comp fit as the reference
         pcube1 = reg.ucube.pcubes['1']
-        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3) # median smooth within a 3x3 square
+        vmap = medfilt2d(pcube1.parcube[0], kernel_size=3)  # median smooth within a 3x3 square
         vmap = cnvtool.regrid(vmap, header1=get_skyheader(pcube1.header), header2=get_skyheader(cube_res_cnv.header))
     else:
         vmap = reg.ucube_cnv.pcubes['1'].parcube[0]
@@ -699,7 +706,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
     mom0 = moms_res_cnv[0]
     if res_snr_cut > 0:
         rms = cube_res_cnv.mad_std(axis=0)
-        snr = mom0/rms
+        snr = mom0 / rms
         maskmap = snr >= res_snr_cut
     else:
         maskmap = np.isfinite(mom0)
@@ -712,7 +719,8 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
         idx_x = indx_g[1][0]
         idx_y = indx_g[0][0]
         start_from_point = (idx_y, idx_x)
-        reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg, maskmap=maskmap, start_from_point=start_from_point)
+        reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg, maskmap=maskmap,
+                                   start_from_point=start_from_point)
     else:
         return None
 
@@ -724,10 +732,11 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=5, savefit=T
 
 
 def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut=5):
-    #convolved residual cube.If masked is True, only convolve over where 'excessive' residual is
+    # convolved residual cube.If masked is True, only convolve over where 'excessive' residual is
     # above a peak SNR value of res_snr_cut masked
 
-    cube_res_masked = get_best_2comp_residual_SpectralCube(reg, masked=masked, window_hwidth=window_hwidth, res_snr_cut=res_snr_cut)
+    cube_res_masked = get_best_2comp_residual_SpectralCube(reg, masked=masked, window_hwidth=window_hwidth,
+                                                           res_snr_cut=res_snr_cut)
 
     cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
                                                  snrmasked=False, iterrefine=False)
@@ -789,7 +798,7 @@ def get_best_2comp_snr_mod(reg):
     modbest = get_best_2comp_model(reg)
     res_cube = get_best_2comp_residual(reg)
     best_rms = UCube.get_rms(res_cube._data)
-    return np.nanmax(modbest, axis=0)/best_rms
+    return np.nanmax(modbest, axis=0) / best_rms
 
 
 def get_best_2comp_model(reg):
@@ -816,8 +825,8 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     import multiprocessing
 
     # replace values in masked pixels with the reference values
-    pcube.parcube[:,mask] = deepcopy(pcube_ref.parcube[:,mask])
-    pcube.errcube[:,mask] = deepcopy(pcube_ref.errcube[:,mask])
+    pcube.parcube[:, mask] = deepcopy(pcube_ref.parcube[:, mask])
+    pcube.errcube[:, mask] = deepcopy(pcube_ref.errcube[:, mask])
     pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
 
     multicore = validate_n_cores(multicore)
