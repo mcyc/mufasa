@@ -137,7 +137,6 @@ class UltraCube(object):
         for nc in ncomps:
             if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                #self.pcubes[str(nc)].get_modelcube(update=False, multicore=multicore)
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
@@ -495,7 +494,7 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
     errcube = copy(ucube.pcubes['2'].errcube)
 
     mask = np.logical_and(lnk21 > lnk21_thres, lnk20 > lnk20_thres)
-    # logger.info("pixels better fitted by 2-comp: {}".format(np.sum(mask)))
+
     if include_1c:
         parcube[:4, ~mask] = copy(ucube.pcubes['1'].parcube[:4, ~mask])
         errcube[:4, ~mask] = copy(ucube.pcubes['1'].errcube[:4, ~mask])

@@ -478,7 +478,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     def q_mask(m0):
         # estimate the noise level, starting with pixels with peaksnr < 3
         qmask = np.logical_and(np.isfinite(m0), peaksnr < 3)
-        #qmask = np.isfinite(m0)
         std_m0 = mad_std(m0[qmask])
         # estimate again with the signals "removed"
         qmask = np.logical_or(qmask, m0 > std_m0)
