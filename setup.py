@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mufasa',
-    version='1.3.0',
+    version='1.3.1',
     description='MUlti-component Fitter for Astrophysical Spectral Applications',
     author='Michael Chun-Yuan Chen',
     author_email='mkid.chen@gmail.com',
@@ -20,7 +20,7 @@ setup(
         'pandas',
         'reproject',
         'pyspeckit @ git+https://github.com/pyspeckit/pyspeckit@master#egg=pyspeckit',
-        'FITS_tools @ git+https://github.com/mcyc/FITS_tools@py312#egg=FITS_tools'
+        'FITS_tools @ git+https://github.com/pyspeckit/FITS_tools@py312#egg=FITS_tools'
     ],
 
     classifiers=[
