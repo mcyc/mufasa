@@ -43,14 +43,24 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
     bmin = hdr['BMIN'] * beamunit * factor
     pa = hdr['BPA']
 
-    beam = Beam(major=bmaj, minor=bmin, pa=pa)
+    try:
+        #for Astropy 6.1.4 forward compatibility
+        from astropy.units.core import UnitScaleError
+        beam = Beam(major=bmaj, minor=bmin, pa=pa)
+    except UnitScaleError:
+        from spectral_cube.utils import NoBeamError # imoprt NoBeamError, since cube most likely wasn't able to read the beam either
+        beam = Beam(major=bmaj, minor=bmin, pa=None)
 
     # convolve
-    cnv_cube = convolve_sky(cube, beam, **kwargs)
+    try:
+        # for Astropy 6.1.4 forward compatibility
+        cnv_cube = convolve_sky(cube, beam, **kwargs)
+    except NoBeamError:
+        cube = cube.with_beam(beam)
+        cnv_cube = convolve_sky(cube, beam, **kwargs)
 
     if cnv_cube.fill_value is not np.nan:
         cnv_cube = cnv_cube.with_fill_value(np.nan)
-    #cnv_cube = cnv_cube.with_fill_value(0.0)
 
     if downsample:
         # regrid the convolved cube
@@ -59,7 +69,6 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
         nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
         newcube = cnv_cube.reproject(nhdr, order='bilinear')
-        # newcube = cnv_cube.reproject(nhdr, order='bicubic')
     else:
         newcube = cnv_cube
 
