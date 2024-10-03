@@ -133,14 +133,11 @@ class UltraCube(object):
     def reset_model_mask(self, ncomps, multicore=True):
         #reset and re-generate master_model_mask for all the components in ncomps
         self.master_model_mask = None
-        #self.rss_maps = {}
-        #self.NSamp_maps = {}
-        #self.AICc_maps = {}
+
         for nc in ncomps:
             if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
-                #self.pcubes[str(nc)]._modelcube = self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
-                self.pcubes[str(nc)].get_modelcube(update=True, multicore=multicore)
+                #self.pcubes[str(nc)].get_modelcube(update=False, multicore=multicore)
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
@@ -187,7 +184,7 @@ class UltraCube(object):
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
-        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=update,
+        rrs, nsamp = calc_rss(self, ncomp, usemask=True, mask=mask, return_size=True, update_cube=False,
                               planemask=planemask, expand=expand)
 
         # only include pixels with samples
@@ -376,9 +373,7 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        #ucube.pcubes[compID]._modelcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
-        #modcube = ucube.pcubes[compID]._modelcube
-        modcube = ucube.pcubes[compID].get_modelcube(update=update_cube, multicore=ucube.n_cores)
+        modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
     gc.collect()
     return get_rss(cube, modcube, expand=expand, usemask=usemask, mask=mask, return_size=return_size,
@@ -402,7 +397,7 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None, expand=20
     return get_chisq(cube, modcube, expand=expand, reduced=reduced, usemask=usemask, mask=mask)
 
 
-def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20):
+def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20):
     # calculate AICc value withouth change the internal ucube data
 
     if isinstance(compID, int):
@@ -415,17 +410,11 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
         # the zero component model is just a y = 0 baseline
         modcube = np.zeros(cube.shape)
     else:
-        modcube = ucube.pcubes[compID].get_modelcube(update=True, multicore=ucube.n_cores)
+        modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
     # get the rss value and sample size
-    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask, return_size=True, return_mask=False)
-    # ensure AICc is only calculated where models exits
-    #nmask = np.isnan(rss_map)
-    #nmask = np.logical_or(NSamp_map == 0)
-    #NSamp_map[nmask] = np.nan
-    #rss_map[nmask] = np.nan
-    #ucube.rss_maps[str(ncomp)] = rss_map
-    #ucube.NSamp_maps[str(ncomp)] = NSamp_map
+    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask,
+                                 return_size=True, return_mask=False, planemask=planemask)
     AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
 
     if return_NSamp:
@@ -434,7 +423,7 @@ def calc_AICc(ucube, compID, mask, mask_plane=None, return_NSamp=True, expand=20
         return AICc_map
 
 
-def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0):
+def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0, planemask=None):
     # return the log likelihood of the A model relative to the B model
     # currently, expand is only used if ucube_B is provided
 
@@ -446,8 +435,9 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
         ucube_B.reset_model_mask(ncomps=[ncomp_B], multicore=multicore)
 
         mask = np.logical_or(ucube.master_model_mask, ucube_B.master_model_mask)
-        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, mask_plane=None, return_NSamp=False, expand=expand)
-        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, mask_plane=None, return_NSamp=False, expand=expand)
+        AICc_A = calc_AICc(ucube, compID=ncomp_A, mask=mask, planemask=planemask, return_NSamp=False, expand=expand)
+        AICc_B = calc_AICc(ucube_B, compID=ncomp_B, mask=mask, planemask=planemask, return_NSamp=False, expand=expand)
+
         return aic.likelihood(AICc_A, AICc_B)
 
     if not str(ncomp_A) in ucube.NSamp_maps:
@@ -456,20 +446,27 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
     if not str(ncomp_B) in ucube.NSamp_maps:
         ucube.get_AICc(ncomp_B)
 
-    NSamp_mapA = ucube.NSamp_maps[str(ncomp_A)] # since (np.nan == np.nan) is False, this threw the below warning unnecessarily
+    NSamp_mapA = ucube.NSamp_maps[str(ncomp_A)]
     NSamp_mapB = ucube.NSamp_maps[str(ncomp_B)]
 
     if not np.array_equal(NSamp_mapA, NSamp_mapB, equal_nan=True):
         logger.warning("Number of samples do not match. Recalculating AICc values")
         #reset the master component mask first
         ucube.reset_model_mask(ncomps=[ncomp_A, ncomp_B], multicore=multicore)
-        ucube.get_AICc(ncomp_A, update=True)
-        ucube.get_AICc(ncomp_B, update=True)
+
+        if planemask is None:
+            pmask = NSamp_mapA != NSamp_mapB
+        else:
+            pmask = np.logical_and(planemask, NSamp_mapA != NSamp_mapB)
+        ucube.get_AICc(ncomp_A, update=True, planemask=pmask)
+        ucube.get_AICc(ncomp_B, update=True, planemask=pmask)
 
     gc.collect()
-    lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
-    # ensure the likihood map doesn't include where there are no samples
-    # lnk[np.isnan(ucube.NSamp_maps[str(ncomp_A)])] = np.nan
+
+    if planemask is None:
+        lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)], ucube.AICc_maps[str(ncomp_B)])
+    else:
+        lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)][planemask], ucube.AICc_maps[str(ncomp_B)][planemask])
     return lnk
 
 def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
@@ -521,7 +518,8 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False, include_nosamp=True, planemask=None):
+def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False,
+            include_nosamp=True, planemask=None):
     '''
     Calculate residual sum of squares (RSS)
 
@@ -577,14 +575,6 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
         # note: using nan-sum may walk over some potential bad pixel cases
         rss = np.nansum((residual * mask) ** 2, axis=0)
         rss[rss == 0] = np.nan
-
-        '''
-        rss_temp = np.zeros(planemask.shape)
-        rss_temp[:] = np.nan
-        rss_temp[planemask] = rss
-        rss = rss_temp
-        mask = mask_temp
-        '''
 
     returns = (rss,)
 
