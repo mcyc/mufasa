@@ -20,21 +20,17 @@ pip install mufasa
 ```
 ### Requirements
 
-```MUFASA``` runs on ```python > v3.6``` and depends on the following packages:
+```MUFASA``` runs on ```python > v3.7``` and depends on the following packages:
 
-- ```numpy > v1.19.2```
+- ```numpy >= v1.19.2```
+- ```scipy >= v1.7.3```
+- ```skimage >= v0.17.2```
+- ```spectral_cube >= v0.6.0```
+- ```pyspeckit >= v1.0.1```
+- ```reproject >= v0.7.1```
+- ```FITS_tools >= v0.2```
 
-- ```skimage > v0.17.2```
-
-- ```spectral_cube > v0.6.0```
-
-- ```pyspeckit > v1.0.1```
-
-- ```reproject > v0.7.1```
-
-- ```FITS_tools > v0.2```
-
-If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` and  ```FITS_tools``` directly from their respective GitHub repository. 
+If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` and  ```FITS_tools``` directly from their respective GitHub repository. The `setup.py` for `MUFASA >= v1.4.0` takes care of such a depdendcy automatically with `pip` installs.
 
 ## Getting Started
 
