@@ -1,8 +1,10 @@
 from setuptools import setup, find_packages
+from .mufasa._version import __version__
+
 
 setup(
     name='mufasa',
-    version='1.4.0',
+    version=__version__,
     description='MUlti-component Fitter for Astrophysical Spectral Applications',
     author='Michael Chun-Yuan Chen',
     author_email='mkid.chen@gmail.com',
@@ -24,7 +26,7 @@ setup(
     ],
 
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Stable',
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: OS Independent',
