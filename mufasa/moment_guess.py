@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 class LineSetup(object):
     def __init__(self, linetype='nh3', new_recipe=True):
 
-        if linetype is 'nh3':
+        if linetype == 'nh3':
             from pyspeckit.spectrum.models.ammonia_constants import voff_lines_dict
 
             voff = voff_lines_dict['oneone']
@@ -40,7 +40,7 @@ class LineSetup(object):
                 self.tex_min = 3.1
                 self.tau_min = 0.3
 
-        elif linetype is 'n2hp':
+        elif linetype == 'n2hp':
             '''
             For Julian to fill in for the N2H+ model
             '''

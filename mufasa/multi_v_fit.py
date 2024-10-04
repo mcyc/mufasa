@@ -38,7 +38,7 @@ class MetaModel(object):
         # a place holder for if the window becomes line specific
         self.main_hf_moments = momgue.window_moments
 
-        if self.fittype is 'nh3_multi_v':
+        if self.fittype == 'nh3_multi_v':
             from pyspeckit.spectrum.models.ammonia_constants import freq_dict
             from pyspeckit.spectrum.models import ammonia
             from .spec_models import ammonia_multiv as ammv
@@ -63,7 +63,7 @@ class MetaModel(object):
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
 
-        elif self.fittype is 'n2hp_multi_v':
+        elif self.fittype == 'n2hp_multi_v':
             from .spec_models.n2hp_constants import freq_dict
             from .spec_models import n2hp_multiv as n2hpmv
 
@@ -180,7 +180,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
     # note: this assume the data cube has the right units
 
-    if pcube.wcs.wcs.restfrq == np.nan:
+    if np.isnan(pcube.wcs.wcs.restfrq):
         # Specify the rest frequency not present
         pcube.xarr.refX = freq_dict[linename]*u.Hz
     pcube.xarr.velocity_convention = 'radio'
@@ -304,12 +304,12 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
     # note: this assume the data cube has the right units
-    if cube._wcs.wcs.restfrq == np.nan:
+    if np.isnan(cube._wcs.wcs.restfrq):
         # Specify the rest frequency not present
         cube = cube.with_spectral_unit(u.Hz, rest_value = mod_info.rest_value)
     cube = cube.with_spectral_unit(u.km/u.s,velocity_convention='radio')
 
-    if pcube.wcs.wcs.restfrq == np.nan:
+    if np.isnan(pcube.wcs.wcs.restfrq):
         # Specify the rest frequency not present
         pcube.xarr.refX = freq_dict[linename]*u.Hz
     pcube.xarr.velocity_convention = 'radio'
