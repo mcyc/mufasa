@@ -1,17 +1,33 @@
 
 import numpy as np
+from skimage.morphology import disk, square
 
 
-def maxref_neighbor_coords(mask, ref, fill_coord=(0, 0)):
+def maxref_neighbor_coords(mask, ref, fill_coord=(0, 0), structure=None, centre=None):
     # find pixel of a neighbour with the highest reference value
     highest_coords = []
 
     # Get coordinates of mask
     true_pixel_coords = np.argwhere(mask)
 
+    if structure is None:
+        structure, centre = square_neighbour(r=1, return_centre=True)
+    else:
+        if isinstance(structure, str):
+            if structure == '4-connect':
+                # 4 nearest neighbours
+                structure, centre = disk_neighbour(1, return_centre=True)
+            elif structure == '8-connect':
+                # 8 nearest neighbours
+                structure, centre = square_neighbour(r=1, return_centre=True)
+
+    if centre is None:
+        centre = structure.shape
+        centre = ( np.ceil(centre[0]/2).astype(int) - 1 , np.ceil(centre[1]/2).astype(int) - 1 )
+
     # For each pixel within the mask, find its valid neighbors
-    for x, y in true_pixel_coords:
-        neighbors = get_valid_neighbors(mask, ref, x, y)
+    for y, x in true_pixel_coords:
+        neighbors = get_valid_neighbors(ref, x, y, structure=structure, centre=centre)
 
         if neighbors:
             # Find the pixel with the highest reference value among the neighbors
@@ -24,19 +40,38 @@ def maxref_neighbor_coords(mask, ref, fill_coord=(0, 0)):
 
     return highest_coords
 
-
-def get_valid_neighbors(mask, data, x, y):
+def get_valid_neighbors(data, x, y, structure, centre):
     neighbors = []
-    rows, cols = mask.shape
 
-    # Check up, down, left, right neighbors
-    if x > 0 and not mask[x - 1, y]:  # up
-        neighbors.append(((x - 1, y), data[x - 1, y]))
-    if x < rows - 1 and not mask[x + 1, y]:  # down
-        neighbors.append(((x + 1, y), data[x + 1, y]))
-    if y > 0 and not mask[x, y - 1]:  # left
-        neighbors.append(((x, y - 1), data[x, y - 1]))
-    if y < cols - 1 and not mask[x, y + 1]:  # right
-        neighbors.append(((x, y + 1), data[x, y + 1]))
+    ycoord, xcoord = get_neighbor_coord(structure, x,y, centre[1], centre[0])
+
+    for y, x in zip(ycoord, xcoord):
+        try:
+            neighbors.append(((y, x), data[y, x]))
+        except IndexError:
+            continue
 
     return neighbors
+
+def get_neighbor_coord(struct, x, y, x_ref, y_ref):
+    idx = np.where(struct)
+    ycoord = idx[0] - y_ref + y
+    xcoord = idx[1] - x_ref + x
+    return (ycoord, xcoord)
+
+def disk_neighbour(r, return_centre=False):
+    struct = disk(r, dtype='bool')
+    struct[r, r] = False
+    if return_centre:
+        return struct, (r,r)
+    else:
+        return struct
+
+def square_neighbour(r, return_centre=False):
+    # r is the degree of seperation from
+    struct = square(r*2+1, dtype='bool')
+    struct[r, r] = False
+    if return_centre:
+        return struct, (r,r)
+    else:
+        return struct
