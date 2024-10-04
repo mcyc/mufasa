@@ -387,6 +387,29 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpola
         zi = interpolate_via_cnv(map)
     return zi
 
+def refine_2c_guess(guesses, f_sigv = 0.5):
+    # f_sigv is the fraction of sigma_v to increase the velocity seperation by
+
+    v1, v2 = guesses[0], guesses[4]
+    s1, s2 = guesses[1], guesses[5]
+
+    vdiff = v1 - v2
+    vdiff_sign = vdiff/np.abs(vdiff)
+    sigvsum = s1 + s2
+
+    # increase their v seperation by half of their total linewidth scaled by f_sigv
+    v1 = v1 + sigvsum/2 * f_sigv * vdiff_sign
+    v2 = v2 - sigvsum/2 * f_sigv * vdiff_sign
+
+    # reduce the linewidth guesses, since they tend to be overestimated
+    s1 = s1/2
+    s2 = s2/2
+
+    guesses[0], guesses[4] = v1, v2
+    guesses[1], guesses[5] = s1, s2
+
+    return guesses
+
 
 def save_guesses(paracube, header, savename, ncomp=2):
     # a method to save the fitted parameter cube with relavent header information

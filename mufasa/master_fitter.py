@@ -386,7 +386,11 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         wide_comp_guess[:, ~mask] = np.nan
 
         final_guess = np.append(c1_guess, wide_comp_guess, axis=0)
+
         mask = np.logical_and(mask, np.all(np.isfinite(final_guess), axis=0))
+
+        # further refine to correct for the typical error esitmate for nh3 residual guesses
+        final_guess = gss_rf.refine_2c_guess(final_guess)
         simpfit = True
 
     elif method == 'moments':
