@@ -240,7 +240,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     reg.log_progress(process_name=proc_name, mark_start=False)
 
 
-def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=True, method='best_neighbour'):
+def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=True, method='best_neighbour'):
     '''
     refit pixels where 2 component fits are substantially worse than good one components
     default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
