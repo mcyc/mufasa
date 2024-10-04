@@ -52,11 +52,11 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 
     '''
 
     # get different types of deblending models
-    if linetype is 'nh3':
+    if linetype == 'nh3':
         from .spec_models import nh3_deblended
         deblend_mod = nh3_deblended.nh3_vtau_singlemodel_deblended
 
-    elif linetype is 'n2hp':
+    elif linetype == 'n2hp':
         from .spec_models import n2hp_deblended
         deblend_mod = n2hp_deblended.n2hp_vtau_singlemodel_deblended
     else:

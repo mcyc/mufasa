@@ -59,7 +59,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         cube = cube.with_beam(beam)
         cnv_cube = convolve_sky(cube, beam, **kwargs)
 
-    if cnv_cube.fill_value is not np.nan:
+    if not np.isnan(cnv_cube.fill_value):
         cnv_cube = cnv_cube.with_fill_value(np.nan)
 
     if downsample:
@@ -72,7 +72,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
     else:
         newcube = cnv_cube
 
-    if savename is not None:
+    if savename != None:
         newcube.write(savename, overwrite=True)
 
     return newcube
@@ -85,7 +85,7 @@ def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0):
     if not isinstance(cube, SpectralCube):
         cube = SpectralCube.read(cube)
 
-    if cube.fill_value is not np.nan:
+    if not np.isnan(cube.fill_value):
         cube = cube.with_fill_value(np.nan)
 
     mask = np.isfinite(cube._data)
