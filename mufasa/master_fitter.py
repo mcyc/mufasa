@@ -240,7 +240,7 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     reg.log_progress(process_name=proc_name, mark_start=False)
 
 
-def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=True, method='best_neighbour'):
+def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=True, method='best_neighbour'):
     '''
     refit pixels where 2 component fits are substantially worse than good one components
     default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
@@ -282,7 +282,9 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-20, multicore=True, save_para=Tr
 
     elif method == 'best_neighbour':
         # use the nearest neighbour with the highest lnk20 value for guesses
-        maxref_coords = neighbours.maxref_neighbor_coords(mask=mask, ref=lnk20, fill_coord=(0, 0))
+        # neighbours.square_neighbour(1) gives the 8 closest neighbours
+        maxref_coords = neighbours.maxref_neighbor_coords(mask=mask, ref=lnk20, fill_coord=(0, 0),
+                                                          structure=neighbours.square_neighbour(1))
         ys, xs = zip(*maxref_coords)
         guesses[:, mask] = guesses[:, ys, xs]
         mask = np.logical_and(mask, np.all(np.isfinite(guesses), axis=0))
