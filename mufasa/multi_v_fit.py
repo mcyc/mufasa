@@ -150,19 +150,48 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         return chisq, np.sum(mask, axis=0)
 
 
+def setup_cube(cube, mod_info, return_spectral_cube=False):
+
+    if hasattr(cube, 'spectral_axis'):
+        pcube = pyspeckit.Cube(cube=cube)
+    elif isinstance(cube, str):
+        cubename = cube
+        if return_spectral_cube:
+            cube = SpectralCube.read(cube)
+            #pcube = pyspeckit.Cube(filename=cubename)
+            pcube = pyspeckit.Cube(cube=cube)
+
+        else:
+            pcube = pyspeckit.Cube(filename=cubename)
+
+    pcube.unit="K"
+    if np.isnan(pcube.wcs.wcs.restfrq):
+        # Specify the rest frequency not present
+        pcube.xarr.refX = mod_info.freq_dict[linename]*u.Hz
+    pcube.xarr.velocity_convention = 'radio'
+
+    # always register the fitter just in case different lines are used
+    fitter = mod_info.fitter
+    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
+    logger.debug("number of parameters is {0}".format(fitter.npars))
+    logger.debug("the line to fit is {0}".format(mod_info.linenames))
+
+    if return_spectral_cube:
+        # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
+        # note: this assume the data cube has the right units
+        if np.isnan(cube._wcs.wcs.restfrq):
+            # Specify the rest frequency not present
+            cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
+        cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+
+        return pcube, cube
+    else:
+        return pcube
+
 def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='nh3_multi_v', **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
 
     logger.debug("using cubefit_simp")
-
-    if hasattr(cube, 'spectral_axis'):
-        pcube = pyspeckit.Cube(cube=cube)
-
-    else:
-        cubename = cube
-        pcube = pyspeckit.Cube(filename=cubename)
-
-    pcube.unit="K"
 
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
@@ -177,17 +206,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     taumin = mod_info.taumin
     eps = mod_info.eps
 
-    # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
-    # note: this assume the data cube has the right units
-
-    if np.isnan(pcube.wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        pcube.xarr.refX = freq_dict[linename]*u.Hz
-    pcube.xarr.velocity_convention = 'radio'
-
-    # always register the fitter just in case different lines are used
-    fitter = mod_info.fitter
-    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
+    pcube = setup_cube(cube, mod_info, return_spectral_cube=False)
 
     multicore = validate_n_cores(multicore)
 
@@ -279,16 +298,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     '''
     logger.debug('Using cubefit_gen')
 
-    if hasattr(cube, 'spectral_axis'):
-        pcube = pyspeckit.Cube(cube=cube)
-
-    else:
-        cubename = cube
-        cube = SpectralCube.read(cubename)
-        pcube = pyspeckit.Cube(filename=cubename)
-
-    pcube.unit="K"
-
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
     freq_dict = mod_info.freq_dict
@@ -302,23 +311,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     taumin = mod_info.taumin
     eps = mod_info.eps
 
-    # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
-    # note: this assume the data cube has the right units
-    if np.isnan(cube._wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        cube = cube.with_spectral_unit(u.Hz, rest_value = mod_info.rest_value)
-    cube = cube.with_spectral_unit(u.km/u.s,velocity_convention='radio')
-
-    if np.isnan(pcube.wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        pcube.xarr.refX = freq_dict[linename]*u.Hz
-    pcube.xarr.velocity_convention = 'radio'
-
-    # always register the fitter just in case different lines are used
-    fitter = mod_info.fitter
-    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
-    logger.info("number of parameters is {0}".format(fitter.npars))
-    logger.info("the line to fit is {0}".format(linename))
+    pcube, cube = setup_cube(cube, mod_info, return_spectral_cube=True)
 
     # Specify a width for the expected velocity range in the data
     v_peak_hwidth = 4.0  # km/s (should be sufficient for GAS Orion, but may not be enough for KEYSTONE)
