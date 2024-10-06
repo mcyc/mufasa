@@ -199,7 +199,7 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     return reg
 
 
-def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False,
+def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False,
                    save_para=True):
     proc_name = 'iter_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
@@ -210,7 +210,12 @@ def iter_2comp_fit(reg, snr_min=3, updateCnvFits=True, planemask=None, multicore
     ncomp = [1, 2]  # ensure this is a two component fitting method
 
     # convolve the cube and fit it
-    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
+
+    # lower the threshold to compensate for potential beam dilution
+    snr_min_cnv = snr_min/4.0
+    if snr_min_cnv < 3:
+        snr_min_cnv = 0
+    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min_cnv, multicore=multicore)
 
     # use the result from the convolved cube as guesses for the full resolution fits
     for nc in ncomp:
