@@ -210,12 +210,7 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
     ncomp = [1, 2]  # ensure this is a two component fitting method
 
     # convolve the cube and fit it
-
-    # lower the threshold to compensate for potential beam dilution
-    snr_min_cnv = snr_min/4.0
-    if snr_min_cnv < 3:
-        snr_min_cnv = 0
-    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min_cnv, multicore=multicore)
+    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
 
     # use the result from the convolved cube as guesses for the full resolution fits
     for nc in ncomp:
