@@ -323,24 +323,29 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
         errmap = None
 
-    '''
-    peaksnr, snr, errmap, err_mask = snr_estimate(pcube, errmap, smooth=True)
-    '''
 
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
-
-    peaksnr, planemask, kwargs, err_mask = handle_snr(pcube, snr_min,planemask=footprint_mask,
-                                                      return_errmask=True, **kwargs)
-
-    if planemask.sum() < 1:
-        logger.warning("the provided snr cut is to strick; auto snr default will be used")
-        planemask = footprint_mask
-
 
     if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
         # trim the edges by 3 pixels to guess the location of the peak emission
         logger.debug("triming the edges to make moment maps")
         footprint_mask = binary_erosion(footprint_mask, disk(3))
+
+    if 'planemask' in kwargs:
+        planemask = kwargs['planemask']
+    else:
+        planemask = footprint_mask.copy()
+
+    if 'maskmap' in kwargs:
+        logger.debug("including user specified mask as a base")
+        planemask = np.logical_and(kwargs['maskmap'], planemask)
+
+    peaksnr, planemask, kwargs, err_mask = handle_snr(pcube, snr_min, planemask=planemask,
+                                                      return_errmask=True, **kwargs)
+
+    if planemask.sum() < 1:
+        logger.warning("the provided snr cut is to strick; auto snr default will be used")
+        planemask = footprint_mask
 
 
     def default_masking(snr, snr_min=5.0):
@@ -356,10 +361,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             planemask = opening(planemask, disk(1))
 
         return (planemask)
-
-    if 'maskmap' in kwargs:
-        logger.debug("including user specified mask as a base")
-        planemask = np.logical_or(kwargs['maskmap'], planemask)
 
     if mask_function is not None:
         msg ="\'mask_function\' is now deprecation, and will be removed in the next version"
@@ -574,18 +575,19 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # set some of the fiteach() inputs to that used in GAS DR1 reduction
     if not 'integral' in kwargs: kwargs['integral'] = False # False is default so this isn't required
 
-    if not 'signal_cut' in kwargs:
-        kwargs['signal_cut'] = 2 # Note: cubefit_simp has this as 0
-
     # Now fit the cube. (Note: the function inputs are consistent with GAS DR1 whenever possible)
-    kwargs['maskmap'] = planemask * footprint_mask
+    kwargs['maskmap'] = planemask * footprint_mask * np.all(np.isfinite(guesses), axis=0)
 
-    if np.sum(kwargs['maskmap']) < 1:
+    mask_size = np.sum(kwargs['maskmap'])
+
+    if mask_size < 1:
         logger.warning("maskmap has no pixels, no fitting will be performed")
         return pcube
     elif np.sum(np.isfinite(guesses)) < 1:
         logger.warning("guesses has no pixels, no fitting will be performed")
         return pcube
+
+    logger.info("final mask size before fitting: {0}".format(mask_size))
 
     multicore = validate_n_cores(multicore)
 
