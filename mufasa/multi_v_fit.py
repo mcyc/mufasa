@@ -333,6 +333,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     if 'planemask' in kwargs:
         planemask = kwargs['planemask']
+    else:
+        planemask = footprint_mask.copy()
 
     if 'maskmap' in kwargs:
         logger.debug("including user specified mask as a base")
