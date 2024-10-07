@@ -575,18 +575,19 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # set some of the fiteach() inputs to that used in GAS DR1 reduction
     if not 'integral' in kwargs: kwargs['integral'] = False # False is default so this isn't required
 
-    if not 'signal_cut' in kwargs:
-        kwargs['signal_cut'] = 2 # Note: cubefit_simp has this as 0
-
     # Now fit the cube. (Note: the function inputs are consistent with GAS DR1 whenever possible)
     kwargs['maskmap'] = planemask * footprint_mask
 
-    if np.sum(kwargs['maskmap']) < 1:
+    mask_size = np.sum(kwargs['maskmap'])
+
+    if mask_size < 1:
         logger.warning("maskmap has no pixels, no fitting will be performed")
         return pcube
     elif np.sum(np.isfinite(guesses)) < 1:
         logger.warning("guesses has no pixels, no fitting will be performed")
         return pcube
+
+    logger.info("final mask size before fitting: {0}".format(mask_size))
 
     multicore = validate_n_cores(multicore)
 
