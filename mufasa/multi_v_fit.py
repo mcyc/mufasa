@@ -9,6 +9,8 @@ import copy
 import os, errno
 from os import path
 import multiprocessing
+import warnings
+
 
 from astropy import units as u
 import scipy.ndimage as nd
@@ -150,19 +152,51 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         return chisq, np.sum(mask, axis=0)
 
 
-def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='nh3_multi_v', **kwargs):
-    # a simper version of cubefit_gen that assumes good user provided guesses
 
-    logger.debug("using cubefit_simp")
+
+
+def setup_cube(cube, mod_info, return_spectral_cube=False):
 
     if hasattr(cube, 'spectral_axis'):
         pcube = pyspeckit.Cube(cube=cube)
-
-    else:
+    elif isinstance(cube, str):
         cubename = cube
-        pcube = pyspeckit.Cube(filename=cubename)
+        if return_spectral_cube:
+            cube = SpectralCube.read(cube)
+            #pcube = pyspeckit.Cube(filename=cubename)
+            pcube = pyspeckit.Cube(cube=cube)
+
+        else:
+            pcube = pyspeckit.Cube(filename=cubename)
 
     pcube.unit="K"
+    if np.isnan(pcube.wcs.wcs.restfrq):
+        # Specify the rest frequency not present
+        pcube.xarr.refX = mod_info.freq_dict[linename]*u.Hz
+    pcube.xarr.velocity_convention = 'radio'
+
+    # always register the fitter just in case different lines are used
+    fitter = mod_info.fitter
+    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
+    logger.debug("number of parameters is {0}".format(fitter.npars))
+    logger.debug("the line to fit is {0}".format(mod_info.linenames))
+
+    if return_spectral_cube:
+        # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
+        # note: this assume the data cube has the right units
+        if np.isnan(cube._wcs.wcs.restfrq):
+            # Specify the rest frequency not present
+            cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
+        cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+
+        return pcube, cube
+    else:
+        return pcube
+
+def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
+    # a simper version of cubefit_gen that assumes good user provided guesses
+
+    logger.debug("using cubefit_simp")
 
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
@@ -177,17 +211,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     taumin = mod_info.taumin
     eps = mod_info.eps
 
-    # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
-    # note: this assume the data cube has the right units
-
-    if np.isnan(pcube.wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        pcube.xarr.refX = freq_dict[linename]*u.Hz
-    pcube.xarr.velocity_convention = 'radio'
-
-    # always register the fitter just in case different lines are used
-    fitter = mod_info.fitter
-    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
+    pcube = setup_cube(cube, mod_info, return_spectral_cube=False)
 
     multicore = validate_n_cores(multicore)
 
@@ -195,17 +219,13 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
     planemask = np.any(np.isfinite(guesses), axis=0)
 
+    peaksnr, planemask, kwargs = handle_snr(pcube, snr_min, planemask, **kwargs)
+
     if maskmap is not None:
         logger.debug("using user specified mask")
         maskmap *= planemask * footprint_mask
     else:
         maskmap = planemask * footprint_mask
-
-    if 'signal_cut' not in kwargs:
-        kwargs['signal_cut'] = 0.0
-
-    if 'errmap' not in kwargs:
-        kwargs['errmap'] = mad_std(pcube.cube, axis=0, ignore_nan = True)
 
     v_peak_hwidth = 10
     v_guess = guesses[::4]
@@ -240,7 +260,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None,fittype='n
     if 'start_from_point' not in kwargs:
         indx_g = np.argwhere(maskmap)
         start_from_point = (indx_g[0,1], indx_g[0,0])
-        logger.info("starting point: {}".format(start_from_point))
+        logger.debug("starting point: {}".format(start_from_point))
         kwargs['start_from_point'] = start_from_point
 
     # add all the pcube.fiteach kwargs)
@@ -279,16 +299,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     '''
     logger.debug('Using cubefit_gen')
 
-    if hasattr(cube, 'spectral_axis'):
-        pcube = pyspeckit.Cube(cube=cube)
-
-    else:
-        cubename = cube
-        cube = SpectralCube.read(cubename)
-        pcube = pyspeckit.Cube(filename=cubename)
-
-    pcube.unit="K"
-
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
     freq_dict = mod_info.freq_dict
@@ -302,54 +312,37 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     taumin = mod_info.taumin
     eps = mod_info.eps
 
-    # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
-    # note: this assume the data cube has the right units
-    if np.isnan(cube._wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        cube = cube.with_spectral_unit(u.Hz, rest_value = mod_info.rest_value)
-    cube = cube.with_spectral_unit(u.km/u.s,velocity_convention='radio')
-
-    if np.isnan(pcube.wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        pcube.xarr.refX = freq_dict[linename]*u.Hz
-    pcube.xarr.velocity_convention = 'radio'
-
-    # always register the fitter just in case different lines are used
-    fitter = mod_info.fitter
-    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
-    logger.info("number of parameters is {0}".format(fitter.npars))
-    logger.info("the line to fit is {0}".format(linename))
+    pcube, cube = setup_cube(cube, mod_info, return_spectral_cube=True)
 
     # Specify a width for the expected velocity range in the data
     v_peak_hwidth = 4.0  # km/s (should be sufficient for GAS Orion, but may not be enough for KEYSTONE)
 
     if errmap11name is not None:
-        errmap11 = fits.getdata(errmap11name)
+        errmap = fits.getdata(errmap11name)
     else:
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
-        errmap11 = mad_std(cube._data, ignore_nan=True, axis=0)
+        errmap = None
 
-    err_med = np.nanmedian(errmap11)
-    logger.info("median rms: {:.5f}".format(err_med))
-
-    # mask out pixels that are too noisy (in this case, 3 times the median rms in the cube)
-    err_mask = errmap11 < err_med * 3.0
-
-    snr = cube.filled_data[:].value / errmap11
-    peaksnr = np.nanmax(snr, axis=0)
-
-    # the snr map will inevitably be noisy, so a little smoothing
-    kernel = Gaussian2DKernel(1)
-    peaksnr = convolve(peaksnr, kernel)
+    '''
+    peaksnr, snr, errmap, err_mask = snr_estimate(pcube, errmap, smooth=True)
+    '''
 
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
+
+    peaksnr, planemask, kwargs, err_mask = handle_snr(pcube, snr_min,planemask=footprint_mask,
+                                                      return_errmask=True, **kwargs)
+
+    if planemask.sum() < 1:
+        logger.warning("the provided snr cut is to strick; auto snr default will be used")
+        planemask = footprint_mask
+
 
     if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
         # trim the edges by 3 pixels to guess the location of the peak emission
         logger.debug("triming the edges to make moment maps")
         footprint_mask = binary_erosion(footprint_mask, disk(3))
 
-    # the following function is copied directly from GAS
+
     def default_masking(snr, snr_min=5.0):
         if snr_min is None:
             planemask = np.isfinite(snr)
@@ -365,19 +358,18 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         return (planemask)
 
     if 'maskmap' in kwargs:
-        logger.debug("using user specified mask as a base")
-        planemask = kwargs['maskmap']
-    elif mask_function is None:
-        planemask = default_masking(peaksnr, snr_min=snr_min)
-    else:
-        planemask = mask_function(peaksnr, snr_min=snr_min)
+        logger.debug("including user specified mask as a base")
+        planemask = np.logical_or(kwargs['maskmap'], planemask)
 
-    logger.debug("planemask size: {0}, shape: {1}".format(planemask[planemask].sum(), planemask.shape))
+    if mask_function is not None:
+        msg ="\'mask_function\' is now deprecation, and will be removed in the next version"
+        warnings.warn(msg, DeprecationWarning)
+        logger.warning(msg)
 
     # masking for moment guesses (note that this isn't used for the actual fit)
     mask = np.isfinite(cube._data) * planemask * footprint_mask #* err_mask
 
-    logger.debug("mask size: {0}, shape: {1}".format(mask[mask].sum(), mask.shape))
+    logger.debug("mask size: {0}, shape: {1}".format(mask.sum(), mask.shape))
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -416,10 +408,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             signal_mask = planemask
             sig_mask_size = signal_mask.sum()
 
-        logger.debug("signal_mask size: {}".format(sig_mask_size))
-
         signal_mask *= err_mask
-
 
         from skimage.morphology import binary_dilation
 
@@ -497,7 +486,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # define acceptable v range based on the provided or determined median velocity
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
-    logger.info("median input velocity: {:.3f}".format(v_median))
+    logger.debug("median input velocity: {:.3f}".format(v_median))
 
     # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
     if v_99p + sigmax > vmax:
@@ -657,7 +646,7 @@ def save_pcube(pcube, savename, ncomp=2):
 
     fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube,pcube.errcube]), header=hdr_new)
     fitcubefile.writeto(savename ,overwrite=True)
-    logger.info("{} saved.".format(savename))
+    logger.debug("{} saved.".format(savename))
 
 ##################
 
@@ -694,6 +683,65 @@ def get_vstats(velocities, signal_mask=None):
 def get_start_point(maskmap):
     indx_g = np.argwhere(maskmap)
     start_from_point = (indx_g[0,1], indx_g[0,0])
-    logger.info("starting point: {}".format(start_from_point))
+    logger.debug("starting point: {}".format(start_from_point))
     return start_from_point
 
+
+def snr_estimate(pcube, errmap, smooth=True):
+
+    if hasattr(pcube, 'cube'):
+        cube = pcube.cube
+    else:
+        # assume pcube is just a "regular" cube
+        cube = pcube
+
+    if errmap is None:
+        # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
+        errmap = mad_std(cube, axis=0, ignore_nan=True)
+
+    err_med = np.nanmedian(errmap)
+    logger.debug("median rms: {:.5f}".format(err_med))
+
+    # mask out pixels that are too noisy (in this case, 3 times the median rms in the cube)
+    err_mask = errmap < err_med * 3.0
+
+    snr = cube / errmap
+    peaksnr = np.nanmax(snr, axis=0)
+
+    if smooth:
+        # the snr map can be noisy, so a little smoothing
+        kernel = Gaussian2DKernel(1)
+        peaksnr = convolve(peaksnr, kernel)
+
+    return peaksnr, snr, errmap, err_mask
+
+
+def handle_snr(pcube, snr_min, planemask, return_errmask=False, **kwargs):
+    if snr_min is None:
+        if 'signal_cut' not in kwargs:
+            snr_min = 0.0
+        else:
+            snr_min = kwargs['signal_cut']
+    elif 'signal_cut' in kwargs:
+        if kwargs['signal_cut'] != snr_min:
+            if kwargs['signal_cut'] > snr_min:
+                snr_min = kwargs['signal_cut']
+            else:
+                kwargs['signal_cut'] = snr_min
+            logger.warning(
+                "snr_min and signal_cut provided do not match. The higher value of the two, {}, is adopted".format(
+                    snr_min))
+
+    if 'errmap' not in kwargs:
+        errmap = None
+
+    peaksnr, snr, emap, err_mask = snr_estimate(pcube, errmap, smooth=True)
+
+    if snr_min > 0:
+        snr_mask = peaksnr > snr_min
+        planemask = np.logical_and(planemask, snr_mask)
+
+    if return_errmask:
+        return peaksnr, planemask, kwargs, err_mask
+    else:
+        return peaksnr, planemask, kwargs
