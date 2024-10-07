@@ -434,8 +434,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
                 # use the simplest main_hf_moments
                 m0, m1, m2 = mod_info.main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
 
-    # mask over robust moment guess pixels to set the velocity fitting range
-    v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
+        # mask over robust moment guess pixels to set the velocity fitting range
+        v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
     logger.debug("median velocity: {:3f}".format(v_median))
 
     # use the median value of the mom0 pixels with snr < 3 as an estimation for the mom0 baseline
