@@ -389,9 +389,9 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         if snr_min > 10 and planemask.sum() > 1:
             signal_mask = planemask
         else:
-            signal_mask = default_masking(peaksnr, snr_min=10)
+            signal_mask = default_masking(peaksnr, snr_min=10)*err_mask
             # apply the error mask to remove potential "fake" signals in noisy maps
-            sig_mask_size = signal_mask.sum()*err_mask
+            sig_mask_size = signal_mask.sum()
 
             snr_list = [10, 5, 3]
             while sig_mask_size < 1 and snr_list[i] >= snr_list[-1]:
