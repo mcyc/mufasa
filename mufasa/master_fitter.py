@@ -189,7 +189,7 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
 
     if refit_bad_pix:
-        refit_bad_2comp(reg, snr_min=snr_min, lnk_thresh=-20, multicore=multicore)
+        refit_bad_2comp(reg, snr_min=snr_min, lnk_thresh=-5, multicore=multicore)
 
     if recover_wide:
         refit_2comp_wide(reg, snr_min=snr_min, multicore=multicore)
