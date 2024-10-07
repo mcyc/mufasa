@@ -338,7 +338,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     if 'maskmap' in kwargs:
         logger.debug("including user specified mask as a base")
-        planemask = np.logical_or(kwargs['maskmap'], planemask)
+        planemask = np.logical_and(kwargs['maskmap'], planemask)
 
     peaksnr, planemask, kwargs, err_mask = handle_snr(pcube, snr_min, planemask=planemask,
                                                       return_errmask=True, **kwargs)
@@ -576,7 +576,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     if not 'integral' in kwargs: kwargs['integral'] = False # False is default so this isn't required
 
     # Now fit the cube. (Note: the function inputs are consistent with GAS DR1 whenever possible)
-    kwargs['maskmap'] = planemask * footprint_mask
+    kwargs['maskmap'] = planemask * footprint_mask * np.all(np.isfinite(guesses), axis=0)
 
     mask_size = np.sum(kwargs['maskmap'])
 
