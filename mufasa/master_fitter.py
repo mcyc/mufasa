@@ -566,7 +566,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
     snr_map = get_best_2comp_snr_mod(reg_final)
     savename = make_save_name(paraRoot, paraDir, "SNR")
     save_map(snr_map, hdr2D, savename)
-    logger.info('{} saved.'.format(savename))
+    logger.debug('{} saved.'.format(savename))
 
     # create moment0 map
     modbest = get_best_2comp_model(reg_final)
@@ -577,13 +577,13 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
     mom0_mod = cube_mod.moment0()
     savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)
-    logger.info('{} saved.'.format(savename))
+    logger.debug('{} saved.'.format(savename))
 
     # created masked mom0 map with model as the mask
     mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=20, mask=None)
     savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
-    logger.info('{} saved.'.format(savename))
+    logger.debug('{} saved.'.format(savename))
 
     # save reduced chi-squred maps
     # would be useful to check if 3rd component is needed
@@ -591,7 +591,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
     chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=modbest, expand=20, reduced=True, usemask=True,
                               mask=None)
     save_map(chi_map, hdr2D, savename)
-    logger.info('{} saved.'.format(savename))
+    logger.debug('{} saved.'.format(savename))
 
     # save reduced chi-squred maps for 1 comp and 2 comp individually
     chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
@@ -599,11 +599,11 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
     save_map(chiRed_1c, hdr2D, savename)
-    logger.info('{} saved.'.format(savename))
+    logger.debug('{} saved.'.format(savename))
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_2c")
     save_map(chiRed_2c, hdr2D, savename)
-    logger.info('{} saved.'.format(savename))
+    logger.debug('{} saved.'.format(savename))
 
     return reg
 

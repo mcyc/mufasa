@@ -260,7 +260,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, fittype='
     if 'start_from_point' not in kwargs:
         indx_g = np.argwhere(maskmap)
         start_from_point = (indx_g[0,1], indx_g[0,0])
-        logger.info("starting point: {}".format(start_from_point))
+        logger.debug("starting point: {}".format(start_from_point))
         kwargs['start_from_point'] = start_from_point
 
     # add all the pcube.fiteach kwargs)
@@ -366,12 +366,10 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         warnings.warn(msg, DeprecationWarning)
         logger.warning(msg)
 
-    logger.info("planemask size: {0}, shape: {1}".format(planemask.sum(), planemask.shape))
-
     # masking for moment guesses (note that this isn't used for the actual fit)
     mask = np.isfinite(cube._data) * planemask * footprint_mask #* err_mask
 
-    logger.debug("mask size: {0}, shape: {1}".format(mask[mask].sum(), mask.shape))
+    logger.debug("mask size: {0}, shape: {1}".format(mask.sum(), mask.shape))
 
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
@@ -406,14 +404,11 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
         if sig_mask_size < 1:
             # if no pixel in the map still, use all pixels
-            logger.info("No pixels with SNR > 3; using all pixels")
+            logger.debug("No pixels with SNR > 3; using all pixels")
             signal_mask = planemask
             sig_mask_size = signal_mask.sum()
 
-        logger.info("signal_mask size: {}".format(sig_mask_size))
-
         signal_mask *= err_mask
-
 
         from skimage.morphology import binary_dilation
 
@@ -491,7 +486,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # define acceptable v range based on the provided or determined median velocity
     vmax = v_median + v_peak_hwidth
     vmin = v_median - v_peak_hwidth
-    logger.info("median input velocity: {:.3f}".format(v_median))
+    logger.debug("median input velocity: {:.3f}".format(v_median))
 
     # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
     if v_99p + sigmax > vmax:
@@ -651,7 +646,7 @@ def save_pcube(pcube, savename, ncomp=2):
 
     fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube,pcube.errcube]), header=hdr_new)
     fitcubefile.writeto(savename ,overwrite=True)
-    logger.info("{} saved.".format(savename))
+    logger.debug("{} saved.".format(savename))
 
 ##################
 
@@ -688,7 +683,7 @@ def get_vstats(velocities, signal_mask=None):
 def get_start_point(maskmap):
     indx_g = np.argwhere(maskmap)
     start_from_point = (indx_g[0,1], indx_g[0,0])
-    logger.info("starting point: {}".format(start_from_point))
+    logger.debug("starting point: {}".format(start_from_point))
     return start_from_point
 
 
@@ -705,7 +700,7 @@ def snr_estimate(pcube, errmap, smooth=True):
         errmap = mad_std(cube, axis=0, ignore_nan=True)
 
     err_med = np.nanmedian(errmap)
-    logger.info("median rms: {:.5f}".format(err_med))
+    logger.debug("median rms: {:.5f}".format(err_med))
 
     # mask out pixels that are too noisy (in this case, 3 times the median rms in the cube)
     err_mask = errmap < err_med * 3.0
