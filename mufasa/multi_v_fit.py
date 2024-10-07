@@ -7,16 +7,14 @@ import pyspeckit
 import astropy.io.fits as fits
 import copy
 import os, errno
-from os import path
 import multiprocessing
 import warnings
 
-
 from astropy import units as u
-import scipy.ndimage as nd
+from scipy import ndimage as ndi
 
 from spectral_cube import SpectralCube
-from skimage.morphology import remove_small_objects,disk,opening,binary_erosion,remove_small_holes
+from skimage.morphology import remove_small_objects, disk, opening, binary_erosion, remove_small_holes, binary_dilation
 from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
@@ -129,7 +127,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
     selem = np.ones(expand,dtype=np.bool)
     selem.shape += (1,1,)
-    mask = nd.binary_dilation(mask, selem)
+    mask = ndi.binary_dilation(mask, selem)
     mask = mask.astype(np.float)
     chisq = np.sum((residual * mask)**2, axis=0)
 
@@ -323,7 +321,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
         errmap = None
 
-
     footprint_mask = np.any(np.isfinite(cube._data), axis=0)
 
     if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
@@ -344,9 +341,9 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
                                                       return_errmask=True, **kwargs)
 
     if planemask.sum() < 1:
-        logger.warning("the provided snr cut is to strick; auto snr default will be used")
-        planemask = footprint_mask
-
+        msg = "The provided snr_min = {} is too strick; fitting terminated".format(snr_min)
+        logger.error(msg)
+        raise Exception(msg)
 
     def default_masking(snr, snr_min=5.0):
         if snr_min is None:
@@ -388,67 +385,57 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         m0, m1, m2 = mod_info.main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
         v_median, v_99p, v_1p = get_vstats(v_guess)
     else:
-        signal_mask = default_masking(peaksnr, snr_min=10.0)
-        sig_mask_size = signal_mask.sum()
-
-        if sig_mask_size < 1:
-            logger.debug("No pixels with SNR > 10; try SNR>5")
-            # if there's no pixel above SNR > 10, try lower the threshold to 5
-            signal_mask = default_masking(peaksnr, snr_min=5.0)
-            sig_mask_size = signal_mask.sum()
-
-        if sig_mask_size < 1:
-            logger.debug("No pixels with SNR > 5; try SNR>3")
-            # if there's no pixel above SNR > 10, try lower the threshold to 5
-            signal_mask = default_masking(peaksnr, snr_min=3.0)
-            sig_mask_size = signal_mask.sum()
-
-        if sig_mask_size < 1:
-            # if no pixel in the map still, use all pixels
-            logger.debug("No pixels with SNR > 3; using all pixels")
+        # create seeds, in the form of signal_mask to divide the cube for different moment guesses
+        if snr_min > 10 and planemask.sum() > 1:
             signal_mask = planemask
-            sig_mask_size = signal_mask.sum()
+        else:
+            signal_mask = default_masking(peaksnr, snr_min=10)
+            # apply the error mask to remove potential "fake" signals in noisy maps
+            sig_mask_size = signal_mask.sum()*err_mask
 
-        signal_mask *= err_mask
+            snr_list = [10, 5, 3]
+            while sig_mask_size < 1 and snr_list[i] >= snr_list[-1]:
+                snr_i = snr_list[i]
+                logger.debug("No pixels with {} > SNR cut; try SNR > {}".format(snr_list[i-1], snr_i))
+                # if there's no pixel above SNR > 10, try lower the threshold to 5
+                signal_mask = default_masking(peaksnr, snr_min=snr_i)*err_mask
+                sig_mask_size = signal_mask.sum()
 
-        from skimage.morphology import binary_dilation
-
-        def adaptive_moment_maps(maskcube, seeds, window_hwidth, weights, signal_mask):
-            # a method to divide the cube into different regions and moments in each region
-            _, n_seeds = ndi.label(seeds)
-            if n_seeds > 10:
-                # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
-                seeds = binary_dilation(seeds, disk(5))
-
-            return momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=window_hwidth,
-                                              weights=weights, signal_mask=signal_mask)
-
+            if sig_mask_size < 1:
+                # if no pixel in the map still, use all pixels
+                logger.debug("No pixels with SNR > {}; using all pixels".format(snr_list[-1]))
+                signal_mask = planemask*err_mask
 
         # find the number of structures in the signal_mask
-        from scipy import ndimage as ndi
-
         _, n_sig_parts = ndi.label(signal_mask)
 
         if n_sig_parts > 1:
             # if there is more than one structure in the signal mask
             seeds = signal_mask
-            m0, m1, m2 = adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
-                                 weights=peaksnr, signal_mask=signal_mask)
+            while n_sig_parts > 10:
+                # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
+                seeds = binary_dilation(seeds, disk(5))
+                _, n_sig_parts = ndi.label(signal_mask)
 
+            m0, m1, m2 = momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                                              weights=peaksnr, signal_mask=signal_mask)
         else:
             # use err_mask if it has structures
             _, n_parts = ndi.label(~err_mask)
             if n_parts > 1:
                 seeds = err_mask
-                m0, m1, m2 = adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
-                                     weights=peaksnr, signal_mask=signal_mask)
+                while n_sig_parts > 10:
+                    # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
+                    seeds = binary_dilation(seeds, disk(5))
+                    _, n_sig_parts = ndi.label(signal_mask)
+                m0, m1, m2 = momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
+                                              weights=peaksnr, signal_mask=signal_mask)
             else:
                 # use the simplest main_hf_moments
                 m0, m1, m2 = mod_info.main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
 
-        # mask over robust moment guess pixels to set the velocity fitting range
-        v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
-
+    # mask over robust moment guess pixels to set the velocity fitting range
+    v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
     logger.debug("median velocity: {:3f}".format(v_median))
 
     # use the median value of the mom0 pixels with snr < 3 as an estimation for the mom0 baseline
@@ -499,7 +486,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     m0, m1, m2 = mmm[0], mmm[1], mmm[2]
 
     logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
-
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
@@ -558,7 +544,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         hdr_new['CRVAL3']= 0
         hdr_new['CRPIX3']= 1
 
-        savedir = "{0}/{1}".format(path.dirname(paraname), "guesses")
+        savedir = "{0}/{1}".format(os.path.dirname(paraname), "guesses")
 
         try:
             os.makedirs(savedir)
@@ -566,8 +552,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
             if e.errno != errno.EEXIST:
                 raise
 
-        savename = "{0}_guesses.fits".format(path.splitext(paraname)[0], "parameter_maps")
-        savename = "{0}/{1}".format(savedir,path.basename(savename))
+        savename = "{0}_guesses.fits".format(os.path.splitext(paraname)[0], "parameter_maps")
+        savename = "{0}/{1}".format(savedir, os.path.basename(savename))
 
         fitcubefile = fits.PrimaryHDU(data=guesses, header=hdr_new)
         fitcubefile.writeto(savename ,overwrite=True)
