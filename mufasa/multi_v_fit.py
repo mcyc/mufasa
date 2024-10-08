@@ -20,6 +20,7 @@ from astropy.stats import mad_std
 
 from . import moment_guess as momgue
 from . import guess_refine as g_refine
+from .exceptions import SNRMaskError, FitTypeError
 from .utils.multicore import validate_n_cores
 from .utils import interpolate
 
@@ -86,7 +87,8 @@ class MetaModel(object):
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
         else:
-            raise Exception("{} is an invalid fittype".format(fittype))
+            raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
+
 
 #=======================================================================================================================
 
@@ -341,9 +343,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
                                                       return_errmask=True, **kwargs)
 
     if planemask.sum() < 1:
-        msg = "The provided snr_min = {} is too strick; fitting terminated".format(snr_min)
-        logger.error(msg)
-        raise Exception(msg)
+        msg = "The provided snr_min={} results in no valid pixels to fit; fitting terminated".format(snr_min)
+        raise SNRMaskError(msg)
 
     def default_masking(snr, snr_min=5.0):
         if snr_min is None:
@@ -728,6 +729,9 @@ def handle_snr(pcube, snr_min, planemask, return_errmask=False, **kwargs):
     if snr_min > 0:
         snr_mask = peaksnr > snr_min
         planemask = np.logical_and(planemask, snr_mask)
+    else:
+        msg = "The provided snr_min={} results in no valid pixels to fit; fitting terminated.".format(snr_min)
+        raise SNRMaskError(msg)
 
     if return_errmask:
         return peaksnr, planemask, kwargs, err_mask

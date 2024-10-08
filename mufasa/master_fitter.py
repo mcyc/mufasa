@@ -30,6 +30,7 @@ from . import UltraCube as UCube
 from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
+from .exceptions import SNRMaskError, FitTypeError
 from .utils.multicore import validate_n_cores
 from .utils import neighbours
 # =======================================================================================================================
@@ -429,8 +430,13 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
     if np.sum(mask) >= 1:
         ucube_new = UCube.UltraCube(ucube.cubefile, fittype=ucube.fittype)
         # fit using simpfit (and take the provided guesses as they are)
-        ucube_new.fit_cube(ncomp=[2], simpfit=simpfit, maskmap=mask, snr_min=snr_min, guesses=guesses,
-                           multicore=multicore)
+        try:
+            ucube_new.fit_cube(ncomp=[2], simpfit=simpfit, maskmap=mask, snr_min=snr_min,
+                               guesses=guesses, multicore=multicore)
+        except SNRMaskError:
+            logger.info("No valid pixel to refit with snr_min={}."
+                        " Please consider trying a lower snr_min value".format(snr_min))
+            return
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
