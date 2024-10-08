@@ -729,7 +729,8 @@ def handle_snr(pcube, snr_min, planemask, return_errmask=False, **kwargs):
     if snr_min > 0:
         snr_mask = peaksnr > snr_min
         planemask = np.logical_and(planemask, snr_mask)
-    else:
+
+    if planemask.sum() < 1:
         msg = "The provided snr_min={} results in no valid pixels to fit; fitting terminated.".format(snr_min)
         raise SNRMaskError(msg)
 
