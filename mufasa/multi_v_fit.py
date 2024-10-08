@@ -20,7 +20,7 @@ from astropy.stats import mad_std
 
 from . import moment_guess as momgue
 from . import guess_refine as g_refine
-from .exceptions import SNRMaskError, FitTypeError
+from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import interpolate
 
@@ -586,15 +586,20 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
 
     kwargs['start_from_point'] = get_start_point(kwargs['maskmap'], weight=peaksnr)
 
-    pcube.fiteach (fittype=fittype, guesses=guesses,
-                  use_neighbor_as_guess=False,
-                  limitedmax=[True,True,True,True]*ncomp,
-                  maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
-                  limitedmin=[True,True,True,True]*ncomp,
-                  minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
-                  multicore=multicore,
-                  **kwargs
-                  )
+    try:
+        pcube.fiteach (fittype=fittype, guesses=guesses,
+                      use_neighbor_as_guess=False,
+                      limitedmax=[True,True,True,True]*ncomp,
+                      maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
+                      limitedmin=[True,True,True,True]*ncomp,
+                      minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
+                      multicore=multicore,
+                      **kwargs
+                      )
+    except AssertionError:
+        msg = "The first fitted pixel did not yield a fit. Likely due to a lack of signal or poor guesses."
+        raise StartFitError(msg)
+
 
     if paraname != None:
         save_pcube(pcube, paraname, ncomp=ncomp)
