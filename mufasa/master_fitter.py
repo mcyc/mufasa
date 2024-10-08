@@ -391,6 +391,10 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
         try:
             wide_comp_guess = get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=snr_min, savefit=True, planemask=mask)
+        except SNRMaskError as e:
+            msg = "Unable to recovere second component from residual." + e.__str__()
+            logger.warning(msg)
+            return
         except StartFitError as e:
             logger.warning(e.__str__())
             return
@@ -444,7 +448,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
                                guesses=guesses, multicore=multicore)
         except SNRMaskError:
             logger.info("No valid pixel to refit with snr_min={}."
-                        " Please consider trying a lower snr_min value".format(snr_min))
+                        " Please consider trying a lower snr_min value.".format(snr_min))
             return
 
         # do a model comparison between the new two component fit verses the original one
@@ -638,8 +642,7 @@ def get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=3, savefit=True, plan
         try:
             fit_best_2comp_residual_cnv(reg, window_hwidth=window_hwidth, res_snr_cut=snr_min, savefit=savefit, planemask=planemask)
         except SNRMaskError:
-            msg = "No valid pixel to refit in the residual cube for snr_min={}. " \
-                  "Please consider trying a lower snr_min value".format(snr_min)
+            msg = "No valid pixel to refit in the residual cube for snr_min={}.".format(snr_min)
             raise SNRMaskError(msg)
         '''
             try:
