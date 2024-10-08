@@ -20,7 +20,7 @@ from astropy.stats import mad_std
 
 from . import moment_guess as momgue
 from . import guess_refine as g_refine
-from .exceptions import SNRMaskError, FitTypeError
+from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import interpolate
 
@@ -583,17 +583,23 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     #get the start point
     if "start_from_point" in kwargs:
         logger.warning("user start point will not be used")
-    kwargs['start_from_point'] = get_start_point(kwargs['maskmap'])
 
-    pcube.fiteach (fittype=fittype, guesses=guesses,
-                  use_neighbor_as_guess=False,
-                  limitedmax=[True,True,True,True]*ncomp,
-                  maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
-                  limitedmin=[True,True,True,True]*ncomp,
-                  minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
-                  multicore=multicore,
-                  **kwargs
-                  )
+    kwargs['start_from_point'] = get_start_point(kwargs['maskmap'], weight=peaksnr)
+
+    try:
+        pcube.fiteach (fittype=fittype, guesses=guesses,
+                      use_neighbor_as_guess=False,
+                      limitedmax=[True,True,True,True]*ncomp,
+                      maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
+                      limitedmin=[True,True,True,True]*ncomp,
+                      minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
+                      multicore=multicore,
+                      **kwargs
+                      )
+    except AssertionError:
+        msg = "The first fitted pixel did not yield a fit. Likely due to a lack of signal or poor guesses."
+        raise StartFitError(msg)
+
 
     if paraname != None:
         save_pcube(pcube, paraname, ncomp=ncomp)
@@ -669,9 +675,19 @@ def get_vstats(velocities, signal_mask=None):
     v_1p = np.percentile(m1_good, 1)
     return v_median, v_99p, v_1p
 
-def get_start_point(maskmap):
-    indx_g = np.argwhere(maskmap)
-    start_from_point = (indx_g[0,1], indx_g[0,0])
+def get_start_point(maskmap, weight=None):
+    if weight is not None:
+        # use the max position in weight within the mask as a start point
+        weight = weight*maskmap
+        indx_g = np.argwhere(weight == weight.max())
+    else:
+        indx_g = np.argwhere(maskmap)
+    try:
+        start_from_point = (indx_g[0,1], indx_g[0,0])
+    except IndexError:
+        indx_g = np.argwhere(maskmap)
+        start_from_point = (indx_g[0, 1], indx_g[0, 0])
+
     logger.debug("starting point: {}".format(start_from_point))
     return start_from_point
 
@@ -729,7 +745,8 @@ def handle_snr(pcube, snr_min, planemask, return_errmask=False, **kwargs):
     if snr_min > 0:
         snr_mask = peaksnr > snr_min
         planemask = np.logical_and(planemask, snr_mask)
-    else:
+
+    if planemask.sum() < 1:
         msg = "The provided snr_min={} results in no valid pixels to fit; fitting terminated.".format(snr_min)
         raise SNRMaskError(msg)
 

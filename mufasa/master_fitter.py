@@ -9,7 +9,7 @@ import numpy as np
 import multiprocessing
 from spectral_cube import SpectralCube
 from astropy import units as u
-from skimage.morphology import binary_dilation, square
+from skimage.morphology import binary_dilation, square, disk
 import astropy.io.fits as fits
 from copy import copy, deepcopy
 import gc
@@ -30,7 +30,7 @@ from . import UltraCube as UCube
 from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
-from .exceptions import SNRMaskError, FitTypeError
+from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import neighbours
 # =======================================================================================================================
@@ -189,11 +189,16 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     '''
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
 
+    # assumes the user wants to recovery a second component that is fainter than the primary
+    recover_snr_min = 3.0
+    if snr_min < recover_snr_min:
+        recover_snr_min = snr_min
+
     if refit_bad_pix:
-        refit_bad_2comp(reg, snr_min=snr_min, lnk_thresh=-5, multicore=multicore)
+        refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
 
     if recover_wide:
-        refit_2comp_wide(reg, snr_min=snr_min, multicore=multicore)
+        refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
 
     save_best_2comp_fit(reg, multicore=multicore)
 
@@ -384,7 +389,15 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         c1_guess = copy(reg.ucube.pcubes['1'].parcube)
         c1_guess = gss_rf.refine_each_comp(c1_guess)
 
-        wide_comp_guess = get_2comp_wide_guesses(reg)
+        try:
+            wide_comp_guess = get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=snr_min, savefit=True, planemask=mask)
+        except SNRMaskError as e:
+            msg = "Unable to recovere second component from residual." + e.__str__()
+            logger.warning(msg)
+            return
+        except StartFitError as e:
+            logger.warning(e.__str__())
+            return
         # reduce the linewidth guess to avoid overestimation
         wide_comp_guess[:, ~mask] = np.nan
 
@@ -435,7 +448,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
                                guesses=guesses, multicore=multicore)
         except SNRMaskError:
             logger.info("No valid pixel to refit with snr_min={}."
-                        " Please consider trying a lower snr_min value".format(snr_min))
+                        " Please consider trying a lower snr_min value.".format(snr_min))
             return
 
         # do a model comparison between the new two component fit verses the original one
@@ -623,19 +636,14 @@ def save_map(map, header, savename, overwrite=True):
 # functions that facilitate
 
 
-def get_2comp_wide_guesses(reg):
+def get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=3, savefit=True, planemask=None):
     if not hasattr(reg, 'ucube_res_cnv'):
         # fit the residual with the one component model if this has not already been done.
         try:
-            fit_best_2comp_residual_cnv(reg)
+            fit_best_2comp_residual_cnv(reg, window_hwidth=window_hwidth, res_snr_cut=snr_min, savefit=savefit, planemask=planemask)
         except SNRMaskError:
-            logger.info("No valid pixel to refit in the residual cube."
-                        " Please consider trying a lower snr_min value")
-            return
-        except ValueError:
-            logger.info("No valid pixel to refit in the residual cube."
-                        " Please consider trying a lower snr_min value")
-            return
+            msg = "No valid pixel to refit in the residual cube for snr_min={}.".format(snr_min)
+            raise SNRMaskError(msg)
         '''
             try:
                 fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
@@ -689,11 +697,12 @@ def get_2comp_wide_guesses(reg):
         return guesses_final
 
 
-def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=3, savefit=True):
+def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=3, savefit=True, planemask=None):
     # fit the residual of the best fitted model (note, this approach may not hold well if the two-slab model
     # insufficiently at describing the observation. Luckily, however, this fit is only to provide initial guess for the
     # final fit)
     # the default window_hwidth = 3.5 is about half-way between the main hyperfine and the satellite
+    # note res_snr_cut is only used for moment guess and not the actual recovery fit.
 
     # need a mechanism to make sure reg.ucube.pcubes['1'], reg.ucube.pcubes['2'] exists
     cube_res_cnv = get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=window_hwidth, res_snr_cut=res_snr_cut)
@@ -731,23 +740,32 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=3, savefit=T
     else:
         maskmap = np.isfinite(mom0)
 
+    if planemask is not None:
+        if planemask.shape == maskmap.shape:
+            maskmap = np.logical_and(maskmap, planemask)
+        else:
+            from reproject import reproject_interp
+            # dilate the planemask to ensure no area lost when downsampling in repojecting
+            planemask_regrid = binary_dilation(planemask, disk(2))
+            planemask_regrid, _ = reproject_interp((planemask_regrid, reg.ucube.cube.wcs.celestial),
+                                                   output_projection=cube_res_cnv.wcs.celestial,
+                                                   shape_out=maskmap.shape)
+            planemask_regrid = planemask_regrid > 0.5
+            maskmap = np.logical_and(maskmap, planemask_regrid)
+
     reg.ucube_res_cnv = UCube.UltraCube(cube=cube_res_cnv, fittype=reg.fittype)
 
     if np.sum(maskmap) > 0:
-        mom0[~maskmap] = np.nan
-        indx_g = np.where(mom0 == np.nanmax(mom0))
-        idx_x = indx_g[1][0]
-        idx_y = indx_g[0][0]
-        start_from_point = (idx_y, idx_x)
+        # note: snr is set to zero here becasue snr masking has already been pefromed once here
         try:
-            reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, signal_cut=0.0, guesses=gg,
-                                       maskmap=maskmap, start_from_point=start_from_point)
-        except SNRMaskError:
-            logger.info("No valid pixel to refit in the residual cube with snr_min={}."
-                        " Please consider trying a lower snr_min value".format(res_snr_cut))
-            return
+            reg.ucube_res_cnv.fit_cube(ncomp=[1], simpfit=False, snr_min=0.0, guesses=gg, maskmap=maskmap)
+        except StartFitError:
+            msg = "The first fitted pixel to the convovled residual cube did not yield a fit, likely due to a lack of signal or poor guesses."
+            raise StartFitError(msg)
     else:
-        return
+        msg = "No valid pixel to refit in the residual cube with snr_min={}. " \
+              "Please consider trying a lower snr_min value".format(res_snr_cut)
+        raise SNRMaskError(msg)
 
     # save the residual fit
     if savefit:
