@@ -745,7 +745,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=3, savefit=T
             # dilate the planemask to ensure no area lost when downsampling in repojecting
             planemask_regrid = binary_dilation(planemask, disk(2))
             planemask_regrid, _ = reproject_interp((planemask_regrid, reg.ucube.cube.wcs.celestial),
-                                                   output_projection=reg.ucube_cnv.cube.wcs.celestial,
+                                                   output_projection=cube_res_cnv.wcs.celestial,
                                                    shape_out=maskmap.shape)
             planemask_regrid = planemask_regrid > 0.5
             maskmap = np.logical_and(maskmap, planemask_regrid)
