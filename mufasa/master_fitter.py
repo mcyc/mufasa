@@ -392,11 +392,15 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         try:
             wide_comp_guess = get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=snr_min, savefit=True, planemask=mask)
         except SNRMaskError as e:
-            msg = "Unable to recovere second component from residual." + e.__str__()
+            msg = "Unable to recovere second component from residual. " + e.__str__()
             logger.warning(msg)
             return
         except StartFitError as e:
             logger.warning(e.__str__())
+            return
+        except ValueError as e:
+            msg = e.__str__() + "Convolved residual cube is not fitted. No recovery is done for the wide component."
+            logger.warning(msg)
             return
         # reduce the linewidth guess to avoid overestimation
         wide_comp_guess[:, ~mask] = np.nan
@@ -644,13 +648,6 @@ def get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=3, savefit=True, plan
         except SNRMaskError:
             msg = "No valid pixel to refit in the residual cube for snr_min={}.".format(snr_min)
             raise SNRMaskError(msg)
-        '''
-            try:
-                fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=0.0)
-            except ValueError as e:
-                logger.info(e)
-                pass
-        '''
 
     def get_mom_guesses(reg):
         # get moment guesses from no masking
@@ -774,7 +771,7 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=3, savefit=T
         reg.ucube_res_cnv.save_fit(savename, ncomp)
 
 
-def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut=5):
+def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut=3):
     # convolved residual cube.If masked is True, only convolve over where 'excessive' residual is
     # above a peak SNR value of res_snr_cut masked
 
@@ -782,7 +779,8 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
                                                            res_snr_cut=res_snr_cut)
 
     cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
-                                                 snrmasked=False, iterrefine=False)
+                                                     snrmasked=False, iterrefine=False)
+
     return cube_res_cnv
 
 
@@ -817,9 +815,13 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
 
         # mask out residual with SNR values over the cut threshold
         mask_res = res_main_hf_snr > res_snr_cut
-        mask_res = binary_dilation(mask_res)
-
-        cube_res_masked = cube_res.with_mask(~mask_res)
+        if mask_res.sum() < 1:
+            logger.debug("No pixel in the residual cube mask. No mask will be applied.")
+            mask_res = binary_dilation(mask_res)
+            cube_res_masked = cube_res.with_mask(~mask_res)
+        else:
+            # no masking
+            cube_res_masked = cube_res
     else:
         # no masking
         cube_res_masked = cube_res
