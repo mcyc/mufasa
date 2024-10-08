@@ -189,10 +189,10 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     '''
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
 
-    # assumes the user wants to recovery a second component that is fainter than the primary
+    # assumes the user wants to recover a second component that is fainter than the primary
     recover_snr_min = 3.0
-    if snr_min < recover_snr_min:
-        recover_snr_min = snr_min
+    if snr_min/3.0 < recover_snr_min:
+        recover_snr_min = snr_min/3.0
 
     if refit_bad_pix:
         refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
