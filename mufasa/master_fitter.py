@@ -398,6 +398,10 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         except StartFitError as e:
             logger.warning(e.__str__())
             return
+        except ValueError as e:
+            msg = e.__str__() + "Convolved residual cube is not fitted. No recovery is done for the wide component."
+            logger.warning(msg)
+            return
         # reduce the linewidth guess to avoid overestimation
         wide_comp_guess[:, ~mask] = np.nan
 
@@ -780,9 +784,12 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
 
     cube_res_masked = get_best_2comp_residual_SpectralCube(reg, masked=masked, window_hwidth=window_hwidth,
                                                            res_snr_cut=res_snr_cut)
+    try:
+        cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
+                                                     snrmasked=False, iterrefine=False)
+    except ValueError as e:
+        msg = e.__str__() + ""
 
-    cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
-                                                 snrmasked=False, iterrefine=False)
     return cube_res_cnv
 
 
