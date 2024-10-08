@@ -686,6 +686,7 @@ def get_start_point(maskmap, weight=None):
         start_from_point = (indx_g[0,1], indx_g[0,0])
     except IndexError:
         indx_g = np.argwhere(maskmap)
+        start_from_point = (indx_g[0, 1], indx_g[0, 0])
 
     logger.debug("starting point: {}".format(start_from_point))
     return start_from_point
