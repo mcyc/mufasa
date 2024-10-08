@@ -583,7 +583,8 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     #get the start point
     if "start_from_point" in kwargs:
         logger.warning("user start point will not be used")
-    kwargs['start_from_point'] = get_start_point(kwargs['maskmap'])
+
+    kwargs['start_from_point'] = get_start_point(kwargs['maskmap'], weight=peaksnr)
 
     pcube.fiteach (fittype=fittype, guesses=guesses,
                   use_neighbor_as_guess=False,
@@ -669,8 +670,13 @@ def get_vstats(velocities, signal_mask=None):
     v_1p = np.percentile(m1_good, 1)
     return v_median, v_99p, v_1p
 
-def get_start_point(maskmap):
-    indx_g = np.argwhere(maskmap)
+def get_start_point(maskmap, weight=None):
+    if weight is not None:
+        # use the max position in weight within the mask as a start point
+        weight = weight*maskmap
+        indx_g = np.argwhere(weight == weight.max())
+    else:
+        indx_g = np.argwhere(maskmap)
     start_from_point = (indx_g[0,1], indx_g[0,0])
     logger.debug("starting point: {}".format(start_from_point))
     return start_from_point
