@@ -1,5 +1,6 @@
 from __future__ import print_function
 from __future__ import absolute_import
+
 __author__ = 'mcychen'
 
 import numpy as np
@@ -24,12 +25,14 @@ from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import interpolate
 
-#=======================================================================================================================
+# =======================================================================================================================
 
 from .utils.mufasa_log import get_logger
+
 logger = get_logger(__name__)
 
-#=======================================================================================================================
+
+# =======================================================================================================================
 
 class MetaModel(object):
     def __init__(self, fittype, ncomp=None):
@@ -50,7 +53,7 @@ class MetaModel(object):
 
             self.fitter = ammv.nh3_multi_v_model_generator(n_comp=ncomp, linenames=self.linenames)
             self.freq_dict = freq_dict
-            self.rest_value= freq_dict['oneone']*u.Hz
+            self.rest_value = freq_dict['oneone'] * u.Hz
             self.spec_model = ammonia._ammonia_spectrum
 
             # set the fit parameter limits (consistent with GAS DR1) for NH3 fits
@@ -90,9 +93,9 @@ class MetaModel(object):
             raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
 
 
-#=======================================================================================================================
+# =======================================================================================================================
 
-def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None, rest_value=None):
+def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None, rest_value=None):
     '''
     cube : SpectralCube
 
@@ -113,7 +116,7 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     '''
 
     if rest_value is not None:
-        cube = cube.with_spectral_unit(u.Hz, rest_value = rest_value)
+        cube = cube.with_spectral_unit(u.Hz, rest_value=rest_value)
 
     if usemask:
         if mask is None:
@@ -121,17 +124,16 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     else:
         mask = ~np.isnan(model)
 
-
-    residual = cube.filled_data[:].value-model
+    residual = cube.filled_data[:].value - model
 
     # This calculates chisq over the region where the fit is non-zero
     # plus a buffer of size set by the expand keyword.
 
-    selem = np.ones(expand,dtype=np.bool)
-    selem.shape += (1,1,)
+    selem = np.ones(expand, dtype=np.bool)
+    selem.shape += (1, 1,)
     mask = ndi.binary_dilation(mask, selem)
     mask = mask.astype(np.float)
-    chisq = np.sum((residual * mask)**2, axis=0)
+    chisq = np.sum((residual * mask) ** 2, axis=0)
 
     if reduced:
         chisq /= np.sum(mask, axis=0)
@@ -139,9 +141,9 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
     # This produces a robust estimate of the RMS along every line of sight:
     # (alternatively, we can use mad_std from astropy?)
     diff = residual - np.roll(residual, 2, axis=0)
-    rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
+    rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2 ** 0.5
 
-    chisq /= rms**2
+    chisq /= rms ** 2
 
     if reduced:
         # return the reduce chi-squares values
@@ -152,27 +154,23 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
         return chisq, np.sum(mask, axis=0)
 
 
-
-
-
 def setup_cube(cube, mod_info, return_spectral_cube=False):
-
     if hasattr(cube, 'spectral_axis'):
         pcube = pyspeckit.Cube(cube=cube)
     elif isinstance(cube, str):
         cubename = cube
         if return_spectral_cube:
             cube = SpectralCube.read(cube)
-            #pcube = pyspeckit.Cube(filename=cubename)
+            # pcube = pyspeckit.Cube(filename=cubename)
             pcube = pyspeckit.Cube(cube=cube)
 
         else:
             pcube = pyspeckit.Cube(filename=cubename)
 
-    pcube.unit="K"
+    pcube.unit = "K"
     if np.isnan(pcube.wcs.wcs.restfrq):
         # Specify the rest frequency not present
-        pcube.xarr.refX = mod_info.freq_dict[linename]*u.Hz
+        pcube.xarr.refX = mod_info.freq_dict[linename] * u.Hz
     pcube.xarr.velocity_convention = 'radio'
 
     # always register the fitter just in case different lines are used
@@ -193,7 +191,8 @@ def setup_cube(cube, mod_info, return_spectral_cube=False):
     else:
         return pcube
 
-def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
+
+def cubefit_simp(cube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
 
     logger.debug("using cubefit_simp")
@@ -201,7 +200,7 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, fittype='
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
     freq_dict = mod_info.freq_dict
-    linename=mod_info.linenames
+    linename = mod_info.linenames
 
     Texmin = mod_info.Texmin
     Texmax = mod_info.Texmax
@@ -222,7 +221,6 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, fittype='
     peaksnr, planemask, kwargs = handle_snr(pcube, snr_min, planemask, **kwargs)
 
     if maskmap is not None:
-        logger.debug("using user specified mask")
         maskmap *= planemask * footprint_mask
     else:
         maskmap = planemask * footprint_mask
@@ -256,10 +254,10 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, fittype='
     impose_lim(guesses[2::4], Texmin, Texmax, eps)
     impose_lim(guesses[3::4], taumin, taumax, eps)
 
-    valid = np.logical_and(maskmap, np.all(np.isfinite(guesses),axis=0))
+    valid = np.logical_and(maskmap, np.all(np.isfinite(guesses), axis=0))
     if 'start_from_point' not in kwargs:
         indx_g = np.argwhere(maskmap)
-        start_from_point = (indx_g[0,1], indx_g[0,0])
+        start_from_point = (indx_g[0, 1], indx_g[0, 0])
         logger.debug("starting point: {}".format(start_from_point))
         kwargs['start_from_point'] = start_from_point
 
@@ -277,8 +275,9 @@ def cubefit_simp(cube, ncomp, guesses, multicore = None, maskmap=None, fittype='
     return pcube
 
 
-def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None, guesses = None, errmap11name = None,
-            multicore = None, mask_function = None, snr_min=0.0, momedgetrim=True, saveguess=False, fittype='nh3_multi_v', **kwargs):
+def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, guesses=None, errmap11name=None,
+                multicore=None, mask_function=None, snr_min=0.0, momedgetrim=True, saveguess=False,
+                fittype='nh3_multi_v', **kwargs):
     '''
     Perform n velocity component fit on the GAS ammonia 1-1 data.
     (This should be the function to call for all future codes if it has been proven to be reliable)
@@ -339,6 +338,10 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         logger.debug("including user specified mask as a base")
         planemask = np.logical_and(kwargs['maskmap'], planemask)
 
+    if 'signal_cut' in kwargs:
+        logger.warning("signal_cut will be set to zero for pcube.fiteach() in cubefit_gen."
+                       " The snr_min is used to determine which pixels to fit prior to calling fiteach()")
+
     peaksnr, planemask, kwargs, err_mask = handle_snr(pcube, snr_min, planemask=planemask,
                                                       return_errmask=True, **kwargs)
 
@@ -346,30 +349,13 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         msg = "The provided snr_min={} results in no valid pixels to fit; fitting terminated".format(snr_min)
         raise SNRMaskError(msg)
 
-    def default_masking(snr, snr_min=5.0):
-        if snr_min is None:
-            planemask = np.isfinite(snr)
-        else:
-            planemask = (snr > snr_min)
-
-        if planemask.sum() > 100:
-            # to create a less noisy mask further
-            planemask = remove_small_holes(planemask, area_threshold=9)
-            planemask = remove_small_objects(planemask, min_size=25)
-            planemask = opening(planemask, disk(1))
-
-        return (planemask)
-
     if mask_function is not None:
-        msg ="\'mask_function\' is now deprecation, and will be removed in the next version"
+        msg = "\'mask_function\' is now deprecation, and will be removed in the next version"
         warnings.warn(msg, DeprecationWarning)
         logger.warning(msg)
 
     # masking for moment guesses (note that this isn't used for the actual fit)
-    mask = np.isfinite(cube._data) * planemask * footprint_mask #* err_mask
-
-    logger.debug("mask size: {0}, shape: {1}".format(mask.sum(), mask.shape))
-
+    mask = np.isfinite(cube._data) * planemask * footprint_mask  # * err_mask
     maskcube = cube.with_mask(mask.astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
@@ -390,22 +376,22 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         if snr_min > 10 and planemask.sum() > 1:
             signal_mask = planemask
         else:
-            signal_mask = default_masking(peaksnr, snr_min=10)*err_mask
+            signal_mask = default_masking(peaksnr, snr_min=10) * err_mask
             # apply the error mask to remove potential "fake" signals in noisy maps
             sig_mask_size = signal_mask.sum()
 
             snr_list = [10, 5, 3]
             while sig_mask_size < 1 and snr_list[i] >= snr_list[-1]:
                 snr_i = snr_list[i]
-                logger.debug("No pixels with {} > SNR cut; try SNR > {}".format(snr_list[i-1], snr_i))
+                logger.debug("No pixels with {} > SNR cut; try SNR > {}".format(snr_list[i - 1], snr_i))
                 # if there's no pixel above SNR > 10, try lower the threshold to 5
-                signal_mask = default_masking(peaksnr, snr_min=snr_i)*err_mask
+                signal_mask = default_masking(peaksnr, snr_min=snr_i) * err_mask
                 sig_mask_size = signal_mask.sum()
 
             if sig_mask_size < 1:
                 # if no pixel in the map still, use all pixels
                 logger.debug("No pixels with SNR > {}; using all pixels".format(snr_list[-1]))
-                signal_mask = planemask*err_mask
+                signal_mask = planemask * err_mask
 
         # find the number of structures in the signal_mask
         _, n_sig_parts = ndi.label(signal_mask)
@@ -419,7 +405,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
                 _, n_sig_parts = ndi.label(signal_mask)
 
             m0, m1, m2 = momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
-                                              weights=peaksnr, signal_mask=signal_mask)
+                                                     weights=peaksnr, signal_mask=signal_mask)
         else:
             # use err_mask if it has structures
             _, n_parts = ndi.label(~err_mask)
@@ -430,7 +416,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
                     seeds = binary_dilation(seeds, disk(5))
                     _, n_sig_parts = ndi.label(signal_mask)
                 m0, m1, m2 = momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
-                                              weights=peaksnr, signal_mask=signal_mask)
+                                                         weights=peaksnr, signal_mask=signal_mask)
             else:
                 # use the simplest main_hf_moments
                 m0, m1, m2 = mod_info.main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
@@ -443,7 +429,7 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     # this will be used for moment guesses
     try:
         fmask = peaksnr < 3
-        if np.sum(fmask*np.isfinite(m0)) > 3:
+        if np.sum(fmask * np.isfinite(m0)) > 3:
             mom0_floor = np.nanmedian(m0[fmask])
         else:
             mom0_floor = np.nanmin(m0)
@@ -486,11 +472,12 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask * footprint_mask)
     m0, m1, m2 = mmm[0], mmm[1], mmm[2]
 
-    logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin,2), np.round(vmax,2)))
+    logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin, 2), np.round(vmax, 2)))
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
-    gg = momgue.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0, linetype=mod_info.linetype, mom0_floor=mom0_floor)
+    gg = momgue.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0, linetype=mod_info.linetype,
+                               mom0_floor=mom0_floor)
 
     if guesses is None:
         guesses = gg
@@ -499,7 +486,6 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         # fill in the blanks with convolved interpolation then moment guesses
         guesses[guesses == 0] = np.nan
         gmask = np.isfinite(guesses)
-        # gmask = binary_erosion(gmask)
 
         mom_mask = np.isfinite(gg)
 
@@ -538,68 +524,61 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
     guesses[3::4][guesses[3::4] < taumin] = taumin
 
     if saveguess:
-        # save the guesses for diagnostic purposes
-        hdr_new = copy.deepcopy(pcube.header)
-        hdr_new['CDELT3']= 1
-        hdr_new['CTYPE3']= 'FITPAR'
-        hdr_new['CRVAL3']= 0
-        hdr_new['CRPIX3']= 1
+        save_guesses(pcube, paraname, guesses, savename)
 
-        savedir = "{0}/{1}".format(os.path.dirname(paraname), "guesses")
-
-        try:
-            os.makedirs(savedir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
-
-        savename = "{0}_guesses.fits".format(os.path.splitext(paraname)[0], "parameter_maps")
-        savename = "{0}/{1}".format(savedir, os.path.basename(savename))
-
-        fitcubefile = fits.PrimaryHDU(data=guesses, header=hdr_new)
-        fitcubefile.writeto(savename ,overwrite=True)
-
-    # set some of the fiteach() inputs to that used in GAS DR1 reduction
-    if not 'integral' in kwargs: kwargs['integral'] = False # False is default so this isn't required
-
-    # Now fit the cube. (Note: the function inputs are consistent with GAS DR1 whenever possible)
-    kwargs['maskmap'] = planemask * footprint_mask * np.all(np.isfinite(guesses), axis=0)
-
+    kwargs['maskmap'] = planemask & footprint_mask & np.all(np.isfinite(guesses), axis=0)
+    kwargs['maskmap'] &= match_pcube_mask(pcube, kwargs['maskmap'])
     mask_size = np.sum(kwargs['maskmap'])
 
     if mask_size < 1:
         logger.warning("maskmap has no pixels, no fitting will be performed")
         return pcube
-    elif np.sum(np.isfinite(guesses)) < 1:
+    elif np.all(np.isfinite(guesses), axis=0).sum() < 1:
         logger.warning("guesses has no pixels, no fitting will be performed")
         return pcube
 
-    logger.info("final mask size before fitting: {0}".format(mask_size))
+    logger.info("Final mask size for the fitting: {0} pixels".format(mask_size))
 
     multicore = validate_n_cores(multicore)
 
-    kwargs = set_pyspeckit_verbosity(**kwargs)
-
-    #get the start point
+    # get the start point
     if "start_from_point" in kwargs:
         logger.warning("user start point will not be used")
+    start_point = get_start_point(kwargs['maskmap'], weight=peaksnr)
+    kwargs['start_from_point'] = start_point
 
-    kwargs['start_from_point'] = get_start_point(kwargs['maskmap'], weight=peaksnr)
+    # finalize the argruments to be passed into fiteach
+    # signal_cut is set to zero, since a signal cut has already been done
+    kwargs_core = dict(fittype=fittype,
+                       guesses=guesses,
+                       limitedmax=[True, True, True, True] * ncomp,
+                       maxpars=[vmax, sigmax, Texmax, taumax] * ncomp,
+                       limitedmin=[True, True, True, True] * ncomp,
+                       minpars=[vmin, sigmin, Texmin, taumin] * ncomp,
+                       multicore=multicore,
+                       use_neighbor_as_guess=False,
+                       guesses_are_moments=False,
+                       signal_cut=0)
+    kwargs = {**kwargs, **kwargs_core}
+    kwargs = set_pyspeckit_verbosity(**kwargs)
 
+    # start fitting the cube
     try:
-        pcube.fiteach (fittype=fittype, guesses=guesses,
-                      use_neighbor_as_guess=False,
-                      limitedmax=[True,True,True,True]*ncomp,
-                      maxpars=[vmax, sigmax, Texmax, taumax]*ncomp,
-                      limitedmin=[True,True,True,True]*ncomp,
-                      minpars=[vmin, sigmin, Texmin, taumin]*ncomp,
-                      multicore=multicore,
-                      **kwargs
-                      )
-    except AssertionError:
-        msg = "The first fitted pixel did not yield a fit. Likely due to a lack of signal or poor guesses."
-        raise StartFitError(msg)
-
+        # fitting the cube
+        idx = kwargs['start_from_point']
+        logger.debug("guesses at start, 1st try: {}".format(guesses[:, idx[1], idx[0]]))
+        logger.debug("peaksnr at start, 1st try: {}".format(peaksnr[idx[1], idx[0]]))
+        pcube.fiteach(**kwargs)
+    except ValueError as e:
+        msg = "The starting fit position is somehow not among the valid, likely due to a bug. " \
+              "ValueError message from pyspeckit: " + e.__str__()
+        logger.warning(msg)
+        retry_fit(pcube, kwargs, start_point, peaksnr=peaksnr)
+    except AssertionError as e:
+        msg = "The starting fit position is somehow not among the valid, likely due to a bug. " \
+              "AssertionError message from pyspeckit: " + e.__str__()
+        logger.warning(msg)
+        retry_fit(pcube, kwargs, start_point, peaksnr=peaksnr)
 
     if paraname != None:
         save_pcube(pcube, paraname, ncomp=ncomp)
@@ -609,11 +588,70 @@ def cubefit_gen(cube, ncomp=2, paraname = None, modname = None, chisqname = None
         model.write(modname, overwrite=True)
 
     if chisqname != None:
-        chisq = get_chisq(cube, pcube.get_modelcube(), expand=20, rest_value= mod_info.rest_value)
+        chisq = get_chisq(cube, pcube.get_modelcube(), expand=20, rest_value=mod_info.rest_value)
         chisqfile = fits.PrimaryHDU(data=chisq, header=cube.wcs.celestial.to_header())
         chisqfile.writeto(chisqname, overwrite=True)
 
     return pcube
+
+
+# ===============================================================================
+
+def default_masking(snr, snr_min=5.0):
+    # a snr masking fucntion that perform some quailty controls
+
+    if snr_min is None:
+        planemask = np.isfinite(snr)
+    else:
+        planemask = (snr > snr_min)
+
+    if planemask.sum() > 100:
+        # to create a less noisy mask further
+        planemask = remove_small_holes(planemask, area_threshold=9)
+        planemask = remove_small_objects(planemask, min_size=25)
+        planemask = opening(planemask, disk(1))
+
+    return (planemask)
+
+
+def match_pcube_mask(pcube, maskmap):
+    # a function to ensure the mask passed into pcube.fiteach will be valid
+    # using the same code as pcube.fiteach to return a maskmap that should be valid when passed into fiteach
+    if not hasattr(pcube.mapplot, 'plane'):
+        logger.debug("pcube.mapplot has no attribute plane. Creating one right now.")
+        pcube.mapplot.makeplane()
+    if isinstance(pcube.mapplot.plane, np.ma.core.MaskedArray):
+        OK = ((~pcube.mapplot.plane.mask) &
+              maskmap.astype('bool')).astype('bool')
+    else:
+        OK = (np.isfinite(pcube.mapplot.plane) &
+              maskmap.astype('bool')).astype('bool')
+    return OK
+
+
+def retry_fit(pcube, kwargs, old_start_point, peaksnr=None):
+    # a module to retry a fit with a different start point
+    # remove the last failed pixel from the mask before trying again
+
+    kwargs['maskmap'][old_start_point[1], old_start_point[0]] = False
+    kwargs['start_from_point'] = get_start_point(kwargs['maskmap'], weight=None)
+    idx = kwargs['start_from_point']
+    logger.debug("guesses at start, 2nd try: {}".format(kwargs['guesses'][:, idx[1], idx[0]]))
+    if peaksnr is not None:
+        logger.debug("peaksnr (not used) at start, 2st try: {}".format(peaksnr[idx[1], idx[0]]))
+
+    try:
+        pcube.fiteach(**kwargs)
+    except ValueError as e:
+        msg = "The first two attempts to fit a pixel did not yield a fit. Likely due to a lack of signal or poor guesses. " \
+              "ValueError message from pyspeckit: " + e.__str__()
+        logger.error(msg)
+        raise StartFitError(msg)
+    except AssertionError as e:
+        msg = "The first two attempts to fit a pixel did not yield a fit. Likely due to a lack of signal or poor guesses. " \
+              "AssertionError message from pyspeckit: " + e.__str__()
+        logger.error(msg)
+        raise StartFitError(msg)
 
 
 def save_pcube(pcube, savename, ncomp=2):
@@ -622,26 +660,50 @@ def save_pcube(pcube, savename, ncomp=2):
     npara = 4
 
     hdr_new = copy.deepcopy(pcube.header)
-    for i in range (0, ncomp):
-        hdr_new['PLANE{0}'.format(i*npara+0)] = 'VELOCITY_{0}'.format(i+1)
-        hdr_new['PLANE{0}'.format(i*npara+1)] = 'SIGMA_{0}'.format(i+1)
-        hdr_new['PLANE{0}'.format(i*npara+2)] = 'TEX_{0}'.format(i+1)
-        hdr_new['PLANE{0}'.format(i*npara+3)] = 'TAU_{0}'.format(i+1)
+    for i in range(0, ncomp):
+        hdr_new['PLANE{0}'.format(i * npara + 0)] = 'VELOCITY_{0}'.format(i + 1)
+        hdr_new['PLANE{0}'.format(i * npara + 1)] = 'SIGMA_{0}'.format(i + 1)
+        hdr_new['PLANE{0}'.format(i * npara + 2)] = 'TEX_{0}'.format(i + 1)
+        hdr_new['PLANE{0}'.format(i * npara + 3)] = 'TAU_{0}'.format(i + 1)
 
     # the loop is split into two so the numbers will be written in ascending order
-    for i in range (0, ncomp):
-        hdr_new['PLANE{0}'.format((ncomp+i)*npara +0)] = 'eVELOCITY_{0}'.format(i+1)
-        hdr_new['PLANE{0}'.format((ncomp+i)*npara +1)] = 'eSIGMA_{0}'.format(i+1)
-        hdr_new['PLANE{0}'.format((ncomp+i)*npara +2)] = 'eTEX_{0}'.format(i+1)
-        hdr_new['PLANE{0}'.format((ncomp+i)*npara +3)] = 'eTAU_{0}'.format(i+1)
-    hdr_new['CDELT3']= 1
-    hdr_new['CTYPE3']= 'FITPAR'
-    hdr_new['CRVAL3']= 0
-    hdr_new['CRPIX3']= 1
+    for i in range(0, ncomp):
+        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 0)] = 'eVELOCITY_{0}'.format(i + 1)
+        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 1)] = 'eSIGMA_{0}'.format(i + 1)
+        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 2)] = 'eTEX_{0}'.format(i + 1)
+        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 3)] = 'eTAU_{0}'.format(i + 1)
+    hdr_new['CDELT3'] = 1
+    hdr_new['CTYPE3'] = 'FITPAR'
+    hdr_new['CRVAL3'] = 0
+    hdr_new['CRPIX3'] = 1
 
-    fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube,pcube.errcube]), header=hdr_new)
-    fitcubefile.writeto(savename ,overwrite=True)
+    fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube, pcube.errcube]), header=hdr_new)
+    fitcubefile.writeto(savename, overwrite=True)
     logger.debug("{} saved.".format(savename))
+
+
+def save_guesses(pcube, paraname, guesses, savename):
+    # a module to save guesses for diagnostic purposes
+    hdr_new = copy.deepcopy(pcube.header)
+    hdr_new['CDELT3'] = 1
+    hdr_new['CTYPE3'] = 'FITPAR'
+    hdr_new['CRVAL3'] = 0
+    hdr_new['CRPIX3'] = 1
+
+    savedir = "{0}/{1}".format(os.path.dirname(paraname), "guesses")
+
+    try:
+        os.makedirs(savedir)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+
+    savename = "{0}_guesses.fits".format(os.path.splitext(paraname)[0], "parameter_maps")
+    savename = "{0}/{1}".format(savedir, os.path.basename(savename))
+
+    fitcubefile = fits.PrimaryHDU(data=guesses, header=hdr_new)
+    fitcubefile.writeto(savename, overwrite=True)
+
 
 ##################
 
@@ -649,7 +711,7 @@ def set_pyspeckit_verbosity(**kwargs):
     if 'verbose_level' not in kwargs:
         from .utils.mufasa_log import DEBUG, INFO
         if logger.getEffectiveLevel() < DEBUG:
-            kwargs['verbose_level'] = 4 
+            kwargs['verbose_level'] = 4
         elif logger.getEffectiveLevel() <= INFO:
             kwargs['verbose_level'] = 1
         else:
@@ -659,8 +721,9 @@ def set_pyspeckit_verbosity(**kwargs):
         kwargs['verbose'] = False
         # pyspeckit defaults to verbose=True
         # if verbose=True and verbose_level=0 it prints output
-        
+
     return kwargs
+
 
 ##################
 def get_vstats(velocities, signal_mask=None):
@@ -675,25 +738,36 @@ def get_vstats(velocities, signal_mask=None):
     v_1p = np.percentile(m1_good, 1)
     return v_median, v_99p, v_1p
 
-def get_start_point(maskmap, weight=None):
+
+def get_start_point(maskmap, weight=None, return_xy=True):
+    # if return_xy, return index in the order of xy (pcube.fiteach's convention) instead of yx
+    # start_from_point is ordered in yx before it was returned upstream
     if weight is not None:
         # use the max position in weight within the mask as a start point
-        weight = weight*maskmap
-        indx_g = np.argwhere(weight == weight.max())
+        weight = np.nan_to_num(weight * maskmap)
+        try:
+            start_from_point = np.unravel_index(weight.argmax(), weight.shape)  # get start_from_point in the yx order
+            logger.debug("starting point obtained from using the weight: {}".format(start_from_point))
+            logger.debug("value of maskmap at startpoint: {}".format(maskmap[start_from_point]))
+            if not maskmap[start_from_point]:
+                msg = "The start point is not within maskmap. This is a bug that needs to be addressed."
+                logger.error(msg)
+                raise IndexError(msg)
+        except IndexError:
+            logger.debug("Trouble getting good start point with weight. Trying again without the weight.")
+            indx_g = np.argwhere(maskmap)
+            start_from_point = (indx_g[0, 0], indx_g[0, 1])
     else:
         indx_g = np.argwhere(maskmap)
-    try:
-        start_from_point = (indx_g[0,1], indx_g[0,0])
-    except IndexError:
-        indx_g = np.argwhere(maskmap)
-        start_from_point = (indx_g[0, 1], indx_g[0, 0])
-
+        start_from_point = (indx_g[0, 0], indx_g[0, 1])
     logger.debug("starting point: {}".format(start_from_point))
-    return start_from_point
+    if return_xy:
+        return (start_from_point[1], start_from_point[0])
+    else:
+        return start_from_point
 
 
 def snr_estimate(pcube, errmap, smooth=True):
-
     if hasattr(pcube, 'cube'):
         cube = pcube.cube
     else:
@@ -733,9 +807,10 @@ def handle_snr(pcube, snr_min, planemask, return_errmask=False, **kwargs):
                 snr_min = kwargs['signal_cut']
             else:
                 kwargs['signal_cut'] = snr_min
-            logger.warning(
-                "snr_min and signal_cut provided do not match. The higher value of the two, {}, is adopted".format(
-                    snr_min))
+            logger.warning("snr_min and signal_cut provided do not match."
+                           " The higher value of the two, {}, is adopted".format(snr_min))
+    else:
+        kwargs['signal_cut'] = 0
 
     if 'errmap' not in kwargs:
         errmap = None
