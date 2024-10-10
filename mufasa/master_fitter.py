@@ -186,7 +186,7 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-component fits
 
 
-def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
+def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True, refit_marginal=True,
                      multicore=True):
     '''
     note: planemask supercedes snr-based mask
@@ -203,6 +203,10 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
 
     if recover_wide:
         refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
+
+    if refit_marginal:
+        refit_marginal(reg, ncomp=2, lnk_thresh=5, holes_only=False, multicore=True,
+                       method='best_neighbour', **kwargs_marg)
 
     save_best_2comp_fit(reg, multicore=multicore)
 
