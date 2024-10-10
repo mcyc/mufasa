@@ -9,7 +9,7 @@ import numpy as np
 import multiprocessing
 from spectral_cube import SpectralCube
 from astropy import units as u
-from skimage.morphology import binary_dilation, square, disk
+from skimage.morphology import binary_dilation, remove_small_holes, remove_small_objects, square, disk
 import astropy.io.fits as fits
 from copy import copy, deepcopy
 import gc
@@ -280,7 +280,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
         logger.info("No pixel was used in attempt to recover bad 2-comp. fits")
         return
 
-    guesses, mask = get_refit_guesses(ucube, mask, ncomp=2, method='best_neighbour')
+    guesses, mask = get_refit_guesses(ucube, mask, ncomp=2, method='best_neighbour', refmap=lnk20)
     # re-fit and save the updated model
     replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore)
 
@@ -291,8 +291,12 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
 
 
-def refit_marginal(reg, ncomp, lnk_thresh=5, multicore=True, save_para=True, method='best_neighbour'):
+def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, save_para=True, method='best_neighbour', **kwargs_marg):
     # refit pixels that seem marginaly okay
+    ucube = reg.ucube
+
+    proc_name = f'refit_marginal_{ncomp}_comp'
+    reg.log_progress(process_name=proc_name, mark_start=True)
     ucube = reg.ucube
 
     multicore = validate_n_cores(multicore)
@@ -301,11 +305,18 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, multicore=True, save_para=True, met
     lnk_maps = reg.ucube.get_all_lnk_maps(ncomp_max=ncomp, rest_model_mask=False, multicore=multicore)
     if ncomp == 1:
         lnkmap = lnk_maps #lnk10
+        refmap = lnkmap
     elif ncomp == 2:
-        lnkmap = lnk_maps[2] #lnk21
+        lnkmap = lnk_maps[2] #lnk21 for thresholding
+        refmap = lnk_maps[1] #lnk20 for best neighbour (in case lnk21 is high simply the one component fit is poor)
 
-    guesses, mask = get_refit_guesses(ucube, mask=lnkmap, ncomp=ncomp, method=method)
+    mask = get_marginal_pix(lnkmap, lnk_thresh=lnk_thresh, holes_only=holes_only, **kwargs_marg)
+    if mask.sum() < 1:
+        logger.info(f"No pixel was used in attempt to recover marginal {ncomp}-comp. fits")
+        return
+    guesses, mask = get_refit_guesses(ucube, mask=mask, ncomp=ncomp, method=method, refmap=lnkmap)
 
+    mask_size = np.sum(mask)
     if mask_size > 0:
         logger.info(f"Attempting to refit over {mask_size} pixels to recover marginal {ncomp}-comp. fits")
     else:
@@ -499,16 +510,21 @@ def replace_rss(ucube, ucube_ref, ncomp, mask):
         else:
             ucube.get_AICc(ncomp=ncomp, update=True, planemask=mask)
 
-def get_refit_guesses(ucube, mask, ncomp, method='best_neighbour'):
+def get_refit_guesses(ucube, mask, ncomp, method='best_neighbour', refmap=None):
+    #get refit guesses from the surrounding pixels
     guesses = copy(ucube.pcubes[str(ncomp)].parcube)
     guesses[guesses == 0] = np.nan
     # remove the bad pixels from the fitted parameters
     guesses[:, mask] = np.nan
 
     if method == 'best_neighbour':
+        if refmap is None:
+            raise ValueError("refmap must be provided for the best_neighbour method.")
+        if not isinstance(refmap, np.ndarray):
+            raise TypeError(f"{type(refmap)} is the incorrect type for refmap.")
         # use the nearest neighbour with the highest lnk20 value for guesses
         # neighbours.square_neighbour(1) gives the 8 closest neighbours
-        maxref_coords = neighbours.maxref_neighbor_coords(mask=mask, ref=lnk20, fill_coord=(0, 0),
+        maxref_coords = neighbours.maxref_neighbor_coords(mask=mask, ref=refmap, fill_coord=(0, 0),
                                                           structure=neighbours.square_neighbour(1))
         ys, xs = zip(*maxref_coords)
         guesses[:, mask] = guesses[:, ys, xs]
