@@ -171,7 +171,11 @@ def get_convolved_fits(reg, ncomp, update=True, **kwargs):
     else:
         reg.get_convolved_cube(update=update, multicore=kwargs['multicore'])
 
-    reg.ucube_cnv.get_model_fit(ncomp, update=update, **kwargs)
+    try:
+        reg.ucube_cnv.get_model_fit(ncomp, update=update, **kwargs)
+    except StartFitError as e:
+        msg = "Fits to convovled cube failed to start. " + e.__str__()
+        pass
 
 
 def get_fits(reg, ncomp, **kwargs):
