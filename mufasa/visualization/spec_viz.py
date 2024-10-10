@@ -7,12 +7,12 @@ from pyspeckit.spectrum.units import SpectroscopicAxis
 # =======================================================================================================================
 
 class Plotter(object):
-    def __init__(self, ucube_plus, fittype=None, ncomp_list=[1,2]):
+    def __init__(self, ucube_plus, fittype=None, ncomp_list=[1,2], spec_unit='km/s'):
         self.ucube = ucube_plus #I need a way to enusre ucube_plus is indeed a ucube_plus object
-        self.cube = self.ucube.cube
+        self.cube = self.ucube.cube.with_spectral_unit(spec_unit, velocity_convention='radio')
         # need to check and see if cube has the right unit
         self.xarr = SpectroscopicAxis(self.cube.spectral_axis.value,
-                                      unit=self.cube.spectral_axis.unit,
+                                      unit=spec_unit,
                                       refX=self.cube._header['RESTFRQ'],
                                       velocity_convention='radio')
 
