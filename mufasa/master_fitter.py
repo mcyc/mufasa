@@ -322,7 +322,7 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
     guesses, mask = get_refit_guesses(ucube, mask=mask, ncomp=ncomp, method=method, refmap=lnkmap)
 
     # ensure the mask doesn't extend beyond the original fit and has guesses
-    mask = np.logical_and(mask, np.isfintie(guesses).all(axis=0))
+    mask = np.logical_and(mask, np.isfinite(guesses).all(axis=0))
     mask = np.logical_and(mask, reg.ucube.pcubes[str(ncomp)].has_fit)
 
     mask_size = np.sum(mask)
