@@ -186,7 +186,7 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-component fits
 
 
-def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True, refit_marginal=True,
+def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True, refit_marg=True,
                      multicore=True):
     '''
     note: planemask supercedes snr-based mask
@@ -204,9 +204,9 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     if recover_wide:
         refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
 
-    if refit_marginal:
+    if refit_marg:
         refit_marginal(reg, ncomp=2, lnk_thresh=5, holes_only=False, multicore=True,
-                       method='best_neighbour', **kwargs_marg)
+                       method='best_neighbour')
 
     save_best_2comp_fit(reg, multicore=multicore)
 
@@ -430,7 +430,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         try:
             wide_comp_guess = get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=snr_min, savefit=True, planemask=mask)
         except SNRMaskError as e:
-            msg = "Unable to recovere second component from residual. " + e.__str__()
+            msg = e.__str__() + " No second component recovered from the residual cube."
             logger.warning(msg)
             return
         except StartFitError as e:
