@@ -7,8 +7,8 @@ from pyspeckit.spectrum.units import SpectroscopicAxis
 # =======================================================================================================================
 
 class Plotter(object):
-    def __init__(self, ucube_plus, fittype=None, ncomp_list=[1,2], spec_unit='km/s'):
-        self.ucube = ucube_plus #I need a way to enusre ucube_plus is indeed a ucube_plus object
+    def __init__(self, ucube, fittype, ncomp_list=None, spec_unit='km/s'):
+        self.ucube = ucube
         self.cube = self.ucube.cube.with_spectral_unit(spec_unit, velocity_convention='radio')
         # need to check and see if cube has the right unit
         self.xarr = SpectroscopicAxis(self.cube.spectral_axis.value,
@@ -30,8 +30,13 @@ class Plotter(object):
             raise ValueError("{} is not one of the currently accepted fittypes.")
 
         self.parcubes = {}
-        for n in ncomp_list:
-            self.parcubes[str(n)] = self.ucube.pcubes[str(n)].parcube
+
+        if ncomp_list is None:
+            for key in self.ucube.pcubes:
+                self.parcubes[key] = self.ucube.pcubes[key].parcube
+        else:
+            for n in ncomp_list:
+                self.parcubes[str(n)] = self.ucube.pcubes[str(n)].parcube
 
     def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
 
@@ -59,12 +64,10 @@ class Plotter(object):
         # add defaults that can be superceeded
         kwargs = {'xlab':self.xlab, 'ylab':self.ylab, **kwargs}
 
-        # take in the user provided arguments
-        kwargs = dict(ncomp=ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
-                      figsize=figsize, origin=origin, mod_all=mod_all, savename=savename,
-                      **kwargs)
-
-        plot_fits_grid(self.cube, self.parcubes[str(ncomp)], self.model_func, x, y, self.xarr, **kwargs)
+        plot_fits_grid(self.cube, self.parcubes[str(ncomp)], self.model_func, x, y, self.xarr,
+                       ncomp=ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
+                       figsize=figsize, origin=origin, mod_all=mod_all, savename=savename,
+                       **kwargs)
 
 # =======================================================================================================================
 
@@ -220,8 +223,8 @@ def plot_model(para, model_func, xarr, ax, ncomp, **kwargs):
 def plot_fits_grid(cube, para, model_func, x, y, xarr, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
                    figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
 
-    kwargs_spc = dict(size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim, figsize=figsize, origin=origin, **kwargs)
-    fig, axs = plot_spec_grid(cube, x, y, **kwargs_spc)
+    fig, axs = plot_spec_grid(cube, x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
+                              figsize=figsize, origin=origin, **kwargs)
 
     ysize, xsize = axs.shape
     xpad = int(xsize/2)

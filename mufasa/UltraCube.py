@@ -22,6 +22,7 @@ from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
 from .utils.multicore import validate_n_cores
+from .visualization.spec_viz import Plotter
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -53,6 +54,7 @@ class UltraCube(object):
         self.cnv_factor = cnv_factor
         self.n_cores = validate_n_cores(n_cores)
         self.fittype = fittype
+        self.plotter = None
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -249,6 +251,30 @@ class UltraCube(object):
 
     def get_best_residual(self, cubetype=None):
         return None
+
+    def get_plotter(self, update=False, spec_unit='km/s', **kwargs):
+        if self.plotter is None or update:
+            self.plotter = Plotter(self, fittype=self.fittype, spec_unit=spec_unit, **kwargs)
+
+    def plot_spec(self, x, y, ax=None, xlab=None, ylab=None, **kwargs):
+        self.get_plotter()
+        return self.plotter.plot_spec(x, y, ax=ax, xlab=xlab, ylab=ylab, **kwargs)
+
+    def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
+        self.get_plotter()
+        self.plotter.plot_spec_grid(x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim, figsize=figsize, **kwargs)
+
+    def plot_fit(self, x, y, ncomp, ax=None, **kwargs):
+        self.get_plotter()
+        if ax is None:
+            fig, ax = self.plot_spec(x,y)
+        self.plotter.plot_fit(x, y, ax, ncomp, **kwargs)
+
+    def plot_fits_grid(self, x, y, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
+                       figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
+        self.get_plotter()
+        self.plotter.plot_fits_grid(x, y, ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
+                       figsize=figsize, origin=origin, mod_all=mod_all, savename=savename, **kwargs)
 
 
 class UCubePlus(UltraCube):
