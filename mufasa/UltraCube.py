@@ -22,6 +22,7 @@ from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
 from .utils.multicore import validate_n_cores
+from .visualization.spec_viz import Plotter
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -53,6 +54,7 @@ class UltraCube(object):
         self.cnv_factor = cnv_factor
         self.n_cores = validate_n_cores(n_cores)
         self.fittype = fittype
+        self.plotter = None
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -150,14 +152,15 @@ class UltraCube(object):
             logger.warning("no fit was performed and thus no file will be saved")
 
 
-    def load_model_fit(self, filename, ncomp, multicore=None):
-        if multicore is None: multicore = self.n_cores
-        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp,self.fittype)
-        # update model mask
-        mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
-        logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
-        gc.collect()
-        self.include_model_mask(mod_mask)
+    def load_model_fit(self, filename, ncomp, calc_model=True, multicore=None):
+        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp, self.fittype)
+        if calc_model:
+            if multicore is None: multicore = self.n_cores
+            # update model mask
+            mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
+            logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
+            gc.collect()
+            self.include_model_mask(mod_mask)
 
 
     def get_residual(self, ncomp, multicore=None):
@@ -249,6 +252,30 @@ class UltraCube(object):
     def get_best_residual(self, cubetype=None):
         return None
 
+    def get_plotter(self, update=False, spec_unit='km/s', **kwargs):
+        if self.plotter is None or update:
+            self.plotter = Plotter(self, fittype=self.fittype, spec_unit=spec_unit, **kwargs)
+
+    def plot_spec(self, x, y, ax=None, xlab=None, ylab=None, **kwargs):
+        self.get_plotter()
+        return self.plotter.plot_spec(x, y, ax=ax, xlab=xlab, ylab=ylab, **kwargs)
+
+    def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
+        self.get_plotter()
+        self.plotter.plot_spec_grid(x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim, figsize=figsize, **kwargs)
+
+    def plot_fit(self, x, y, ncomp, ax=None, **kwargs):
+        self.get_plotter()
+        if ax is None:
+            fig, ax = self.plot_spec(x,y)
+        self.plotter.plot_fit(x, y, ax, ncomp, **kwargs)
+
+    def plot_fits_grid(self, x, y, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
+                       figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
+        self.get_plotter()
+        self.plotter.plot_fits_grid(x, y, ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
+                       figsize=figsize, origin=origin, mod_all=mod_all, savename=savename, **kwargs)
+
 
 class UCubePlus(UltraCube):
     # create a subclass of UltraCube that holds the directory information
@@ -275,6 +302,23 @@ class UCubePlus(UltraCube):
             os.makedirs(self.paraDir)
 
         self.paraPaths = {}
+
+
+    def read_model_fit(self, ncomps, read_conv=False, **kwargs):
+        '''
+        load the model fits if it exists, else
+
+        kwargs are passed to pyspeckit.Cube.fiteach (if update)
+        '''
+
+        for nc in ncomps:
+            if str(nc) not in self.paraPaths:
+                self.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(self.paraDir, self.paraNameRoot, nc)
+
+            super().load_model_fit(self.paraPaths[str(nc)], ncomp=nc, calc_model=False)
+
+            if 'conv' in self.paraPaths[str(nc)]:
+                logger.info(f'Reading convolved cube fits for {nc} component(s)')
 
 
     def get_model_fit(self, ncomp, update=True, **kwargs):
@@ -332,7 +376,7 @@ def save_fit(pcube, savename, ncomp):
 
 
 def load_model_fit(cube, filename, ncomp, fittype):
-    # currently only loads ammonia multi-component model
+
     pcube = pyspeckit.Cube(cube=cube)
 
     # reigster fitter
@@ -348,7 +392,6 @@ def load_model_fit(cube, filename, ncomp, fittype):
 
     pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
     pcube.xarr.velocity_convention = 'radio'
-
     pcube.load_model_fit(filename, npars=fitter.npars,fittype=fittype)
     gc.collect()
     return pcube
