@@ -150,14 +150,15 @@ class UltraCube(object):
             logger.warning("no fit was performed and thus no file will be saved")
 
 
-    def load_model_fit(self, filename, ncomp, multicore=None):
-        if multicore is None: multicore = self.n_cores
-        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp,self.fittype)
-        # update model mask
-        mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
-        logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
-        gc.collect()
-        self.include_model_mask(mod_mask)
+    def load_model_fit(self, filename, ncomp, calc_model=True, multicore=None):
+        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp, self.fittype)
+        if calc_model:
+            if multicore is None: multicore = self.n_cores
+            # update model mask
+            mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
+            logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
+            gc.collect()
+            self.include_model_mask(mod_mask)
 
 
     def get_residual(self, ncomp, multicore=None):
@@ -277,6 +278,23 @@ class UCubePlus(UltraCube):
         self.paraPaths = {}
 
 
+    def read_model_fit(self, ncomps, read_conv=False, **kwargs):
+        '''
+        load the model fits if it exists, else
+
+        kwargs are passed to pyspeckit.Cube.fiteach (if update)
+        '''
+
+        for nc in ncomps:
+            if str(nc) not in self.paraPaths:
+                self.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(self.paraDir, self.paraNameRoot, nc)
+
+            super().load_model_fit(self.paraPaths[str(nc)], ncomp=nc, calc_model=False)
+
+            if 'conv' in self.paraPaths[str(nc)]:
+                logger.info(f'Reading convolved cube fits for {nc} component(s)')
+
+
     def get_model_fit(self, ncomp, update=True, **kwargs):
         '''
         load the model fits if it exists, else
@@ -332,7 +350,7 @@ def save_fit(pcube, savename, ncomp):
 
 
 def load_model_fit(cube, filename, ncomp, fittype):
-    # currently only loads ammonia multi-component model
+
     pcube = pyspeckit.Cube(cube=cube)
 
     # reigster fitter
@@ -348,7 +366,6 @@ def load_model_fit(cube, filename, ncomp, fittype):
 
     pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
     pcube.xarr.velocity_convention = 'radio'
-
     pcube.load_model_fit(filename, npars=fitter.npars,fittype=fittype)
     gc.collect()
     return pcube
