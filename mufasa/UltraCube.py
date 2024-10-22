@@ -29,15 +29,32 @@ logger = get_logger(__name__)
 #======================================================================================================================#
 
 class UltraCube(object):
+    """
+    A framework to handle multi-component fits and their results for spectral cubes.
+    """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
-        '''
-        # a data frame work to handel multiple component fits and their results
+        """
+        Initialize the UltraCube object.
+
         Parameters
         ----------
-        filename : str, optional
-            The name of 3D FITS file to load
-        '''
+        cubefile : str, optional
+            Path to the .fits cube file.
+        cube : SpectralCube, optional
+            A spectral cube object. Used if `cubefile` is not provided.
+        fittype : str, optional
+            Keyword for the spectral model to be fitted. Currently available options are: "" and "".
+        snr_min : float, optional
+            Minimum peak signal-to-noise ratio for attempting fits.
+        rmsfile : str, optional
+            Path to the file containing RMS values for the cube.
+        cnv_factor : int, optional
+            Factor by which to spatially convolve the cube (default is 2).
+        n_cores : bool or int, optional
+            Number of cores to use for main computing tasks, including model fitting (default is True,
+            which uses all available CPUs minus 1). If an integer is provided, it specifies the number of CPU cores to use.
+        """
 
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
@@ -74,36 +91,84 @@ class UltraCube(object):
 
 
     def load_cube(self, fitsfile):
-        # loads SpectralCube
+        """
+        Load a SpectralCube from a .fits file.
+
+        Parameters
+        ----------
+        fitsfile : str
+            Path to the .fits cube file.
+
+        Returns
+        -------
+        None
+        """
         self.cube = SpectralCube.read(fitsfile)
 
 
     def convolve_cube(self, savename=None, factor=None, edgetrim_width=5):
-        # convolved the SpectralCube to a resolution X times the factor specified
+        """
+        Convolve the SpectralCube to a lower spatial resolution by a specified factor.
+
+        Parameters
+        ----------
+        savename : str, optional
+            Path to save the convolved cube. If None, the cube is not saved.
+        factor : int, optional
+            Factor by which to convolve the cube spatially. If None, the default `cnv_factor` is used.
+        edgetrim_width : int, optional
+            Width of the edge to be trimmed after convolution before the fit (default is 5).
+
+        Returns
+        -------
+        None
+        """
         if factor is None:
             factor = self.cnv_factor
         self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, edgetrim_width=edgetrim_width)
 
 
     def get_cnv_cube(self, filename=None):
-        # load the convolve cube if the file exist, create one if otherwise
+        """
+        Load the convolved cube if the file exists, or create one if it does not.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Path to the convolved cube file. If None, a new convolved cube is created using the default `cnv_factor`.
+
+        Returns
+        -------
+        None
+        """
         if filename is None:
             self.convolve_cube(factor=self.cnv_factor)
         elif os.path.exists(filename):
             self.cube_cnv = SpectralCube.read(filename)
         else:
-            logger.warning("the specified convolved cube file does not exist.")
+            logger.warning("The specified convolved cube file does not exist.")
 
 
     def fit_cube(self, ncomp, simpfit=False, **kwargs):
-        '''
-        currently limited to NH3 (1,1) 2-slab fit
+        """
+        Fit the spectral cube with the specified number of components.
 
-        kwargs are those used for pyspeckit.Cube.fiteach
-        '''
+        Parameters
+        ----------
+        ncomp : int or list of int
+            Number of components for the model to fit. If a list is provided, multiple fits are performed.
+        simpfit : bool, optional
+            Whether to use a simplified fitting method (`cubefit_simp`) instead of the general fitting method (`cubefit_gen`).
+        **kwargs
+            Additional keyword arguments passed to `pyspeckit.Cube.fiteach`.
+
+        Returns
+        -------
+        None
+        """
 
         if not 'multicore' in kwargs:
-            kwargs['multicore'] = self.n_cores 
+            kwargs['multicore'] = self.n_cores
 
         if not 'snr_min' in kwargs:
             kwargs['snr_min'] = self.snr_min
@@ -123,6 +188,7 @@ class UltraCube(object):
                 mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=kwargs['multicore']) > 0
                 self.include_model_mask(mod_mask)
             gc.collect()
+
 
     def include_model_mask(self, mask):
         # update the mask that shows were all the models are non-zero
@@ -280,36 +346,72 @@ class UltraCube(object):
 class UCubePlus(UltraCube):
     # create a subclass of UltraCube that holds the directory information
 
-    def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None,fittype=None, **kwargs): # snr_min=None, rmsfile=None, cnv_factor=2):
-        # super(UCube, self).__init__(cubefile=cubefile)
+    class UCubePlus(UltraCube):
+        """
+        A subclass of UltraCube that holds directory information for parameter maps and model fits.
+        """
 
-        UltraCube.__init__(self, cubefile, cube, fittype, **kwargs) # snr_min, rmsfile, cnv_factor)
+        def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None, fittype=None, **kwargs):
+            """
+            Initialize the UCubePlus object.
 
-        self.cubeDir = os.path.dirname(cubefile)
+            Parameters
+            ----------
+            cubefile : str
+                Path to the .fits cube file.
+            cube : SpectralCube, optional
+                A spectral cube object. Used if `cubefile` is not provided.
+            paraNameRoot : str, optional
+                Root name for the parameter map files. If None, the cube file name is used as the basis.
+            paraDir : str, optional
+                Directory to store the parameter map files. If None, a default directory is created.
+            fittype : str, optional
+                Keyword for the spectral model to be fitted.
+            **kwargs
+                Additional keyword arguments passed to the UltraCube initializer.
 
-        if paraNameRoot is None:
-            # use the cube file name as the basis
-            self.paraNameRoot = "{}_paramaps".format(os.path.splitext(os.path.basename(cubefile))[0])
-        else:
-            self.paraNameRoot = paraNameRoot
+            Returns
+            -------
+            None
+            """
 
-        if paraDir is None:
-            self.paraDir = "{}/para_maps".format(self.cubeDir)
-        else:
-            self.paraDir = paraDir
+            UltraCube.__init__(self, cubefile, cube, fittype, **kwargs)
 
-        if not os.path.exists(self.paraDir):
-            os.makedirs(self.paraDir)
+            self.cubeDir = os.path.dirname(cubefile)
 
-        self.paraPaths = {}
+            if paraNameRoot is None:
+                # use the cube file name as the basis
+                self.paraNameRoot = "{}_paramaps".format(os.path.splitext(os.path.basename(cubefile))[0])
+            else:
+                self.paraNameRoot = paraNameRoot
 
+            if paraDir is None:
+                self.paraDir = "{}/para_maps".format(self.cubeDir)
+            else:
+                self.paraDir = paraDir
+
+            if not os.path.exists(self.paraDir):
+                os.makedirs(self.paraDir)
+
+            self.paraPaths = {}
 
     def read_model_fit(self, ncomps, read_conv=False, **kwargs):
-        '''
-        load the model fits if it exists, else
+        """
+        Load the model fits if they exist; otherwise, perform the fitting.
 
-        kwargs are passed to pyspeckit.Cube.fiteach (if update)
-        '''
+        Parameters
+        ----------
+        ncomps : list of int
+            List of the number of components in the model to be loaded.
+        read_conv : bool, optional
+            Whether or not to load the convolved cube fits too if available (default is False).
+        **kwargs
+            Additional keyword arguments passed to `pyspeckit.Cube.fiteach` if the fitting needs to be updated.
+
+        Returns
+        -------
+        None
+        """
 
         for nc in ncomps:
             if str(nc) not in self.paraPaths:
@@ -322,11 +424,21 @@ class UCubePlus(UltraCube):
 
 
     def get_model_fit(self, ncomp, update=True, **kwargs):
-        '''
-        load the model fits if it exists, else
+        """
+        Load the model fits if they exist, or perform fitting if they don't.
+        Parameters
+        ----------
+        ncomp : int or list of int
+            Number of components for the model fit. If a list is provided, a fits will be performed for each component.
+        update : bool, optional
+            Whether to update (i.e., re-fit) the cube even if model fits already exist (default is True).
+        **kwargs
+            Additional keyword arguments passed to `pyspeckit.Cube.fiteach` if the fitting needs to be updated.
 
-        kwargs are passed to pyspeckit.Cube.fiteach (if update)
-        '''
+        Returns
+        -------
+        None
+        """
 
         for nc in ncomp:
             if not str(nc) in self.paraPaths:
@@ -339,7 +451,6 @@ class UCubePlus(UltraCube):
                     logger.info(f'Fitting convolved cube for {nc} component(s)')
                 else:
                     logger.info(f'Fitting cube for {nc} component(s)')
-                #if update or (not os.path.isfile(self.paraPaths[str(nc)])):
                 if 'multicore' not in kwargs:
                     kwargs['multicore'] = self.n_cores
                 self.fit_cube(ncomp=[nc], **kwargs)
@@ -360,9 +471,25 @@ class UCubePlus(UltraCube):
 #======================================================================================================================#
 
 def fit_cube(cube, fittype, simpfit=False, **kwargs):
-    '''
-    kwargs are those used for pyspeckit.Cube.fiteach
-    '''
+    """
+    Fit the spectral cube using the specified fitting type.
+
+    Parameters
+    ----------
+    cube :
+        The cube to be fitted.
+    fittype : str
+        The type of spectral model to be used for fitting.
+    simpfit : bool, optional
+        If True, use a simplified fitting method (`cubefit_simp`) without pre-processing (default is False).
+    **kwargs
+        Additional keyword arguments passed to `pyspeckit.Cube.fiteach`.
+
+    Returns
+    -------
+    pyspeckit.Cube
+        The fitted pyspeckit cube.
+    """
     if simpfit:
         # fit the cube with the provided guesses and masks with no pre-processing
         return mvf.cubefit_simp(cube, fittype=fittype, **kwargs)
@@ -370,20 +497,57 @@ def fit_cube(cube, fittype, simpfit=False, **kwargs):
         return mvf.cubefit_gen(cube, fittype=fittype, **kwargs)
 
 
+
 def save_fit(pcube, savename, ncomp):
+    """
+    Save the fitted parameter cube to a .fits file with the appropriate header.
+
+    Parameters
+    ----------
+    pcube : pyspeckit.Cube
+        The fitted parameter cube to be saved.
+    savename : str
+        The path where the .fits file will be saved.
+    ncomp : int
+        The number of components in the model.
+
+    Returns
+    -------
+    None
+    """
     # specifically save ammonia multi-component model with the right fits header
     mvf.save_pcube(pcube, savename, ncomp)
 
 
+
 def load_model_fit(cube, filename, ncomp, fittype):
+    """
+    Load the spectral fit results from a .fits file.
+
+    Parameters
+    ----------
+    cube : SpectralCube
+        The spectral cube object to which the fit results will be loaded.
+    filename : str
+        Path to the .fits file containing the fitted parameters.
+    ncomp : int
+        Number of components in the model.
+    fittype : str
+        The keyword that designates the model. Currently available options are 'nh3_multi_v' and 'n2hp_multi_v'.
+
+    Returns
+    -------
+    pyspeckit.Cube
+        The fitted pyspeckit cube with the loaded model.
+    """
 
     pcube = pyspeckit.Cube(cube=cube)
 
-    # reigster fitter
+    # register fitter
     if fittype == 'nh3_multi_v':
         linename = 'oneone'
         from .spec_models import ammonia_multiv as ammv
-        fitter = ammv.nh3_multi_v_model_generator(n_comp = ncomp, linenames=[linename])
+        fitter = ammv.nh3_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
 
     elif fittype == 'n2hp_multi_v':
         linename = 'onezero'
@@ -392,9 +556,10 @@ def load_model_fit(cube, filename, ncomp, fittype):
 
     pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
     pcube.xarr.velocity_convention = 'radio'
-    pcube.load_model_fit(filename, npars=fitter.npars,fittype=fittype)
+    pcube.load_model_fit(filename, npars=fitter.npars, fittype=fittype)
     gc.collect()
     return pcube
+
 
 
 def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
@@ -729,7 +894,6 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
 
 def expand_mask(mask, expand):
-
     # adds a buffer of size set by the expand keyword to a 2D mask,
     selem = np.ones(expand,dtype=bool)
     selem.shape += (1,1,)
@@ -746,7 +910,13 @@ def get_rms(residual):
 
 
 def get_residual(cube, model, planemask=None):
-    # calculate the residual of the fit to the cube
+    '''
+    calculate the residual of the fit to the cube
+    :param cube: a SpectralCube object
+    :param model: ndarray, a model of the cube
+    :param planemask: a 2D boolean mask specifying where to calculated. Using this can save computing time
+    :return:
+    '''
     if planemask is None:
         residual = cube.filled_data[:].value - model
     else:
@@ -756,4 +926,9 @@ def get_residual(cube, model, planemask=None):
 
 
 def get_Tpeak(model):
+    '''
+    Return the peak value of a model cube at each spatial pixel (i.e. along the spectral axis)
+    :param model:
+    :return:
+    '''
     return np.nanmax(model, axis=0)
