@@ -42,10 +42,56 @@ logger = get_logger(__name__)
 # =======================================================================================================================
 
 class Region(object):
+    """
+    A class to represent a region of a spectral cube and perform analysis on it.
+
+    Attributes
+    ----------
+    cubePath : str
+        Path to the spectral cube FITS file.
+    paraNameRoot : str
+        Root string used for naming output files.
+    paraDir : str
+        Directory to store output files.
+    fittype : str
+        Type of fitting to use.
+    ucube : UCubePlus
+        UltraCube object for handling spectral cube operations.
+    cnv_factor : int
+        Number of beam-widths to convolve by.
+    progress_log_name : str
+        Path to the progress log CSV file.
+    progress_log : pandas.DataFrame
+        DataFrame to log the progress of different processes.
+    """
+
 
     def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, initialize_logging=True,
                  multicore=True, **kwargs):
-        """initialize region object
+        """
+        Initialize region object
+
+        Parameters
+        ----------
+        cubePath : str
+            Path to the spectral cube FITS file.
+        paraNameRoot : str
+            A common root string to name the output .fits files.
+        paraDir : str, optional
+            Directory to store output files (default is None, in which case outputs are saved in the same directory as the input cube).
+        cnv_factor : int, optional
+            The factor spatially convolve the cube if needed by the interative fitting process (default is 2).
+        fittype : str, optional
+            The spectral model to use for the fit (default is 'nh3_multi_v').
+        initialize_logging : bool, optional
+            Whether to initialize logging (default is True).
+        multicore : bool or int, optional
+            Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+            If an integer is provided, it specifies the number of CPU cores to use.
+
+        **kwargs : dict, optional
+        Additional keyword arguments passed to the logging initialization.
+
             :param cubePath (str): path to spectral cube
             :param paraNameRoot (str): string to prepend to output file names
             :param paraDir (str, optional): directory to output files. Defaults to None.
@@ -58,10 +104,12 @@ class Region(object):
                 :param file_level: minimum logging level to save to file (default logging.INFO)
                 :param log_pyspeckit_to_file: whether to include psypeckit outputs in log file (default False)
         """
+
         if initialize_logging: init_logging(**kwargs)
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
+
         if fittype is None:
             fittype = 'nh3_multi_v'
             message = "[WARNING] The optionality of the fittype argment for the Region class will be deprecated in the future. " \
@@ -186,11 +234,37 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-component fits
 
 
-def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True, refit_marg=True,
-                     multicore=True):
-    '''
-    note: planemask supercedes snr-based mask
-    '''
+def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
+                     refit_marg=True, multicore=True):
+    """
+    Perform a two-component fit for the cube hold within the Region object
+
+    Parameters
+    ----------
+    reg : Region object
+        A Region object with the cube to be fitted
+    snr_min : float, optional
+        Minimum peak signal-to-noise ratio required for fitting (default is 0.0).
+    recover_wide : bool, optional
+        If True, attempts to recover spectral components that has large velocity seperation (default is True).
+    planemask : ndarray, optional
+        2D mask specifying which pixels to fit. Using a mask can save computing time by peforming targed fits
+        (default is None). If provided, this mask will superseed the provided planemask
+    updateCnvFits : bool, optional
+        If True, peform fits to the conovled cube first, even if a fit has been performed before (default is True).
+    refit_bad_pix : bool, optional
+        If True, refits any pixels with poor fits (default is True).
+    refit_marg : bool, optional
+        If True, refits any pixels with fits that are only marginally good (default is True).
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+        If an integer is provided, it specifies the number of CPU cores to use.
+
+    Returns
+    -------
+
+    """
+
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
 
     # assumes the user wants to recover a second component that is fainter than the primary
@@ -216,6 +290,33 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
 
 def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False,
                    save_para=True):
+    """
+    Perform a two-component fit iterantively through two steps. The first step fits the convovle cube use moment-based guesses
+    The second setp fits fits the cube at its native spatial resolution, using the results from the first iteration for guesses.
+
+    Parameters
+    ----------
+    reg : Region object
+        A Region object with the cube to be fitted
+    snr_min : float, optional
+        Minimum signal-to-noise ratio required for attempting fits (default is 3.0).
+    updateCnvFits : bool, optional
+        If True, fit the covlved cube first, even if it has been fitted before (default is True).
+    planemask : ndarray, optional
+        Mask specifying which spatial pixels to fit (default is None).
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+        If an integer is provided, it specifies the number of CPU cores to use.
+    use_cnv_lnk : bool, optional
+        If True,
+    save_para : bool, optional
+        If True, saves the fited parameters as . fits files after each iteration (default is True).
+
+    Returns
+    -------
+
+    """
+
     proc_name = 'iter_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
 
@@ -257,10 +358,32 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
 
 
 def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=True, method='best_neighbour'):
-    '''
-    refit pixels where 2 component fits are substantially worse than good one components
-    default threshold of -20 should be able to pickup where 2 component fits are exceptionally poor
-    '''
+
+    """
+    Refit pixels with poor 2-component fits, as determined by the log-likelihood of 2- and 1- compoent fits, using
+    specified models
+
+    Parameters
+    ----------
+    reg : Region object
+        A Region object with the cube to be fitted
+    snr_min : float, optional
+        Minimum signal-to-noise ratio required for refitting (default is 3).
+    lnk_thresh : float, optional
+        Log-likelihood threshold used to identify pixels with pad fits (default is -5).
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+        If an integer is provided, it specifies the number of CPU cores to use.
+    save_para : bool, optional
+        If True, saves the fit parameters as .fits files after refitting (default is True).
+    method : str, optional
+        The method used for refitting bad pixels (default is 'best_neighbour').
+
+    Returns
+    -------
+
+    """
+
     proc_name = 'refit_bad_2comp'
     reg.log_progress(process_name=proc_name, mark_start=True)
     ucube = reg.ucube
@@ -296,7 +419,34 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
 
 def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, save_para=True, method='best_neighbour', **kwargs_marg):
-    # refit pixels that seem marginaly okay
+    """
+    Refit pixels with fits that appears marginally okay, as deterined by the specified log-likelihood threshold provided
+
+    Parameters
+    ----------
+    reg : Region object
+        A Region object with the cube to be fitted
+    ncomp : int
+        Number of components of the model to be refitted
+    lnk_thresh : float, optional
+        Log-likelihood threshold used to determine the pixels to refit (default is 5).
+    holes_only : bool, optional
+        If True, only refits pixels surrounded by good fits (default is False).
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+        If an integer is provided, it specifies the number of CPU cores to use.
+    save_para : bool, optional
+        If True, saves the fit parameters as .fits files after refitting (default is True).
+    method : str, optional
+        The method used for refitting marginal pixels (default is 'best_neighbour').
+    **kwargs_marg : dict, optional
+        Additional keyword arguments for fine-tuning the marginal refitting process.
+
+    Returns
+    -------
+
+    """
+
     ucube = reg.ucube
 
     proc_name = f'refit_marginal_{ncomp}_comp'
@@ -344,6 +494,21 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
 
 
 def refit_swap_2comp(reg, snr_min=3):
+    """
+    Refit the cube by using the previous fit result as guesses, but with the front and rear components switched.
+
+    Parameters
+    ----------
+    reg : Region object
+        The Region object containing the cube to be refitted
+    snr_min : float, optional
+        Minimum signal-to-noise ratio required for a pixel to be refitted (default is 3).
+
+    Returns
+    -------
+    None
+    """
+
     ncomp = [1, 2]
 
     # load the fitted parameters
@@ -385,7 +550,32 @@ def refit_swap_2comp(reg, snr_min=3):
 
 
 def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicore=True, save_para=True):
-    # if plane mask isn't provided, only try to recover pixels where the 2-comp fit is worse than the one component fit
+    """
+    Refit pixels to recover compoents with wide velocity separation for 2-component models
+
+    Parameters
+    ----------
+    reg : Region object
+        A Region object with the cube to be fitted
+    snr_min : float, optional
+        Minimum signal-to-noise ratio required for refitting (default is 3).
+    method : {'residual', 'moments'}, optional
+        Method used to recover the wide component. 'residual' uses the residual cube to recover the wide component,
+        while 'moments' uses moment-based guesses (default is 'residual').
+    planemask : ndarray, optional
+        Mask specifying which spatial pixels to fit (default is None). If not provided, only pixels where the
+        two-component fit is worse than the one-component fit are used.
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+        If an integer is provided, it specifies the number of CPU cores to use.
+    save_para : bool, optional
+        If True, saves the fit parameters as .fits files after refitting (default is True).
+
+    Returns
+    -------
+    None
+
+    """
 
     proc_name = 'refit_2comp_wide'
     reg.log_progress(process_name=proc_name, mark_start=True)
@@ -413,7 +603,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
     if method == 'residual':
         logger.debug("recovering second component from residual")
         # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
-        # a second componet that is found in wide seperation)
+        # a second component that is found in wide separation)
         lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False)
 
         if planemask is None:
@@ -423,12 +613,13 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
             mask10 = planemask
             mask = planemask
 
-        # use the one component fit and the refined 1-componet guess for the residual to perform the two components fit
+        # use the one component fit and the refined 1-component guess for the residual to perform the two components fit
         c1_guess = copy(reg.ucube.pcubes['1'].parcube)
         c1_guess = gss_rf.refine_each_comp(c1_guess)
 
         try:
-            wide_comp_guess = get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=snr_min, savefit=True, planemask=mask)
+            wide_comp_guess = get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=snr_min, savefit=True,
+                                                     planemask=mask)
         except SNRMaskError as e:
             msg = e.__str__() + " No second component recovered from the residual cube."
             logger.warning(msg)
@@ -447,7 +638,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
         mask = np.logical_and(mask, np.all(np.isfinite(final_guess), axis=0))
 
-        # further refine to correct for the typical error esitmate for nh3 residual guesses
+        # further refine to correct for the typical error estimate for nh3 residual guesses
         final_guess = gss_rf.refine_2c_guess(final_guess)
         simpfit = True
 
@@ -476,7 +667,32 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
 
 def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, multicore=True):
-    # refit bad pixels marked by the mask, save the new parameter files with the bad pixels replaced
+    """
+    Refit pixels marked by the mask as "bad" and adopt the new model if it is determined to be better.
+
+    Parameters
+    ----------
+    ucube : UltraCube object
+        The UltraCube object containing the spectral data to be refitted.
+    mask : ndarray
+        A boolean mask indicating the pixels to be refitted.
+    snr_min : float
+        Minimum signal-to-noise ratio required for refitting.
+    guesses : ndarray
+        Initial guesses for the refitting process.
+    lnk21 : None, optional
+        Deprecated. This argument is retained for backward compatibility but will be removed in a future update.
+    simpfit : bool, optional
+        If True, use simplified fitting (default is True).
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+        If an integer is provided, it specifies the number of CPU cores to use.
+
+    Returns
+    -------
+    None
+
+    """
 
     if lnk21 is not None:
         message = "[WARNING] The lnk21 argument will be deprecated in a future update."
@@ -550,14 +766,26 @@ def get_refit_guesses(ucube, mask, ncomp, method='best_neighbour', refmap=None):
 
 
 def get_marginal_pix(lnkmap, lnk_thresh=5, holes_only=False, smallest_struct_size=9):
-    '''
-    Retrun pixels next to the edge of the structures with >lnk_thresh, or pixels less than lnk_thresh enclosed within the structures
-    :param lnkmap: the relative log-likelihood map
-    :param lnk_thresh: the relative log-likelihood thereshold
-    :param holes_only: return only holes
-    :param smallest_struct_size: the minimum size of the connected pixels to be considred a good reference structure
-    :return:
-    '''
+    """
+    Return pixels at the edge of structures with values greater than `lnk_thresh`, or pixels less than `lnk_thresh`
+    enclosed within the structures.
+
+    Parameters
+    ----------
+    lnkmap : ndarray
+        The relative log-likelihood map.
+    lnk_thresh : float, optional
+        The relative log-likelihood threshold for identifying structures (default is 5).
+    holes_only : bool, optional
+        If True, return only the holes surrounded by pixels with values greater than `lnk_thresh` (default is False).
+    smallest_struct_size : int, optional
+        The minimum size of connected pixels to be considered a good reference structure (default is 9).
+
+    Returns
+    -------
+    ndarray
+        A boolean mask indicating the marginal pixels, either at the edges of structures or within enclosed regions.
+    """
 
     mask = remove_small_objects(lnkmap > lnk_thresh, smallest_struct_size)
     mask_nosml = remove_small_holes(mask)
@@ -571,14 +799,29 @@ def get_marginal_pix(lnkmap, lnk_thresh=5, holes_only=False, smallest_struct_siz
         return np.logical_xor(mask_nosml, mask)
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
-    # two compnent fitting method using the moment map guesses method
+    """
+    Perform a two-component fit for the cube using default moment map guesses.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the cube to be fitted.
+    planemask : ndarray, optional
+        Mask specifying which spatial pixels to fit (default is None). If provided, fitting is limited to the masked area.
+    snr_min : float, optional
+        Minimum signal-to-noise ratio required for attempting fits (default is 3).
+
+    Returns
+    -------
+    None
+    """
     proc_name = 'standard_2comp_fit'
     reg.log_progress(process_name=proc_name, mark_start=True)
     ncomp = [1, 2]
 
-    # only use the moment maps for the fits
+    # Only use the moment maps for the fits
     for nc in ncomp:
-        # update is set to True to save the fits
+        # Update is set to True to save the fits
         kwargs = {'update': True, 'snr_min': snr_min}
         if planemask is not None:
             kwargs['maskmap'] = planemask
@@ -588,17 +831,46 @@ def standard_2comp_fit(reg, planemask=None, snr_min=3):
 
 
 def save_updated_paramaps(ucube, ncomps):
-    # save the updated parameter cubes
+    """
+    Save the updated parameter maps for specified components.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        The UltraCube object containing the spectral data.
+    ncomps : list of int
+        List of the number of components of the model for which parameter maps will be saved.
+
+    Returns
+    -------
+    None
+    """
     for nc in ncomps:
-        if not str(nc) in ucube.paraPaths:
-            logger.error("the ucube does not have paraPath for '{}' components".format(nc))
+        if str(nc) not in ucube.paraPaths:
+            logger.error("The ucube does not have paraPath for '{}' components".format(nc))
         else:
             ucube.save_fit(ucube.paraPaths[str(nc)], nc)
 
 
+
 def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
-    # should be renamed to determine_best_2comp_fit or something along that line
-    # currently use np.nan for pixels with no models
+    """
+    Save the best two-component fit results for the specified region.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the cube and fit results.
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
+        If an integer is provided, it specifies the number of CPU cores to use.
+    from_saved_para : bool, optional
+        If True, reload parameters from saved files instead of using existing results in memory (default is False).
+
+    Returns
+    -------
+    None
+    """
 
     ncomps = [1, 2]
     multicore = validate_n_cores(multicore)
@@ -607,48 +879,60 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
     save_updated_paramaps(reg.ucube, ncomps=ncomps)
 
     if from_saved_para:
-        # ideally, a copy function should be in place of reloading
-
-        # a new Region object is created start fresh on some of the functions (e.g., aic comparison)
+        # create a new Region object to start fresh
         reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
 
-        # start out clean, especially since the deepcopy function doesn't work well for pyspeckit cubes
-        # load the file based on the passed in reg, rather than the default
+        # load files using paths from reg if they exist
         for nc in ncomps:
             if not str(nc) in reg.ucube.pcubes:
                 reg_final.load_fits(ncomp=[nc])
             else:
-                # load files using paths from reg if they exist
-                logger.debug("loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
+                logger.debug("Loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
                 reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
-
     else:
         reg_final = reg
 
-    # make the 2-comp para maps with the best fit model
+    # make the two-component parameter maps with the best fit model
     pcube_final = reg_final.ucube.pcubes['2']
     kwargs = dict(multicore=multicore, lnk21_thres=5, lnk10_thres=5, return_lnks=True)
     parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
     pcube_final.parcube = parcube
     pcube_final.errcube = errcube
 
-    # use the default file formate to save the finals
+    # use the default file format to save the final results
     nc = 2
     if not str(nc) in reg_final.ucube.paraPaths:
-        reg_final.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(reg_final.ucube.paraDir,
-                                                                         reg_final.ucube.paraNameRoot, nc)
+        reg_final.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(
+            reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot, nc
+        )
 
     savename = "{}_final.fits".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
     UCube.save_fit(pcube_final, savename=savename, ncomp=2)
 
     hdr2D = reg.ucube.cube.wcs.celestial.to_header()
-    hdr2D['HISTORY'] = 'Written by MUFASA {}'.format({str(ctime())})
+    hdr2D['HISTORY'] = 'Written by MUFASA {}'.format(ctime())
 
     paraDir = reg_final.ucube.paraDir
     paraRoot = reg_final.ucube.paraNameRoot
 
     def make_save_name(paraRoot, paraDir, key):
-        # replace "parameters" related names in the save names
+        """
+        Generate the filename for saving parameter maps, based on the provided root and directory.
+
+        Parameters
+        ----------
+        paraRoot : str
+            Root name of the parameter map files.
+        paraDir : str
+            Directory to save the parameter map files.
+        key : str
+            Key to differentiate the saved parameter map files.
+
+        Returns
+        -------
+        str
+            Full path for saving the parameter map file.
+        """
         if "parameters" in paraRoot:
             return "{}/{}.fits".format(paraDir, paraRoot.replace("parameters", key))
         elif "parameter" in paraRoot:
@@ -657,6 +941,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
             return "{}/{}.fits".format(paraDir, paraRoot.replace("para", key))
         else:
             return "{}/{}_{}.fits".format(paraDir, paraRoot, key)
+
 
     # save the lnk21 map
     savename = make_save_name(paraRoot, paraDir, "lnk21")
