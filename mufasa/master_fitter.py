@@ -907,13 +907,29 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
         )
 
     savename = "{}_final.fits".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
-    UCube.save_fit(pcube_final, savename=savename, ncomp=2)
+    notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
+    UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
 
-    hdr2D = reg.ucube.cube.wcs.celestial.to_header()
-    hdr2D['HISTORY'] = 'Written by MUFASA {}'.format(ctime())
-
+    hdr2D = reg.ucube.make_header2D()
     paraDir = reg_final.ucube.paraDir
     paraRoot = reg_final.ucube.paraNameRoot
+
+    def make_lnk_header(ref_header, root):
+
+        hdr_new = ref_header.copy()
+
+        comp_a, comp_b = root[0], root[1]
+        if comp_b == '0':
+            comp_b = 'noise'
+        else:
+            comp_b = f'{comp_b} comp fit'
+
+        hdr_new.set(keyword='NOTES', value=f"Relative log-likelihood of {comp_a} comp fit vs {comp_b}",
+                     comment=None, before='DATE')
+        hdr_new.set(keyword='BUNIT', value='unitless', comment=None, before=1)
+
+        return hdr_new
+
 
     def make_save_name(paraRoot, paraDir, key):
         """
@@ -945,23 +961,29 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
 
     # save the lnk21 map
     savename = make_save_name(paraRoot, paraDir, "lnk21")
-    save_map(lnk21, hdr2D, savename)
-    logger.info('{} saved.'.format(savename))
+    hdr_save = make_lnk_header(ref_header=hdr2D, root='21')
+    save_map(lnk21, hdr_save, savename)
+    logger.debug('{} saved.'.format(savename))
 
     # save the lnk10 map
     savename = make_save_name(paraRoot, paraDir, "lnk10")
-    save_map(lnk10, hdr2D, savename)
-    logger.info('{} saved.'.format(savename))
+    hdr_save = make_lnk_header(ref_header=hdr2D, root='10')
+    save_map(lnk10, hdr_save, savename)
+    logger.debug('{} saved.'.format(savename))
 
-    # create and save the lnk20 map for reference:
+    # save the lnk20 map for reference:
     savename = make_save_name(paraRoot, paraDir, "lnk20")
-    save_map(lnk20, hdr2D, savename)
-    logger.info('{} saved.'.format(savename))
+    hdr_save = make_lnk_header(ref_header=hdr2D, root='20')
+    save_map(lnk20, hdr_save, savename)
+    logger.debug('{} saved.'.format(savename))
 
     # save the SNR map
     snr_map = get_best_2comp_snr_mod(reg_final)
+    hdr_save = hdr2D.copy()
+    hdr_save.set(keyword='NOTES', value='Estimated peak signal-to-noise ratio', comment=None, before='DATE')
+    hdr_save.set(keyword='BUNIT', value='unitless', comment=None, before=1)
     savename = make_save_name(paraRoot, paraDir, "SNR")
-    save_map(snr_map, hdr2D, savename)
+    save_map(snr_map, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
     # create moment0 map
@@ -983,22 +1005,36 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
 
     # save reduced chi-squred maps
     # would be useful to check if 3rd component is needed
+    '''
     savename = make_save_name(paraRoot, paraDir, "chi2red_final")
     chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=modbest, expand=20, reduced=True, usemask=True,
                               mask=None)
-    save_map(chi_map, hdr2D, savename)
+    hdr_save = hdr2D.copy()
+    hdr_save.set(keyword='NOTES', value='chi-squared values of the best 1- or 2-comp fit model',
+                 comment=None, before='DATE')
+    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
+    save_map(chi_map, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
+    '''
 
     # save reduced chi-squred maps for 1 comp and 2 comp individually
     chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
     chiRed_2c = reg_final.ucube.get_reduced_chisq(2)
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
-    save_map(chiRed_1c, hdr2D, savename)
+    hdr_save = hdr2D.copy()
+    hdr_save.set(keyword='NOTES', value='reduced chi-squared values of the 1-comp model',
+                 comment=None, before='DATE')
+    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
+    save_map(chiRed_1c, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_2c")
-    save_map(chiRed_2c, hdr2D, savename)
+    hdr_save = hdr2D.copy()
+    hdr_save.set(keyword='NOTES', value='reduced chi-squared values of the 2-comp model',
+                 comment=None, before='DATE')
+    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
+    save_map(chiRed_2c, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
     return reg
@@ -1007,7 +1043,6 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
 def save_map(map, header, savename, overwrite=True):
     fits_map = fits.PrimaryHDU(data=map, header=header)
     fits_map.writeto(savename, overwrite=overwrite)
-
 
 # =======================================================================================================================
 # functions that facilitate

@@ -10,6 +10,7 @@ import copy
 import os, errno
 import multiprocessing
 import warnings
+from datetime import datetime
 
 from astropy import units as u
 from scipy import ndimage as ndi
@@ -24,6 +25,7 @@ from . import guess_refine as g_refine
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import interpolate
+from . import __version__
 
 # =======================================================================================================================
 
@@ -654,28 +656,111 @@ def retry_fit(pcube, kwargs, old_start_point, peaksnr=None):
         raise StartFitError(msg)
 
 
-def save_pcube(pcube, savename, ncomp=2):
+def make_header(ndim, ref_header):
+    '''
+    Create a new header while retaining
+
+    :param ndim:
+    :param ref_header:
+    :return:
+    '''
+
+    # initilizing a new, empthy header
+    hdr_new = fits.Header()
+
+    hdr_new.set(keyword='DATE', value=datetime.now().strftime('%Y-%m-%dT%H:%M:%S'), comment=f"Written by MUFASA v{__version__}")
+
+    if ndim==3:
+        keylist = ['SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'NAXIS3', 'OBJECT',
+                   'BMAJ', 'BMIN', 'BPA', 'WCSAXES', 'CRPIX1', 'CRPIX2', 'CRPIX3',
+                   'CDELT1', 'CDELT2', 'CDELT3', 'CUNIT1', 'CUNIT2', 'CUNIT3',
+                   'CTYPE1', 'CTYPE2', 'CTYPE3', 'CRVAL1', 'CRVAL2', 'CRVAL3',
+                   'LONPOLE', 'LATPOLE', 'WCSNAME', 'MJDREF', 'RADESYS',
+                   'EQUINOX', 'SPECSYS']
+    elif ndim==2:
+        keylist = ['SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'OBJECT',
+                   'BMAJ', 'BMIN', 'BPA', 'WCSAXES', 'CRPIX1', 'CRPIX2',
+                   'CDELT1', 'CDELT2', 'CUNIT1', 'CUNIT2',
+                   'CTYPE1', 'CTYPE2', 'CRVAL1', 'CRVAL2',
+                   'LONPOLE', 'LATPOLE', 'WCSNAME', 'MJDREF',
+                   'RADESYS', 'EQUINOX', 'SPECSYS']
+
+    for key in keylist:
+        # copy cards from the reference header if they exist
+        if key in ref_header:
+            hdr_new.append(copy.copy(ref_header.cards[key]))
+
+    # make sure the dimension of the header is written correctly
+    comments_dict = dict(NAXIS='Number of array dimensions', WCSAXES='Number of coordinate axes')
+    for key, comment in comments_dict.items():
+        if (key in hdr_new) and (hdr_new[key] != ndim):
+            hdr_new.set(keyword=key, value=ndim, comment=comment)
+
+    hdr_new.add_history("====================================================================")
+    hdr_new.add_history(f"Written by MUFASA v{__version__} on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    hdr_new.add_comment("====================================================================")
+    hdr_new.add_comment("MUFASA citation: Chen et al. (2020), DOI: 10.3847/1538-4357/ab7378")
+    hdr_new.add_comment("MUFASA is available on GitHub at: https://github.com/mcyc/mufasa")
+
+    return hdr_new
+
+
+def save_pcube(pcube, savename, ncomp, npara=4, header_note=None):
     # a method to save the fitted parameter cube with relavent header information
 
-    npara = 4
+    # create a new header using the pcube's cube header as a template
+    hdr_new = make_header(ndim=3, ref_header=pcube.header)
 
-    hdr_new = copy.deepcopy(pcube.header)
-    for i in range(0, ncomp):
-        hdr_new['PLANE{0}'.format(i * npara + 0)] = 'VELOCITY_{0}'.format(i + 1)
-        hdr_new['PLANE{0}'.format(i * npara + 1)] = 'SIGMA_{0}'.format(i + 1)
-        hdr_new['PLANE{0}'.format(i * npara + 2)] = 'TEX_{0}'.format(i + 1)
-        hdr_new['PLANE{0}'.format(i * npara + 3)] = 'TAU_{0}'.format(i + 1)
+    if header_note is None:
+        header_note = f'Parameter maps derived from {ncomp}-comp model fits'
 
-    # the loop is split into two so the numbers will be written in ascending order
-    for i in range(0, ncomp):
-        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 0)] = 'eVELOCITY_{0}'.format(i + 1)
-        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 1)] = 'eSIGMA_{0}'.format(i + 1)
-        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 2)] = 'eTEX_{0}'.format(i + 1)
-        hdr_new['PLANE{0}'.format((ncomp + i) * npara + 3)] = 'eTAU_{0}'.format(i + 1)
-    hdr_new['CDELT3'] = 1
-    hdr_new['CTYPE3'] = 'FITPAR'
-    hdr_new['CRVAL3'] = 0
-    hdr_new['CRPIX3'] = 1
+    hdr_new.set(keyword='NOTES', value=header_note, comment=None, before='DATE')
+
+    # modify the units of the plane accordingly
+    hdr_new.set(keyword ='CDELT3', value=1, comment='[unitless] Coordinate increment at reference point')
+    hdr_new.set(keyword ='CTYPE3', value='FITPAR', comment='fitted parameters')
+    hdr_new.set(keyword ='CRVAL3', value=0, comment='[unitless] Coordinate value at reference point')
+    hdr_new.set(keyword='CRPIX3', value=1, comment='[unitless] Pixel coordinate of reference point')
+    hdr_new.set(keyword ='CUNIT3', value='None', comment='[unitless] Units of coordinate increment and value')
+
+    if ncomp == 1:
+        hdr_new.set(keyword ='PLANE0', value= 'VELOCITY', comment='[km/s] vlsr')
+        hdr_new.set(keyword ='PLANE1', value= 'SIGMA', comment='[km/s] velocity dispersion')
+        hdr_new.set(keyword ='PLANE2', value  = 'TEX', comment='[K] excitation temperature')
+        hdr_new.set(keyword ='PLANE3', value  = 'TAU', comment='[unitless] peak optical depth')
+
+        hdr_new.set(keyword ='PLANE4', value  = 'eVELOCITY', comment='[km/s] estimated error of vlsr')
+        hdr_new.set(keyword ='PLANE5', value  = 'eSIGMA', comment='[km/s] estimated error velocity dispersion')
+        hdr_new.set(keyword ='PLANE6', value = 'eTEX', comment='[K] estimated error excitation temperature')
+        hdr_new.set(keyword ='PLANE7', value = 'eTAU', comment='[unitless] estimated error of peak optical depth')
+
+    elif ncomp > 1:
+        for i in range(0, ncomp):
+            hdr_new.set(keyword=f'PLANE{i * npara + 0}', value=f'VELOCITY_{i + 1}',
+                        comment=f'[km/s] vlsr of component {i+1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 1}', value=f'SIGMA_{i + 1}',
+                        comment=f'[km/s] velocity dispersion of component {i + 1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 2}', value=f'TEX_{i + 1}',
+                        comment=f'[K] excitation temperature of component {i + 1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 3}', value=f'TAU_{i + 1}',
+                        comment=f'[unitless] peak optical depth of component {i + 1}')
+
+        # the loop is split into two so the numbers will be written in ascending order
+        for i in range(0, ncomp):
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 0}', value=f'eVELOCITY_{i + 1}',
+                        comment=f'[km/s] estimated error of component {i+1} vlsr')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 1}', value=f'eSIGMA_{i + 1}',
+                        comment=f'[km/s] estimated error of component {i + 1} velocity dispersion')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 2}', value=f'eTEX_{i + 1}',
+                        comment=f'[K] estimated error of component {i + 1} excitation temperature')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 3}', value=f'eTAU_{i + 1}',
+                        comment=f'[unitless] estimated error of component {i + 1} peak optical depth')
 
     fitcubefile = fits.PrimaryHDU(data=np.concatenate([pcube.parcube, pcube.errcube]), header=hdr_new)
     fitcubefile.writeto(savename, overwrite=True)
@@ -684,11 +769,16 @@ def save_pcube(pcube, savename, ncomp=2):
 
 def save_guesses(pcube, paraname, guesses, savename):
     # a module to save guesses for diagnostic purposes
-    hdr_new = copy.deepcopy(pcube.header)
-    hdr_new['CDELT3'] = 1
-    hdr_new['CTYPE3'] = 'FITPAR'
-    hdr_new['CRVAL3'] = 0
-    hdr_new['CRPIX3'] = 1
+
+    # create a new header using the pcube's cube header as a template
+    hdr_new = make_header(ndim=3, ref_header=pcube.header)
+
+    # modify the units of the plane accordingly
+    hdr_new.set(keyword ='CDELT3', value=1, comment='[unitless] Coordinate increment at reference point')
+    hdr_new.set(keyword ='CTYPE3', value='FITPAR', comment='fitted parameters')
+    hdr_new.set(keyword ='CRVAL3', value=0, comment='[unitless] Coordinate value at reference point')
+    hdr_new.set(keyword='CRPIX3', value=1, comment='[unitless] Pixel coordinate of reference point')
+    hdr_new.set(keyword ='CUNIT3', value='None', comment='[unitless] Units of coordinate increment and value')
 
     savedir = "{0}/{1}".format(os.path.dirname(paraname), "guesses")
 

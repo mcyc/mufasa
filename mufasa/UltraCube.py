@@ -90,6 +90,9 @@ class UltraCube(object):
             self.rmsfile = rmsfile
 
 
+    def make_header2D(self):
+        return mvf.make_header(ndim=2, ref_header=self.cube.header)
+
     def load_cube(self, fitsfile):
         """
         Load a SpectralCube from a .fits file.
@@ -210,10 +213,10 @@ class UltraCube(object):
             gc.collect()
 
 
-    def save_fit(self, savename, ncomp):
+    def save_fit(self, savename, ncomp, header_note=None):
         # note, this implementation currently relies on
         if hasattr(self.pcubes[str(ncomp)], 'parcube'):
-            save_fit(self.pcubes[str(ncomp)], savename, ncomp)
+            save_fit(self.pcubes[str(ncomp)], savename, ncomp, header_note=header_note)
         else:
             logger.warning("no fit was performed and thus no file will be saved")
 
@@ -344,56 +347,53 @@ class UltraCube(object):
 
 
 class UCubePlus(UltraCube):
-    # create a subclass of UltraCube that holds the directory information
+    """
+    A subclass of UltraCube that holds directory information for parameter maps and model fits.
+    """
 
-    class UCubePlus(UltraCube):
+    def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None, fittype=None, **kwargs):
         """
-        A subclass of UltraCube that holds directory information for parameter maps and model fits.
+        Initialize the UCubePlus object.
+
+        Parameters
+        ----------
+        cubefile : str
+            Path to the .fits cube file.
+        cube : SpectralCube, optional
+            A spectral cube object. Used if `cubefile` is not provided.
+        paraNameRoot : str, optional
+            Root name for the parameter map files. If None, the cube file name is used as the basis.
+        paraDir : str, optional
+            Directory to store the parameter map files. If None, a default directory is created.
+        fittype : str, optional
+            Keyword for the spectral model to be fitted.
+        **kwargs
+            Additional keyword arguments passed to the UltraCube initializer.
+
+        Returns
+        -------
+        None
         """
 
-        def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None, fittype=None, **kwargs):
-            """
-            Initialize the UCubePlus object.
+        super().__init__(cubefile, cube, fittype, **kwargs)
 
-            Parameters
-            ----------
-            cubefile : str
-                Path to the .fits cube file.
-            cube : SpectralCube, optional
-                A spectral cube object. Used if `cubefile` is not provided.
-            paraNameRoot : str, optional
-                Root name for the parameter map files. If None, the cube file name is used as the basis.
-            paraDir : str, optional
-                Directory to store the parameter map files. If None, a default directory is created.
-            fittype : str, optional
-                Keyword for the spectral model to be fitted.
-            **kwargs
-                Additional keyword arguments passed to the UltraCube initializer.
+        self.cubeDir = os.path.dirname(cubefile)
 
-            Returns
-            -------
-            None
-            """
+        if paraNameRoot is None:
+            # use the cube file name as the basis
+            self.paraNameRoot = "{}_paramaps".format(os.path.splitext(os.path.basename(cubefile))[0])
+        else:
+            self.paraNameRoot = paraNameRoot
 
-            UltraCube.__init__(self, cubefile, cube, fittype, **kwargs)
+        if paraDir is None:
+            self.paraDir = "{}/para_maps".format(self.cubeDir)
+        else:
+            self.paraDir = paraDir
 
-            self.cubeDir = os.path.dirname(cubefile)
+        if not os.path.exists(self.paraDir):
+            os.makedirs(self.paraDir)
 
-            if paraNameRoot is None:
-                # use the cube file name as the basis
-                self.paraNameRoot = "{}_paramaps".format(os.path.splitext(os.path.basename(cubefile))[0])
-            else:
-                self.paraNameRoot = paraNameRoot
-
-            if paraDir is None:
-                self.paraDir = "{}/para_maps".format(self.cubeDir)
-            else:
-                self.paraDir = paraDir
-
-            if not os.path.exists(self.paraDir):
-                os.makedirs(self.paraDir)
-
-            self.paraPaths = {}
+        self.paraPaths = {}
 
     def read_model_fit(self, ncomps, read_conv=False, **kwargs):
         """
@@ -498,7 +498,7 @@ def fit_cube(cube, fittype, simpfit=False, **kwargs):
 
 
 
-def save_fit(pcube, savename, ncomp):
+def save_fit(pcube, savename, ncomp, header_note=None):
     """
     Save the fitted parameter cube to a .fits file with the appropriate header.
 
@@ -510,13 +510,15 @@ def save_fit(pcube, savename, ncomp):
         The path where the .fits file will be saved.
     ncomp : int
         The number of components in the model.
+    header_note : str
+        One card (line) notes to put in the header
 
     Returns
     -------
     None
     """
     # specifically save ammonia multi-component model with the right fits header
-    mvf.save_pcube(pcube, savename, ncomp)
+    mvf.save_pcube(pcube, savename, ncomp, header_note=header_note)
 
 
 
