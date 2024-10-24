@@ -17,8 +17,8 @@ from scipy.signal import medfilt2d
 from time import ctime
 from datetime import timezone, datetime
 import warnings
-
-from pandas import DataFrame
+import pandas as pd
+from datetime import datetime
 
 try:
     from pandas import concat
@@ -124,12 +124,16 @@ class Region(object):
         self.cnv_factor = cnv_factor
         self.progress_log_name = "{}/{}_progress_log.csv".format(self.ucube.paraDir, self.ucube.paraNameRoot)
 
+        self.timestemp = None
         try:
             from pandas import read_csv
             self.progress_log = read_csv(self.progress_log_name)
             # could use a checking mechanism to ensure the logfile is the right format
         except FileNotFoundError:
-            self.progress_log = DataFrame(columns=['process', 'last complete'])
+            columns = ['process', 'last completed', 'attempted fits (pix)', 'successful fits (pix)',
+                       'total runtime (dd:hh:mm:ss)', 'cores used']
+            self.progress_log = pd.DataFrame(columns=columns)
+
 
     def get_convolved_cube(self, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None,
                            multicore=True):
@@ -154,28 +158,118 @@ class Region(object):
     def standard_2comp_fit(self, planemask=None):
         standard_2comp_fit(self, planemask=planemask)
 
-    def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds'):
-        # log the time when a process is finished
+
+    def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds', n_attempted=None,
+                     n_success=None, finished=False, cores=None):
+        """
+        Log the progress of a process with start and completion times, including the number of attempted and successful fits.
+
+        Parameters
+        ----------
+        process_name : str
+            Name of the process to log.
+        mark_start : bool, optional
+            If True, marks the start of the process. Default is False.
+        save : bool, optional
+            If True, saves the log to a CSV file. Default is True.
+        timespec : str, optional
+            Specifies the level of detail for the timestamp. Default is 'seconds'.
+            Options include 'seconds', 'milliseconds', etc.
+        n_attempted : int, optional
+            Number of attempted fits, corresponds to 'attempted fits (pix)'. Default is None.
+        n_success : int, optional
+            Number of successful fits, corresponds to 'successful fits (pix)'. Default is None.
+        finished : bool, optional
+            If True and `mark_start` is False, records the time elapsed in 'total runtime (dd:hh:mm:ss)' and clears `self.timestamp`. Default is False.
+        cores : int, optional
+            Number of cores used, corresponds to 'cores used'. Default is None.
+
+        Notes
+        -----
+        - When `mark_start` is True, the 'last completed' column is set to the current timestamp and 'total runtime (dd:hh:mm:ss)' is set to "in progress".
+        - When `mark_start` is False and `finished` is True, the function calculates the runtime from the recorded start time (`self.timestamp`) and records it in a simplified format.
+        - The `self.timestamp` attribute is cleared only if `mark_start` is False and `finished` is True.
+        - If the DataFrame `self.progress_log` does not exist, it will be initialized with default columns.
+        """
         if mark_start:
-            time_info = "unfinished"
+            # Mark the start time
+            self.timestamp = datetime.now()
+            time_info = self.timestamp.isoformat(timespec=timespec)
+            runtime_info = "in progress"
         else:
-            timestemp = datetime.now()
-            time_info = timestemp.isoformat(timespec=timespec)
+            timestamp = datetime.now()
+            time_info = timestamp.isoformat(timespec=timespec)
+
+            # Calculate runtime if finished is True
+            if self.timestamp is not None and finished:
+                runtime_delta = timestamp - self.timestamp
+
+                days = runtime_delta.days
+                hours, remainder = divmod(runtime_delta.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                runtime_info = ""
+                if days > 0:
+                    runtime_info += f"{days}d "
+                if hours > 0:
+                    runtime_info += f"{hours}h "
+                if minutes > 0:
+                    runtime_info += f"{minutes:02}:"
+                if seconds < 10:
+                    runtime_info += f"{seconds + runtime_delta.microseconds / 1e6:.2f}"
+                elif seconds < 60:
+                    runtime_info += f"{seconds + runtime_delta.microseconds / 1e6:.1f}"
+                else:
+                    runtime_info += f"{seconds}"
+                # Clear the timestamp as the task is completed
+                self.timestamp = None
+            else:
+                runtime_info = "in progress" if self.timestamp is not None else "N/A"
+
+        # Initialize progress log if it doesn't exist yet
+        if not hasattr(self, 'progress_log'):
+            columns = ['process', 'last completed', 'attempted fits (pix)', 'successful fits (pix)',
+                       'total runtime (dd:hh:mm:ss)', 'cores used']
+            self.progress_log = pd.DataFrame(columns=columns)
+
+        cores_info = int(cores) if cores is not None else "N/A"
 
         if process_name in self.progress_log['process'].values:
-            # replace the previous entry if the process has been logged
+            # Replace the previous entry if the process has been logged
             mask = self.progress_log['process'] == process_name
-            self.progress_log.loc[mask, 'last complete'] = time_info
+            self.progress_log.loc[mask, ['last completed', 'total runtime (dd:hh:mm:ss)']] = [time_info, runtime_info]
+
+            # Update cores used only if the existing value is the default "N/A"
+            if cores is not None or self.progress_log.loc[mask, 'cores used'].values[0] == "N/A":
+                self.progress_log.loc[mask, 'cores used'] = cores_info
+
+            # Update attempted fits and successful fits if arguments are provided
+            if n_attempted is not None:
+                self.progress_log.loc[mask, 'attempted fits (pix)'] = n_attempted
+            if n_success is not None:
+                self.progress_log.loc[mask, 'successful fits (pix)'] = n_success
         else:
-            # add an new entry otherwise
-            info = {'process': process_name, 'last complete': time_info}
-            try:
-                self.progress_log = concat([self.progress_log, DataFrame([info])], ignore_index=True)
-            except AttributeError:
+            # Add a new entry otherwise
+            # Fill the additional columns with default values (e.g., "None" for unspecified fields)
+            info = {
+                'process': process_name,
+                'last completed': time_info,
+                'attempted fits (pix)': n_attempted if n_attempted is not None else "None",
+                'successful fits (pix)': n_success if n_success is not None else "None",
+                'total runtime (dd:hh:mm:ss)': runtime_info,
+                'cores used': cores_info
+            }
+
+            if pd.__version__ >= '1.3.0':
+                # For newer pandas versions, use concat
+                self.progress_log = pd.concat([self.progress_log, pd.DataFrame([info])], ignore_index=True)
+            else:
+                # For older pandas versions, use append
                 self.progress_log = self.progress_log.append(info, ignore_index=True)
 
         if save:
-            # write the log as an csv file
+            # Reorder the rows by 'last completed' in chronological order
+            self.progress_log = self.progress_log.sort_values(by='last completed', ascending=True)
+            # Write the log as a CSV file
             self.progress_log.to_csv(self.progress_log_name, index=False)
 
 
@@ -317,19 +411,22 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
 
     """
 
-    proc_name = 'iter_2comp_fit'
-    reg.log_progress(process_name=proc_name, mark_start=True)
-
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
     ncomp = [1, 2]  # ensure this is a two component fitting method
 
     # convolve the cube and fit it
-    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore)
+    proc_name = f'iter conv fits'
+    reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
+    reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore) # actual fitting
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted='N/A', n_success='N/A', finished=True)
 
     # use the result from the convolved cube as guesses for the full resolution fits
     for nc in ncomp:
+        proc_name = f'iter {nc} comp fit'
+        reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
+
         pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
         if nc == 2 and use_cnv_lnk:
             # clean up the fits with lnk maps
@@ -345,15 +442,24 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header,
                                             clean_map=clean_map, tau_thresh=1)
 
+        n_pix = np.all(np.isfinite(guesses), axis=0).sum()
+
         # update is set to True to save the fits
         kwargs = {'update': True, 'guesses': guesses, 'snr_min': snr_min, 'multicore': multicore}
         if planemask is not None:
             kwargs['maskmap'] = planemask
+            n_pix = np.sum(np.all(np.isfinite(guesses), axis=0) & planemask)
+
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_pix, n_success='N/A')
+
         reg.ucube.get_model_fit([nc], **kwargs)
 
-    if save_para:
-        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
-    reg.log_progress(process_name=proc_name, mark_start=False)
+        if save_para:
+            save_updated_paramaps(reg.ucube, ncomps=[nc])
+
+        n_good = reg.ucube.pcubes[str(nc)].has_fit.sum()
+
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
 
 
 
@@ -383,16 +489,15 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
     -------
 
     """
-
-    proc_name = 'refit_bad_2comp'
-    reg.log_progress(process_name=proc_name, mark_start=True)
-    ucube = reg.ucube
-
-    from astropy.convolution import Gaussian2DKernel, convolve
-
     logger.info("Begin re-fitting bad 2-comp pixels")
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
+
+    proc_name = 'refit_bad_2comp'
+    reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
+    ucube = reg.ucube
+
+    from astropy.convolution import Gaussian2DKernel, convolve
 
     lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False, multicore=multicore)
 
@@ -403,18 +508,20 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
     mask_size = np.sum(mask)
     if mask_size > 0:
         logger.info("Attempting to refit over {} pixels to recover bad 2-comp. fits".format(mask_size))
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=mask_size, n_success='in progress')
     else:
         logger.info("No pixel was used in attempt to recover bad 2-comp. fits")
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=0, finished=True)
         return
 
     guesses, mask = get_refit_guesses(ucube, mask, ncomp=2, method='best_neighbour', refmap=lnk20)
     # re-fit and save the updated model
-    replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore)
+    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore, return_n_good=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
-    reg.log_progress(process_name=proc_name, mark_start=False)
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
 
 
 
@@ -448,13 +555,12 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
     """
 
     ucube = reg.ucube
-
-    proc_name = f'refit_marginal_{ncomp}_comp'
-    reg.log_progress(process_name=proc_name, mark_start=True)
-    ucube = reg.ucube
-
     multicore = validate_n_cores(multicore)
     logger.info(f"Begin re-fitting marginal pixels using {multicore} cores")
+
+    proc_name = f'refit_marginal_{ncomp}_comp'
+    reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
+    ucube = reg.ucube
 
     lnk_maps = reg.ucube.get_all_lnk_maps(ncomp_max=ncomp, rest_model_mask=False, multicore=multicore)
     if ncomp == 1:
@@ -467,6 +573,7 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
     mask = get_marginal_pix(lnkmap, lnk_thresh=lnk_thresh, holes_only=holes_only, **kwargs_marg)
     if mask.sum() < 1:
         logger.info(f"No pixel was used in attempt to recover marginal {ncomp}-comp. fits")
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=0, finished=True)
         return
 
     guesses, mask = get_refit_guesses(ucube, mask=mask, ncomp=ncomp, method=method, refmap=lnkmap)
@@ -478,18 +585,20 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
     mask_size = np.sum(mask)
     if mask_size > 0:
         logger.info(f"Attempting to refit over {mask_size} pixels to recover marginal {ncomp}-comp. fits")
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=mask_size, n_success='in progress')
     else:
         logger.info(f"No pixel was used in attempt to recover marginal {ncomp}-comp. fits")
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=0, finished=True)
         return
 
     # re-fit and save the updated model
     snr_min=0
-    replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore)
+    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore, return_n_good=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
-    reg.log_progress(process_name=proc_name, mark_start=False)
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
 
 
 
@@ -576,13 +685,12 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
     None
 
     """
-
-    proc_name = 'refit_2comp_wide'
-    reg.log_progress(process_name=proc_name, mark_start=True)
-
     logger.info("Begin wide component recovery")
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
+
+    proc_name = 'refit_2comp_wide'
+    reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
 
     ncomp = [1, 2]
 
@@ -623,6 +731,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         except SNRMaskError as e:
             msg = e.__str__() + " No second component recovered from the residual cube."
             logger.warning(msg)
+            reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=0, finished=True)
             return
         except StartFitError as e:
             logger.warning(e.__str__())
@@ -630,6 +739,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         except ValueError as e:
             msg = e.__str__() + "Convolved residual cube is not fitted. No recovery is done for the wide component."
             logger.warning(msg)
+            reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=0, finished=True)
             return
         # reduce the linewidth guess to avoid overestimation
         wide_comp_guess[:, ~mask] = np.nan
@@ -654,19 +764,22 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
     mask_size = np.sum(mask)
     if mask_size > 0:
         logger.info("Attempting wide recovery over {} pixels".format(mask_size))
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=mask_size, n_success='in progress')
     else:
         logger.info("No pixel was used in attempt to recover wide component")
-        pass
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=None, finished=True)
+        return
 
-    replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21=None, simpfit=simpfit, multicore=multicore)
+    n_good = replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21=None, simpfit=simpfit,
+                             multicore=multicore, return_n_good=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
-    reg.log_progress(process_name=proc_name, mark_start=False)
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
 
 
-def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, multicore=True):
+def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, multicore=True, return_n_good=False):
     """
     Refit pixels marked by the mask as "bad" and adopt the new model if it is determined to be better.
 
@@ -687,6 +800,8 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
     multicore : bool or int, optional
         Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
         If an integer is provided, it specifies the number of CPU cores to use.
+    return_n_good : bool
+        If True, return the number of pixels with good fits
 
     Returns
     -------
@@ -707,19 +822,29 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         except SNRMaskError:
             logger.info("No valid pixel to refit with snr_min={}."
                         " Please consider trying a lower snr_min value.".format(snr_min))
-            return
+            if return_n_good:
+                return 0
+            else:
+                return
 
         # do a model comparison between the new two component fit verses the original one
         lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
 
         good_mask = np.logical_and(lnk_NvsO > 0, mask)
 
-        logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
+        n_good = good_mask.sum()
+
+        logger.info("Replacing {} bad pixels with better fits".format(n_good))
         # replace the values
         replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
         replace_rss(ucube, ucube_new, ncomp=2, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
+        n_good=0
+
+    if return_n_good:
+        return n_good
+
 
 
 def replace_rss(ucube, ucube_ref, ncomp, mask):
@@ -827,7 +952,7 @@ def standard_2comp_fit(reg, planemask=None, snr_min=3):
             kwargs['maskmap'] = planemask
         reg.ucube.get_model_fit([nc], fittype=reg.fittype, **kwargs)
 
-    reg.log_progress(process_name=proc_name, mark_start=False)
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=None)
 
 
 def save_updated_paramaps(ucube, ncomps):
