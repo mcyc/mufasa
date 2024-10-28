@@ -1057,7 +1057,7 @@ def save_updated_paramaps(ucube, ncomps):
 
 
 
-def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
+def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=5, lnk10_thres=5):
     """
     Save the best two-component fit results for the specified region.
 
@@ -1070,6 +1070,10 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
         If an integer is provided, it specifies the number of CPU cores to use.
     from_saved_para : bool, optional
         If True, reload parameters from saved files instead of using existing results in memory (default is False).
+    lnk21_thres : float, optional
+        The log-relative-likelihood theshold to select the 2-component model over the 1-component model (default is 5)
+    lnk10_thres : float, optional
+        The log-relative-likelihood theshold to select the 1-component model over the noise model (default is 5)
 
     Returns
     -------
@@ -1098,7 +1102,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
 
     # make the two-component parameter maps with the best fit model
     pcube_final = reg_final.ucube.pcubes['2']
-    kwargs = dict(multicore=multicore, lnk21_thres=5, lnk10_thres=5, return_lnks=True)
+    kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True)
     parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
     pcube_final.parcube = parcube
     pcube_final.errcube = errcube
