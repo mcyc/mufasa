@@ -143,7 +143,7 @@ class ScatterPPV(object):
         df['delt Dec'] = df['delt Dec'] - dec_ref
 
 
-    def plot_ppv(self, label_key='peakT', vel_scale=0.8, xyunit='arcmin', **kwargs):
+    def plot_ppv(self, label_key='peakT', vel_scale=0.8, xyunit='arcmin', savename=None, **kwargs):
         """
         Plot the fitted model in position-position-velocity (PPV) space, with points colored by a specified key.
 
@@ -154,9 +154,18 @@ class ScatterPPV(object):
         vel_scale : float, optional
             Scale factor for the velocity axis relative to x & y axes, where x is normalized to 1. Default is 0.8.
         xyunit : {'arcmin', 'pix'}, optional
-            Units for x & y coordinates. If 'arcmin', plots relative RA and Dec in arcminutes. If 'pix', plots coordinates in pixels. Default is 'arcmin'.
-        kwargs : dict
-            Additional keyword arguments for customization in plotting.
+            Units for x & y coordinates. If 'arcmin', plots relative RA and Dec in arcminutes. If 'pix', plots coordinates in pixels.
+             Default is 'arcmin'.
+        savename : str, optional
+            Path to save the plot as an HTML file. Default is None.
+        kwargs : dict, optional
+            Additional keyword arguments are passed to `plot_ppv`, allowing customization of the PPV scatter plot.
+
+            Key options include:
+            - `auto_open_html` : bool, optional
+                If True, automatically opens the saved HTML file in a browser after saving. Default is True.
+            - `mask_df`: pandas.Series or None, optional
+                Boolean mask to filter the DataFrame before plotting. Default is None.
 
         Returns
         -------
@@ -199,7 +208,7 @@ class ScatterPPV(object):
         self.fig = scatter_3D_df(self.dataframe[vmask], z_key='vlsr',
                                  zlab='<i>v</i><sub>LSR</sub> (km s<sup>-1</sup>)',
                                  nx=self.header['NAXIS1'], ny=self.header['NAXIS2'],
-                                 vmin=cmin, vmax=cmax, z_scale=vel_scale,
+                                 vmin=cmin, vmax=cmax, z_scale=vel_scale, savename=savename,
                                  **kwargs)
 
 def scatter_3D_df(dataframe, x_key, y_key, z_key, label_key=None, mask_df=None,

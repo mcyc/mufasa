@@ -29,6 +29,7 @@ pip install mufasa
 - ```pyspeckit >= v1.0.1```
 - ```reproject >= v0.7.1```
 - ```FITS_tools >= v0.2```
+- ```plotly >= v4.0```
 
 If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` and  ```FITS_tools``` directly from their respective GitHub repository. The `setup.py` for `MUFASA >= v1.4.0` takes care of such a depdendcy automatically with `pip` installs.
 
@@ -52,9 +53,11 @@ In the example above, ```cubePath``` is the path to the FITS data cube, ```paraN
 
 If one wishes to fit pixels only above a specific signal-to-noise-ratio (SNR) threshold, one can specify such a threshold using the ```snr_min``` argument.
 
-### Visualize the fits
+### Visualizing the Results
 
-To quickly visualize the saved fits, one can plot the spectral model at position x, y, and its neighbors with:
+#### Plotting Fitted Spectra
+
+To quickly plot the fitted spectra from the saved fits for position (x,y) and its surrounding pixels, run:
 
 ```
 from mufasa import UltraCube as UCube
@@ -67,7 +70,16 @@ ucube.read_model_fit(ncomps=[1,2])
 ucube.plot_fits_grid(x,y, ncomp=2, size=3, xlim=None, ylim=None)
 ```
 
-where the ```comp``` and ```size``` arguments in ```plot_fits_grid``` are the number of components in the model and the plot's grid size. For example, setting ```size=3``` results in a plot with 3x3 grid of spectral models centered on the position ```x``` and ```y```. To zoom in on the plot (e.g., to look closely at a hyperfine group), one can use the ```xlim``` and ```ylim``` arguments to constrain the plot's x and y limits. 
+where the ```comp``` and ```size``` arguments in ```plot_fits_grid``` are the number of components in the model and the plot's grid size. For example, setting ```size=3``` results in a plot with 3x3 grid of spectral models centered on the position ```x``` and ```y```. To zoom in on the plot (e.g., to look closely at a hyperfine group), one can use the ```xlim``` and ```ylim``` arguments to constrain the plot's x and y limits.
+
+#### Plotting in PPV with 3D Scatter
+
+To visualize the best-fit models in position-position-velocity (PPV) space, run: 
+```
+reg.plot_ppv_scatter(savepath, vel_scale=0.5)
+```
+where ```savepath``` is the file path to save the plot as an HTML file and ```vel_scale``` is the scale factor for the velocity axis for the visualization relative to the x and y axes, with x normalized to 1. 
+
 
 
 
