@@ -186,7 +186,8 @@ class Region(object):
         filepath = "{}_final.fits".format(os.path.splitext(self.ucube.paraPaths[str(ncomp)])[0])
         return fits.getdata(filepath, header=header)
 
-    def plot_ppv_scatter(self, ncomp=2, label_key='peakT', savename=None, vel_scale=0.8, **kwargs):
+    def plot_ppv_scatter(self, ncomp=2, label_key='peakT', savename=None, vel_scale=0.8, vrange=None, verr_thres=5,
+                         **kwargs):
         """
         Generate a 3D scatter plot of the position-position-velocity (PPV) data from MUFASA generaged fitted parameters for the
         best model, up to 'ncomp' of components.
@@ -195,10 +196,16 @@ class Region(object):
         ----------
         ncomp : int, optional
             The number of components in the model to be plotted.
+        label_key : str, optional
+            DataFrame column to color each data point by, e.g., 'peakT' for peak intensity or clustering labels. Default is 'peakT'.
         savename : str, optional
             The file path to save the 3D plot as an HTML file. If None, the plot will not be saved. Default is None.
         vel_scale : float, optional
             Scale factor for the velocity axis relative to the x and y axes, with x normalized to 1. Default is 0.8.
+        vrange : tuple of float, optional
+            Velocity range to clip the data (in km/s).
+        verr_thres : float, optional
+            The velocity error threshold (in km/s) to filter the data. Data with errors above this threshold is excluded.
         kwargs : dict, optional
             Additional keyword arguments are passed to `plot_ppv`, allowing customization of the PPV scatter plot.
 
@@ -227,8 +234,8 @@ class Region(object):
         except KeyError:
             filepath = '{}/{}_{}vcomp_final.fits'.format(self.ucube.paraDir, self.ucube.paraNameRoot, ncomp)
 
-        self.ScatterPPV = scatter_3D.ScatterPPV(filepath, fittype=self.fittype)
-        return self.ScatterPPV.plot_ppv(savename=savename, vel_scale=vel_scale)
+        self.ScatterPPV = scatter_3D.ScatterPPV(filepath, fittype=self.fittype, vrange=vrange, verr_thres=verr_thres)
+        return self.ScatterPPV.plot_ppv(savename=savename, vel_scale=vel_scale, **kwargs)
 
 
     def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds', n_attempted=None,

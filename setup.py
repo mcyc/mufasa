@@ -24,6 +24,7 @@ setup(
         'pvextractor',
         'pandas',
         'plotly',
+        'nbformat',
         'reproject>=0.7.1',
         'pyspeckit @ git+https://github.com/pyspeckit/pyspeckit@master#egg=pyspeckit',
         'FITS_tools @ git+https://github.com/keflavich/FITS_tools@master#egg=FITS_tools'

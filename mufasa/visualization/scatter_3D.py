@@ -51,21 +51,6 @@ class ScatterPPV(object):
             The velocity error threshold (in km/s) to filter the data. Data with errors above this threshold is excluded.
         """
 
-    def __init__(self, parafile, fittype, vrange=None, verr_thres=5):
-        """
-        Parameters
-        ----------
-        parafile : str
-            Path to the .fits file containing the modeled parameter maps.
-        fittype : str
-            The name of the fit model, e.g., "nh3_multi_v" or "n2hp_multi_v".
-        vrange : tuple of float, optional
-            Velocity range to clip the data (in km/s). Data outside this range is excluded. Default is None.
-        verr_thres : float, optional
-            Velocity error threshold (in km/s) to filter out data with higher errors.
-             Data with a velocity error greater than this threshold is excluded. Default is 5.
-        """
-
         self.paracube, self.header = fits.getdata(parafile, header=True)
         self.fittype = fittype
 
