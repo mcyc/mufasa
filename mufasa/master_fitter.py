@@ -33,7 +33,6 @@ from . import guess_refine as gss_rf
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import neighbours
-from .visualization import scatter_3D
 # =======================================================================================================================
 from .utils.mufasa_log import init_logging, get_logger
 
@@ -228,6 +227,8 @@ class Region(object):
         selected component count (`ncomp`). It then calls the `plot_ppv` method to generate the PPV scatter plot, allowing
         for optional customization through `savename`, `vel_scale`, and `kwargs`.
         """
+
+        from .visualization import scatter_3D
 
         try:
             filepath = "{}_final.fits".format(os.path.splitext(self.ucube.paraPaths[str(ncomp)])[0])
