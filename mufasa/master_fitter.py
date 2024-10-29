@@ -236,7 +236,7 @@ class Region(object):
             filepath = '{}/{}_{}vcomp_final.fits'.format(self.ucube.paraDir, self.ucube.paraNameRoot, ncomp)
 
         self.ScatterPPV = scatter_3D.ScatterPPV(filepath, fittype=self.fittype, vrange=vrange, verr_thres=verr_thres)
-        return self.ScatterPPV.plot_ppv(savename=savename, vel_scale=vel_scale, **kwargs)
+        return self.ScatterPPV.plot_ppv(label_key=label_key, savename=savename, vel_scale=vel_scale, **kwargs)
 
 
     def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds', n_attempted=None,
