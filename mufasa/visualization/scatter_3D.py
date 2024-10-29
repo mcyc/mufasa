@@ -158,7 +158,8 @@ class ScatterPPV(object):
         if label_key == 'peakT':
             kwdf = dict(cmap='magma_r', opacity_ranges=5)
             kwargs = {**kwdf, **kwargs}
-            kwargs['label_key'] = label_key
+
+        kwargs['label_key'] = label_key
 
         # get the velocity range to plot
         vmin, vmax = np.nanpercentile(self.dataframe['vlsr'], [1, 99])
@@ -170,8 +171,11 @@ class ScatterPPV(object):
 
         vmask = np.logical_and(self.dataframe['vlsr']>vmin, self.dataframe['vlsr']<vmax)
 
-        # Calculate the 1st and 99th percentiles for color and opacity scaling
-        cmin, cmax = np.nanpercentile(self.dataframe[label_key][vmask], [1, 99])
+        if label_key is not None:
+            # Calculate the 1st and 99th percentiles for color and opacity scaling
+            cmin, cmax = np.nanpercentile(self.dataframe[label_key][vmask], [1, 99])
+            kwargs['vmin'] = cmin
+            kwargs['vmax'] = cmax
 
         if xyunit == 'arcmin':
             # plot delta RA & Dec in arcmin
@@ -190,8 +194,7 @@ class ScatterPPV(object):
         self.fig = scatter_3D_df(self.dataframe[vmask], z_key='vlsr',
                                  zlab='<i>v</i><sub>LSR</sub> (km s<sup>-1</sup>)',
                                  nx=self.header['NAXIS1'], ny=self.header['NAXIS2'],
-                                 vmin=cmin, vmax=cmax, z_scale=vel_scale, savename=savename,
-                                 **kwargs)
+                                 z_scale=vel_scale, savename=savename, **kwargs)
 
 def scatter_3D_df(dataframe, x_key, y_key, z_key, label_key=None, mask_df=None,
                   auto_open_html=True, **kwargs):
@@ -334,6 +337,8 @@ def scatter_3D(x, y, z, labels=None, nx=None, ny=None, z_scale=0.8, shadow=True,
             fig.add_scatter3d(x=sub_x, y=sub_y, z=sub_z, mode='markers', marker=marker)
     else:
         # Single trace for non-peakT labels or opacity_ranges=1
+        if labels is None:
+            labels = '#1f77b4' #muted blue
         marker = dict(size=1, color=labels, colorscale=cmap, opacity=1.0)
         if vmin is not None and vmax is not None:
             marker.update(cmin=vmin, cmax=vmax)
