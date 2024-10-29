@@ -3,9 +3,6 @@ from astropy.io import fits
 from plotly.subplots import make_subplots
 import plotly.offline as pyo
 
-# Set notebook mode to work in offline
-pyo.init_notebook_mode()
-
 from ..utils import dataframe as dframe
 from ..moment_guess import peakT
 
@@ -386,6 +383,8 @@ def scatter_3D(x, y, z, labels=None, nx=None, ny=None, z_scale=0.8, shadow=True,
         fig.add_scatter3d(x=x, y=y, z=z_shadow, **kw_scatter3d_mod)
 
     if showfig:
+        # Set notebook mode to work in offline
+        pyo.init_notebook_mode()
         fig.show()
 
     if savename is not None:

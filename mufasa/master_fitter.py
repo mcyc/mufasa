@@ -33,7 +33,6 @@ from . import guess_refine as gss_rf
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import neighbours
-from .visualization import scatter_3D
 # =======================================================================================================================
 from .utils.mufasa_log import init_logging, get_logger
 
@@ -228,6 +227,8 @@ class Region(object):
         selected component count (`ncomp`). It then calls the `plot_ppv` method to generate the PPV scatter plot, allowing
         for optional customization through `savename`, `vel_scale`, and `kwargs`.
         """
+
+        from .visualization import scatter_3D
 
         try:
             filepath = "{}_final.fits".format(os.path.splitext(self.ucube.paraPaths[str(ncomp)])[0])
@@ -1057,7 +1058,7 @@ def save_updated_paramaps(ucube, ncomps):
 
 
 
-def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
+def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=5, lnk10_thres=5):
     """
     Save the best two-component fit results for the specified region.
 
@@ -1070,6 +1071,10 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
         If an integer is provided, it specifies the number of CPU cores to use.
     from_saved_para : bool, optional
         If True, reload parameters from saved files instead of using existing results in memory (default is False).
+    lnk21_thres : float, optional
+        The log-relative-likelihood theshold to select the 2-component model over the 1-component model (default is 5)
+    lnk10_thres : float, optional
+        The log-relative-likelihood theshold to select the 1-component model over the noise model (default is 5)
 
     Returns
     -------
@@ -1098,7 +1103,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False):
 
     # make the two-component parameter maps with the best fit model
     pcube_final = reg_final.ucube.pcubes['2']
-    kwargs = dict(multicore=multicore, lnk21_thres=5, lnk10_thres=5, return_lnks=True)
+    kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True)
     parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
     pcube_final.parcube = parcube
     pcube_final.errcube = errcube
