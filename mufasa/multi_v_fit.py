@@ -20,6 +20,7 @@ from skimage.morphology import remove_small_objects, disk, opening, binary_erosi
 from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
+from . import signals
 from . import moment_guess as momgue
 from . import guess_refine as g_refine
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
@@ -314,6 +315,7 @@ def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, gues
     eps = mod_info.eps
 
     pcube, cube = setup_cube(cube, mod_info, return_spectral_cube=True)
+    cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
     # Specify a width for the expected velocity range in the data
     v_peak_hwidth = 4.0  # km/s (should be sufficient for GAS Orion, but may not be enough for KEYSTONE)
@@ -324,7 +326,54 @@ def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, gues
         # a quick way to estimate RMS as long as the noise dominates the spectrum by channels
         errmap = None
 
-    footprint_mask = np.any(np.isfinite(cube._data), axis=0)
+    linewidth_sigma = False
+    trim = 3
+
+    # trim the edges by 3 pixels
+    cube = signals.trim_cube_edge(cube, trim=trim)
+    m0, m1, m2, rms = signals.get_moments(cube, window_hwidth=5, linewidth_sigma=linewidth_sigma, trim=None,
+                                          return_rms=True)
+
+    peaksnr = signals.get_snr(cube, rms=rms)
+
+    # use min and max assuming the moment 1 is robust
+    vmax = np.nanmax(m1).value + sigmax / 2
+    vmin = np.nanmin(m1).value - sigmax / 2
+
+    logger.debug("velocity limit: ({:.3f}, {:.3f})".format(vmin, vmax))
+
+    if 'planemask' in kwargs:
+        planemask = kwargs['planemask']
+        planemask = planemask & np.any(cube.mask.include(), axis=0)
+    else:
+        planemask = np.any(cube.mask.include(), axis=0)
+
+    if 'maskmap' in kwargs:
+        logger.debug("including user specified mask as a base")
+        planemask = np.logical_and(kwargs['maskmap'], planemask)
+
+    if 'signal_cut' in kwargs:
+        logger.warning("signal_cut will be set to zero for pcube.fiteach() in cubefit_gen."
+                       " The snr_min is used to determine which pixels to fit prior to calling fiteach()")
+
+    if snr_min > 0:
+        snr_mask = peaksnr > snr_min
+        if snr_min >= 3:
+            mom_mask = np.isfinite(m1)
+            planemask = planemask & snr_mask & mom_mask
+        else:
+            planemask = planemask & snr_mask
+
+    if planemask.sum() < 1:
+        msg = "The provided snr_min={} results in no valid pixels to fit; fitting terminated".format(snr_min)
+        raise SNRMaskError(msg)
+
+    if mask_function is not None:
+        msg = "\'mask_function\' is now deprecation, and will be removed in the next version"
+        warnings.warn(msg, DeprecationWarning)
+        logger.warning(msg)
+
+    '''
 
     if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
         # trim the edges by 3 pixels to guess the location of the peak emission
@@ -473,13 +522,17 @@ def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, gues
 
     mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask * footprint_mask)
     m0, m1, m2 = mmm[0], mmm[1], mmm[2]
+    '''
+
+    mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask)
+    m0, m1, m2 = mmm[0], mmm[1], mmm[2]
 
     logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin, 2), np.round(vmax, 2)))
 
     # get the guesses based on moment maps
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
     gg = momgue.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0, linetype=mod_info.linetype,
-                               mom0_floor=mom0_floor)
+                               mom0_floor=None)
 
     if guesses is None:
         guesses = gg
@@ -528,7 +581,7 @@ def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, gues
     if saveguess:
         save_guesses(pcube, paraname, guesses, savename)
 
-    kwargs['maskmap'] = planemask & footprint_mask & np.all(np.isfinite(guesses), axis=0)
+    kwargs['maskmap'] = planemask & np.any(cube.mask.include(), axis=0) & np.all(np.isfinite(guesses), axis=0)
     kwargs['maskmap'] &= match_pcube_mask(pcube, kwargs['maskmap'])
     mask_size = np.sum(kwargs['maskmap'])
 

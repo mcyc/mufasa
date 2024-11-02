@@ -366,7 +366,8 @@ def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=
     noise_mask_cut = 2.5
 
     # Trim cube edges
-    cube = trim_cube_edge(cube, trim=trim)
+    if trim is not None:
+        cube = trim_cube_edge(cube, trim=trim)
     rms = get_rms_robust(cube, sigma_cut=noise_mask_cut, **kwargs)
     v_peak = v_estimate(cube, rms, snr_cut=snr_cut)
 
