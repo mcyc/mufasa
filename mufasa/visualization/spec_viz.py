@@ -16,7 +16,7 @@ class Plotter(object):
                                       refX=self.cube._header['RESTFRQ'],
                                       velocity_convention='radio')
 
-        # the following need to be consistient with the data provided
+        # the following need to be consistent with the data provided
         self.xlab = r"$v_{\mathrm{LSR}}$ (km s$^{-1}$)"
         self.ylab = r"$T_{\mathrm{MB}}$ (K)"
 
@@ -27,7 +27,7 @@ class Plotter(object):
             from ..spec_models.n2hp_multiv import n2hp_multi_v
             self.model_func = n2hp_multi_v
         else:
-            raise ValueError("{} is not one of the currently accepted fittypes.")
+            raise ValueError(f"{fittype} is not one of the currently accepted fittypes.")
 
         self.parcubes = {}
 
@@ -40,8 +40,8 @@ class Plotter(object):
 
     def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
 
-        # add defaults that can be superceeded
-        kwargs = {'xlab':self.xlab, 'ylab':self.ylab, **kwargs}
+        # add defaults that can be superseded
+        kwargs = {'xlab': self.xlab, 'ylab': self.ylab, **kwargs}
 
         self.fig, self.axs = \
             plot_spec_grid(self.cube, x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim, figsize=figsize, **kwargs)
@@ -52,22 +52,26 @@ class Plotter(object):
             xlab = self.xlab
         if ylab is None:
             ylab = self.ylab
-        return plot_spec(spc, xarr=self.xarr, ax=ax, xlab=xlab, ylab=ylab, **kwargs)
+        self.fig, self.axs = plot_spec(spc, xarr=self.xarr, ax=ax, xlab=xlab, ylab=ylab, **kwargs)
+        return self.fig, self.axs
 
-
-    def plot_fit(self, x, y, ax, ncomp, **kwargs):
-        plot_model(self.parcubes[str(ncomp)][:,y,x], self.model_func, self.xarr, ax, ncomp, **kwargs)
+    def plot_fit(self, x, y, ax=None, ncomp=None, **kwargs):
+        if ax is None:
+            self.fig, ax = plt.subplots()
+            self.axs = ax
+        plot_model(self.parcubes[str(ncomp)][:, y, x], self.model_func, self.xarr, ax, ncomp, **kwargs)
 
     def plot_fits_grid(self, x, y, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
                        figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
 
-        # add defaults that can be superceeded
-        kwargs = {'xlab':self.xlab, 'ylab':self.ylab, **kwargs}
+        # add defaults that can be superseded
+        kwargs = {'xlab': self.xlab, 'ylab': self.ylab, **kwargs}
 
-        plot_fits_grid(self.cube, self.parcubes[str(ncomp)], self.model_func, x, y, self.xarr,
-                       ncomp=ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
-                       figsize=figsize, origin=origin, mod_all=mod_all, savename=savename,
-                       **kwargs)
+        self.fig, self.axs = \
+            plot_fits_grid(self.cube, self.parcubes[str(ncomp)], self.model_func, x, y, self.xarr,
+                           ncomp=ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
+                           figsize=figsize, origin=origin, mod_all=mod_all, savename=savename,
+                           **kwargs)
 
 # =======================================================================================================================
 
@@ -82,9 +86,7 @@ def get_cube_slab(cube, vZoomLims=(-5, 20)):
                              refX=cube_s._header['RESTFRQ'], velocity_convention='radio')
     return cube_s, xarr
 
-
 # =======================================================================================================================
-
 
 def plot_spec(spc, xarr=None, ax=None, fill=False, xlab=None, ylab=None, **kwargs):
 
@@ -95,9 +97,9 @@ def plot_spec(spc, xarr=None, ax=None, fill=False, xlab=None, ylab=None, **kwarg
             kwargs['color'] = kwargs['c']
             del kwargs['c']
     elif 'color' not in kwargs:
-        kwargs['color'] = '0.5'
+        kwargs['color'] = '0.65'
 
-    kwargs_df = dict(lw=1) # default kwargs
+    kwargs_df = dict(lw=1)  # default kwargs
     kwargs = {**kwargs_df, **kwargs}
 
     return_fig = False
@@ -122,20 +124,10 @@ def plot_spec(spc, xarr=None, ax=None, fill=False, xlab=None, ylab=None, **kwarg
     if return_fig:
         return fig, ax
 
-
 def get_spec_grid(size=3, xsize=None, ysize=None, figsize=None):
 
-    if size%2 ==0 and size > 0:
-        raise ValueError("Size provided must be an odd, positive interget that is not zero.")
-
-    if xsize is None:
-        xsize = size
-
-    if ysize is None:
-        ysize = size
-
-    if size%2 ==0 and size > 0:
-        raise ValueError("Size provided must be an odd, positive interget that is not zero.")
+    if size % 2 == 0 and size > 0:
+        raise ValueError("Size provided must be an odd, positive integer that is not zero.")
 
     if xsize is None:
         xsize = size
@@ -144,10 +136,9 @@ def get_spec_grid(size=3, xsize=None, ysize=None, figsize=None):
         ysize = size
 
     # initiate the plot grid
-    fig, axs = plt.subplots(ysize, xsize, sharex=all, sharey=all, gridspec_kw={'hspace': 0, 'wspace': 0}, figsize=figsize)
+    fig, axs = plt.subplots(ysize, xsize, sharex='all', sharey='all', gridspec_kw={'hspace': 0, 'wspace': 0}, figsize=figsize)
 
     return fig, axs
-
 
 def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None,
                    origin='lower', **kwargs):
@@ -164,15 +155,15 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
     fig, axs = get_spec_grid(size=size, xsize=xsize, ysize=ysize, figsize=figsize, **kwargs)
     ysize, xsize = axs.shape
 
-    xpad = int(xsize/2)
-    ypad = int(ysize/2)
+    xpad = int(xsize / 2)
+    ypad = int(ysize / 2)
 
     # get a subcube
-    scube = cube[:, y-ypad : y+ypad+1, x-xpad: x+xpad+ 1]
+    scube = cube[:, y - ypad: y + ypad + 1, x - xpad: x + xpad + 1]
 
     if ylim is None:
         ymax = scube.max()
-        ylim = (None, ymax*1.1)
+        ylim = (None, ymax * 1.1)
 
     # plot spectra over the grid
     for index, ax in np.ndenumerate(axs):
@@ -181,7 +172,7 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
         if origin == 'lower':
             yi = ysize - 1 - yi
         elif origin != 'upper':
-            raise KeyError("The keyword \'{}\' is unsupported.".format(origin))
+            raise KeyError(f"The keyword '{origin}' is unsupported.")
 
         spc = scube[:, yi, xi]
         plot_spec(spc, ax=ax, **kwargs)
@@ -199,26 +190,24 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
 
     # provide a common labeling ax
     fig.add_subplot(111, frameon=False, zorder=-100)
-    plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
+    plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
     plt.grid(False)
     plt.xlabel(xlab)
     plt.ylabel(ylab)
 
     return fig, axs
 
-
 def plot_model(para, model_func, xarr, ax, ncomp, **kwargs):
 
     for i in range(ncomp):
-        pp = para[i*4:(i+1)*4]
+        pp = para[i * 4:(i + 1) * 4]
         mod = model_func(xarr, *pp)
-        if not 'alpha' in kwargs:
+        if 'alpha' not in kwargs:
             kwargs['alpha'] = 0.6
-        plot_spec(mod, xarr, ax, fill=True, color='C{}'.format(i), **kwargs)
+        plot_spec(mod, xarr, ax, fill=True, color=f'C{i}', **kwargs)
 
     mod_tot = model_func(xarr, *para)
     plot_spec(mod_tot, xarr, ax, c='0.1', zorder=30, **kwargs)
-
 
 def plot_fits_grid(cube, para, model_func, x, y, xarr, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
                    figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
@@ -227,18 +216,19 @@ def plot_fits_grid(cube, para, model_func, x, y, xarr, ncomp, size=3, xsize=None
                               figsize=figsize, origin=origin, **kwargs)
 
     ysize, xsize = axs.shape
-    xpad = int(xsize/2)
-    ypad = int(ysize/2)
+    xpad = int(xsize / 2)
+    ypad = int(ysize / 2)
 
     if mod_all:
         for j in range(y - ypad, y + ypad + 1):
             for i in range(x - xpad, x + xpad + 1):
-                plot_model(para[:,j,i], model_func, xarr, ax=axs[j - y + ypad, i - x + xpad], ncomp=ncomp, lw=1)
+                plot_model(para[:, j, i], model_func, xarr, ax=axs[j - y + ypad, i - x + xpad], ncomp=ncomp, lw=1)
 
     else:
         # plot the central pixel only
-        plot_model(para[:,y,x], model_func, xarr, ax=axs[ypad, xpad], ncomp=ncomp, lw=1)
+        plot_model(para[:, y, x], model_func, xarr, ax=axs[ypad, xpad], ncomp=ncomp, lw=1)
 
-    if not savename is None:
+    if savename is not None:
         fig.savefig(savename, bbox_inches='tight')
-    return fig
+
+    return fig, axs
