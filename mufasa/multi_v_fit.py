@@ -49,6 +49,13 @@ class MetaModel(object):
         self.fittype = fittype
         self.adoptive_snr_masking = True
 
+        # the default windows for calculating moments
+        # final window for evaluating moments (center differs from pixel to pixel)
+        self.window_hwidth = 5
+        # intermediate window for filtering out satallite hyperfine lines. The window is fixed and the same
+        # throughout all pixels
+        self.central_win_hwidth = None
+
         # a place holder for if the window becomes line specific
         self.main_hf_moments = momgue.window_moments
 
@@ -76,7 +83,6 @@ class MetaModel(object):
             self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
             self.eps = 0.001  # a small perturbation that can be used in guesses
 
-
         elif self.fittype == 'n2hp_multi_v':
             from .spec_models.n2hp_constants import freq_dict
             from .spec_models import n2hp_multiv as n2hpmv
@@ -98,6 +104,10 @@ class MetaModel(object):
             self.taumax = 40.0  # when the satellite hyperfine lines becomes optically thick
             self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
             self.eps = 0.001  # a small perturbation that can be used in guesses
+
+            # overwrite default windows, since N2H+ (1-0) have a satellite line that could be fairly bright
+            self.window_hwidth = 4
+            self.central_win_hwidth = 3.5
 
         else:
             raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
@@ -379,13 +389,7 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
     taumin = mod_info.taumin
     eps = mod_info.eps
 
-    #pcube, cube = setup_cube(cube, mod_info, return_spectral_cube=True)
-    #cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-
     register_pcube(pcube, mod_info)
-
-    # Specify a width for the expected velocity range in the data
-    v_peak_hwidth = 4.0  # km/s (should be sufficient for GAS Orion, but may not be enough for KEYSTONE)
 
     if errmap11name is not None:
         errmap = fits.getdata(errmap11name)
@@ -398,7 +402,9 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
 
     # trim the edges by 3 pixels
     cube = signals.trim_cube_edge(cube, trim=trim)
-    m0, m1, m2, rms = signals.get_moments(cube, window_hwidth=5, linewidth_sigma=linewidth_sigma, trim=None,
+    m0, m1, m2, rms = signals.get_moments(cube, window_hwidth=mod_info.window_hwidth,
+                                          linewidth_sigma=linewidth_sigma, trim=None,
+                                          central_win_hwidth=mod_info.central_win_hwidth,
                                           return_rms=True)
 
     peaksnr = signals.get_snr(cube, rms=rms)

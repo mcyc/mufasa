@@ -19,6 +19,8 @@ Functions:
 """
 __author__ = "Mike Chen"
 
+import gc
+
 #=======================================================================================================================
 
 import numpy as np
@@ -338,7 +340,8 @@ def get_v_mask(cube_masked, v_center, rms=None, window_hwidth=5):
         return cube_masked.get_mask_array() & window_mask
 
 
-def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=False, **kwargs):
+def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=False, central_win_hwidth=None,
+                **kwargs):
     """
     Calculate moments of the signals in a cube.
 
@@ -354,6 +357,11 @@ def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=
         Number of pixels to trim from edges of the cube.
     return_rms : bool, optional
         Whether to return RMS along with moments.
+    central_win_hwidth : float, optional
+        If provided, re-evulate velocity at peak using a window centered on the mode of the initial velocity estimate, with a
+        half-wdith of central_win_hwidth. Note that window is the same for all pixels, but only applied as an intermediate step.
+        This should only used if hyperfine lines far from the main hyperfines have a comprable brightness.
+
     **kwargs
         Additional arguments.
 
@@ -371,6 +379,16 @@ def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=
     rms = get_rms_robust(cube, sigma_cut=noise_mask_cut, **kwargs)
     v_peak = v_estimate(cube, rms, snr_cut=snr_cut)
 
+    if central_win_hwidth is not None:
+        # impose a strick window based on the esitmated mode velocity to re-evaulate v_peak
+        v_mode = estimate_mode(v_peak, bins=25)
+        signal_mask_tmp = get_v_mask(cube, v_center=v_mode, rms=rms, window_hwidth=central_win_hwidth)
+        cube_signal_tmp = cube.with_mask(signal_mask_tmp)
+        v_peak = v_estimate(cube_signal_tmp, rms, snr_cut=snr_cut)
+        del signal_mask_tmp
+        del cube_signal_tmp
+        gc.collect()
+
     # Get velocity mask centered on v_peak with window_hwidth
     signal_mask = get_v_mask(cube, v_peak, rms=rms, window_hwidth=window_hwidth)
     # Expand the footprint a bit
@@ -382,11 +400,28 @@ def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=
     output = (mom0, mom1)
 
     if linewidth_sigma:
-        output += (cube_signal.linewidth_sigma(),) #how='ray'
+        output += (cube_signal.linewidth_sigma(),)
     else:
-        output += (cube_signal.moment2(),) #how='ray'
+        output += (cube_signal.moment2(),)
 
     if return_rms:
         output += (rms,)
 
     return output
+
+
+def estimate_mode(data, bins=25):
+    """
+    Estimate the mode of the data using a histogram
+    :param data:
+        the data to evaluate
+    :param bins:
+        number of bins
+    :return:
+    """
+    data=data[np.isfinite(data)]
+    counts, bins = np.histogram(data, bins=bins)
+
+    # Find the bin with the maximum frequency
+    max_bin_index = np.argmax(counts)
+    return (bins[max_bin_index] + bins[max_bin_index + 1]) / 2
