@@ -287,9 +287,8 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
     else:
         maskmap = planemask & footprint_mask
 
-    logger.info(f"maskmap type: {type(maskmap)}")
+    logger.debug(f"maskmap type: {type(maskmap)}")
     maskmap = maskmap.compute()
-    logger.info(f"maskmap type: {type(maskmap)}")
 
     v_peak_hwidth = 10
     v_guess = guesses[::4]
@@ -441,157 +440,7 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
         warnings.warn(msg, DeprecationWarning)
         logger.warning(msg)
 
-    '''
-
-    if np.logical_and(footprint_mask.sum() > 1000, momedgetrim):
-        # trim the edges by 3 pixels to guess the location of the peak emission
-        logger.debug("triming the edges to make moment maps")
-        footprint_mask = binary_erosion(footprint_mask, disk(3))
-
-    if 'planemask' in kwargs:
-        planemask = kwargs['planemask']
-    else:
-        planemask = footprint_mask.copy()
-
-    if 'maskmap' in kwargs:
-        logger.debug("including user specified mask as a base")
-        planemask = np.logical_and(kwargs['maskmap'], planemask)
-
-    if 'signal_cut' in kwargs:
-        logger.warning("signal_cut will be set to zero for pcube.fiteach() in cubefit_gen."
-                       " The snr_min is used to determine which pixels to fit prior to calling fiteach()")
-
-    peaksnr, planemask, kwargs, err_mask = handle_snr(pcube, snr_min, planemask=planemask,
-                                                      return_errmask=True, **kwargs)
-
-    if planemask.sum() < 1:
-        msg = "The provided snr_min={} results in no valid pixels to fit; fitting terminated".format(snr_min)
-        raise SNRMaskError(msg)
-
-    if mask_function is not None:
-        msg = "\'mask_function\' is now deprecation, and will be removed in the next version"
-        warnings.warn(msg, DeprecationWarning)
-        logger.warning(msg)
-
-    # masking for moment guesses (note that this isn't used for the actual fit)
-    mask = np.isfinite(cube._data) * planemask * footprint_mask  # * err_mask
-    maskcube = cube.with_mask(mask.astype(bool))
-    maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-
-    if guesses is not None:
-        v_guess = guesses[::4]
-        v_guess[v_guess == 0] = np.nan
-    else:
-        v_guess = np.nan
-
-    if np.isfinite(v_guess).sum() > 0:
-        v_guess = v_guess[np.isfinite(v_guess)]
-        v_median = np.median(v_guess)
-        logger.debug("The median of the user provided velocities is: {:.3f}".format(v_median))
-        m0, m1, m2 = mod_info.main_hf_moments(maskcube, window_hwidth=v_peak_hwidth, v_atpeak=v_median)
-        v_median, v_99p, v_1p = get_vstats(v_guess)
-    else:
-        # create seeds, in the form of signal_mask to divide the cube for different moment guesses
-        if snr_min > 10 and planemask.sum() > 1:
-            signal_mask = planemask
-        else:
-            signal_mask = default_masking(peaksnr, snr_min=10) * err_mask
-            # apply the error mask to remove potential "fake" signals in noisy maps
-            sig_mask_size = signal_mask.sum()
-
-            snr_list = [10, 5, 3]
-            while sig_mask_size < 1 and snr_list[i] >= snr_list[-1]:
-                snr_i = snr_list[i]
-                logger.debug("No pixels with {} > SNR cut; try SNR > {}".format(snr_list[i - 1], snr_i))
-                # if there's no pixel above SNR > 10, try lower the threshold to 5
-                signal_mask = default_masking(peaksnr, snr_min=snr_i) * err_mask
-                sig_mask_size = signal_mask.sum()
-
-            if sig_mask_size < 1:
-                # if no pixel in the map still, use all pixels
-                logger.debug("No pixels with SNR > {}; using all pixels".format(snr_list[-1]))
-                signal_mask = planemask * err_mask
-
-        # find the number of structures in the signal_mask
-        _, n_sig_parts = ndi.label(signal_mask)
-
-        if n_sig_parts > 1:
-            # if there is more than one structure in the signal mask
-            seeds = signal_mask
-            while n_sig_parts > 10:
-                # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
-                seeds = binary_dilation(seeds, disk(5))
-                _, n_sig_parts = ndi.label(signal_mask)
-
-            m0, m1, m2 = momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
-                                                     weights=peaksnr, signal_mask=signal_mask)
-        else:
-            # use err_mask if it has structures
-            _, n_parts = ndi.label(~err_mask)
-            if n_parts > 1:
-                seeds = err_mask
-                while n_sig_parts > 10:
-                    # if there are a large number of seeds, dilate the structure to merge the nearby structures into one
-                    seeds = binary_dilation(seeds, disk(5))
-                    _, n_sig_parts = ndi.label(signal_mask)
-                m0, m1, m2 = momgue.adaptive_moment_maps(maskcube, seeds, window_hwidth=v_peak_hwidth,
-                                                         weights=peaksnr, signal_mask=signal_mask)
-            else:
-                # use the simplest main_hf_moments
-                m0, m1, m2 = mod_info.main_hf_moments(maskcube, window_hwidth=v_peak_hwidth)
-
-        # mask over robust moment guess pixels to set the velocity fitting range
-        v_median, v_99p, v_1p = get_vstats(m1, signal_mask)
-    logger.debug("median velocity: {:3f}".format(v_median))
-
-    # use the median value of the mom0 pixels with snr < 3 as an estimation for the mom0 baseline
-    # this will be used for moment guesses
-    try:
-        fmask = peaksnr < 3
-        if np.sum(fmask * np.isfinite(m0)) > 3:
-            mom0_floor = np.nanmedian(m0[fmask])
-        else:
-            mom0_floor = np.nanmin(m0)
-            if mom0_floor < 0:
-                mom0_floor = None
-    except:
-        mom0_floor = None
-
-    # quality control - remove pixels with mom0 that seems to be below the rms threshold
-    def q_mask(m0):
-        # estimate the noise level, starting with pixels with peaksnr < 3
-        qmask = np.logical_and(np.isfinite(m0), peaksnr < 3)
-        std_m0 = mad_std(m0[qmask])
-        # estimate again with the signals "removed"
-        qmask = np.logical_or(qmask, m0 > std_m0)
-        std_m0 = mad_std(m0[qmask])
-        return m0 < std_m0
-
-    qmask = q_mask(m0)
-    # make sure we don't remove pixles with snr > 10
-    qmask = np.logical_and(qmask, peaksnr < 10)
-
-    if np.sum(np.logical_and(~qmask, footprint_mask)) > 25:
-        # only apply the quality cut if there are more than 25 pixels remaining
-        m0[qmask] = np.nan
-        m1[qmask] = np.nan
-        m2[qmask] = np.nan
-
-    # define acceptable v range based on the provided or determined median velocity
-    vmax = v_median + v_peak_hwidth
-    vmin = v_median - v_peak_hwidth
-    logger.debug("median input velocity: {:.3f}".format(v_median))
-
-    # use percentile limits padded with sigmax if these values are more relaxed than the v_peak window
-    if v_99p + sigmax > vmax:
-        vmax = v_99p + sigmax
-    if v_1p - sigmax < vmin:
-        vmin = v_1p - sigmax
-
-    mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask * footprint_mask)
-    m0, m1, m2 = mmm[0], mmm[1], mmm[2]
-    '''
-
+    # interpolate the moment maps
     mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask)
     m0, m1, m2 = mmm[0], mmm[1], mmm[2]
 

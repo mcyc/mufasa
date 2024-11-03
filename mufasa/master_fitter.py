@@ -1400,6 +1400,12 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
     cube_res_masked = get_best_2comp_residual_SpectralCube(reg, masked=masked, window_hwidth=window_hwidth,
                                                            res_snr_cut=res_snr_cut)
 
+    if cube_res_masked.mask is None:
+        msg = "Cube_res_masked does not have a mask for res_snr_cut={}. No residual refitting will be performed".format(res_snr_cut)
+        logger.debug(msg)
+        raise SNRMaskError(msg)
+        return
+
     cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
                                                      snrmasked=False, iterrefine=False)
 
