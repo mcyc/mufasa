@@ -54,7 +54,7 @@ def get_snr(cube, rms=None, **kwargs):
     if rms is None:
         rms = get_rms_robust(cube, **kwargs)
 
-    return cube.max(axis=0) / rms
+    return cube.max(axis=0) / rms #, how='ray'
 
 
 def get_rms_robust(cube, sigma_cut=2.5, expand=20, trim=None, method='robust', return_sigmask=False, **kwargs):
@@ -87,7 +87,7 @@ def get_rms_robust(cube, sigma_cut=2.5, expand=20, trim=None, method='robust', r
         cube = trim_cube_edge(cube, trim)
 
     if method == 'robust':
-        rms = cube.mad_std(axis=0, how='ray')
+        rms = cube.mad_std(axis=0) #how='ray'
         # Refine RMS by masking signal regions
         rms, sig_mask = refine_rms(cube, rms, sigma_cut=sigma_cut, expand=expand)
 
@@ -95,7 +95,7 @@ def get_rms_robust(cube, sigma_cut=2.5, expand=20, trim=None, method='robust', r
         # Use signal mask method to calculate RMS
         sig_mask = get_signal_mask(cube, sigma_cut=sigma_cut, **kwargs)
         noise_cube = cube.with_mask(~sig_mask & cube.mask.include())
-        rms = noise_cube.mad_std(axis=0, how='ray')
+        rms = noise_cube.mad_std(axis=0) #how='ray'
 
     if return_sigmask:
         return rms, sig_mask
@@ -129,7 +129,7 @@ def refine_rms(cube, rms, sigma_cut=3, expand=20):
     sig_mask = (cube > sigma_cut * rms)
     sig_mask = binary_dilation(sig_mask.include(), np.ones(shape=(expand, 1, 1), dtype=bool))
     noise_cube = cube.with_mask(~sig_mask & cube.mask.include())
-    rms = noise_cube.mad_std(axis=0, how='ray')
+    rms = noise_cube.mad_std(axis=0) #how='ray'
     return rms, sig_mask
 
 
@@ -159,7 +159,7 @@ def get_signal_mask(cube, snr_cut=3, minsize=2, expand=20, clean=True, return_rm
     Quantity, optional
         RMS value if `return_rms` is True.
     """
-    rms = cube.mad_std(axis=0, how='ray')
+    rms = cube.mad_std(axis=0) #how='ray'
     # Mask above the cut threshold
     sig_mask = (cube > snr_cut * rms)
     sig_mask = refine_signal_mask(sig_mask, minsize=minsize, expand=expand, clean=clean)
@@ -298,7 +298,7 @@ def get_v_at_peak(cube_masked):
     ndarray
         Velocity at peak emission.
     """
-    idx_max = cube_masked.argmax(axis=0, how='slice')
+    idx_max = cube_masked.argmax(axis=0)#, how='slice')
     v_est = cube_masked.spectral_axis[idx_max]
     # Set velocity to NaN where no valid data is present
     v_est[~np.any(cube_masked.get_mask_array(), axis=0)] = np.nan
@@ -382,9 +382,9 @@ def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=
     output = (mom0, mom1)
 
     if linewidth_sigma:
-        output += (cube_signal.linewidth_sigma(how='ray'),)
+        output += (cube_signal.linewidth_sigma(),) #how='ray'
     else:
-        output += (cube_signal.moment2(how='ray'),)
+        output += (cube_signal.moment2(),) #how='ray'
 
     if return_rms:
         output += (rms,)

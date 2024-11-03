@@ -18,6 +18,8 @@ import gc
 from astropy import units as u
 import scipy.ndimage as nd
 
+import dask.array as da
+
 from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
@@ -106,7 +108,26 @@ class UltraCube(object):
         -------
         None
         """
-        self.cube = SpectralCube.read(fitsfile)
+        cube = SpectralCube.read(fitsfile, use_dask=True)
+
+        if np.isnan(cube._wcs.wcs.restfrq):
+            # Specify the rest frequency not present
+            cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
+        self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+
+    def load_pcube(self):
+        """
+        Load a pyspeckit cube from a .fits file.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        pyspeckit Spectral Cube
+        """
+        return pyspeckit.Cube(filename=self.cubefile)
+
 
 
     def convolve_cube(self, savename=None, factor=None, edgetrim_width=5):
@@ -147,7 +168,7 @@ class UltraCube(object):
         if filename is None:
             self.convolve_cube(factor=self.cnv_factor)
         elif os.path.exists(filename):
-            self.cube_cnv = SpectralCube.read(filename)
+            self.cube_cnv = SpectralCube.read(filename, use_dask=True)
         else:
             logger.warning("The specified convolved cube file does not exist.")
 
@@ -184,7 +205,8 @@ class UltraCube(object):
             ncomp = [ncomp]
 
         for nc in ncomp:
-            self.pcubes[str(nc)] = fit_cube(self.cube, fittype=self.fittype, simpfit=simpfit, ncomp=nc, **kwargs)
+            self.pcubes[str(nc)] = self.load_pcube()
+            self.pcubes[str(nc)] = fit_cube(self.cube, self.pcubes[str(nc)], fittype=self.fittype, simpfit=simpfit, ncomp=nc, **kwargs)
 
             if hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
@@ -222,7 +244,7 @@ class UltraCube(object):
 
 
     def load_model_fit(self, filename, ncomp, calc_model=True, multicore=None):
-        self.pcubes[str(ncomp)] = load_model_fit(self.cube, filename, ncomp, self.fittype)
+        self.pcubes[str(ncomp)] = load_model_fit(self.cubefile, filename, ncomp, self.fittype)
         if calc_model:
             if multicore is None: multicore = self.n_cores
             # update model mask
@@ -470,7 +492,7 @@ class UCubePlus(UltraCube):
 
 #======================================================================================================================#
 
-def fit_cube(cube, fittype, simpfit=False, **kwargs):
+def fit_cube(cube, pcube, fittype, simpfit=False, **kwargs):
     """
     Fit the spectral cube using the specified fitting type.
 
@@ -492,9 +514,9 @@ def fit_cube(cube, fittype, simpfit=False, **kwargs):
     """
     if simpfit:
         # fit the cube with the provided guesses and masks with no pre-processing
-        return mvf.cubefit_simp(cube, fittype=fittype, **kwargs)
+        return mvf.cubefit_simp(cube, pcube, fittype=fittype, **kwargs)
     else:
-        return mvf.cubefit_gen(cube, fittype=fittype, **kwargs)
+        return mvf.cubefit_gen(cube, pcube, fittype=fittype, **kwargs)
 
 
 
@@ -543,7 +565,8 @@ def load_model_fit(cube, filename, ncomp, fittype):
         The fitted pyspeckit cube with the loaded model.
     """
 
-    pcube = pyspeckit.Cube(cube=cube)
+    #pcube = pyspeckit.Cube(cube=cube)
+    pcube = pyspeckit.Cube(cube)
 
     # register fitter
     if fittype == 'nh3_multi_v':
@@ -727,7 +750,7 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=True, return_mask=False,
+def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False,
             include_nosamp=True, planemask=None):
     '''
     Calculate residual sum of squares (RSS)
@@ -755,10 +778,20 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
         mm = nsamp_map <= 0
         try:
             max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
-            spec_mask_fill = copy(mask[:,max_y[0], max_x[0]])
+            spec_mask_fill = copy(mask[:, max_y[0], max_x[0]])
         except:
-            spec_mask_fill = np.any(mask, axis=(1,2))
+            spec_mask_fill = np.any(mask, axis=(1, 2))
+
+        # Handle dask compatibility by computing the mask if necessary
+        if isinstance(mask, da.Array):
+            mask = mask.compute()
+
+        # Apply the mask update with numpy-compatible indexing
         mask[:, mm] = spec_mask_fill[:, np.newaxis]
+
+        # Convert back to dask if needed
+        if isinstance(cube._data, da.Array):
+            mask = da.from_array(mask, chunks=cube._data.chunksize)
 
     # assume flat-baseline model even if no model exists
     model[np.isnan(model)] = 0
@@ -771,28 +804,26 @@ def get_rss(cube, model, expand=20, usemask = True, mask = None, return_size=Tru
 
     if planemask is None:
         residual = get_residual(cube, model)
-
-        # note: using nan-sum may walk over some potential bad pixel cases
-        rss = np.nansum((residual * mask)**2, axis=0)
-        rss[rss == 0] = np.nan
-
+        residual = da.from_array(residual) if isinstance(cube._data, da.Array) else residual
     else:
         residual = get_residual(cube, model, planemask=planemask)
         mask_temp = mask
-        mask = mask[:,planemask]
+        mask = mask[:, planemask]
 
-        # note: using nan-sum may walk over some potential bad pixel cases
-        rss = np.nansum((residual * mask) ** 2, axis=0)
-        rss[rss == 0] = np.nan
+    # note: using nan-sum may walk over some potential bad pixel cases
+    rss = da.nansum((residual * mask) ** 2, axis=0) if isinstance(residual, da.Array) else np.nansum(
+        (residual * mask) ** 2, axis=0)
+    rss[rss == 0] = np.nan
 
-    returns = (rss,)
+    returns = (rss.compute() if isinstance(rss, da.Array) else rss,)
 
     if return_size:
-        nsamp = np.nansum(mask, axis=0)
+        nsamp = da.nansum(mask, axis=0) if isinstance(mask, da.Array) else np.nansum(mask, axis=0)
         nsamp[np.isnan(rss)] = np.nan
-        returns += (nsamp,)
+        returns += (nsamp.compute() if isinstance(nsamp, da.Array) else nsamp,)
     if return_mask:
-        returns += mask
+        returns += (mask.compute() if isinstance(mask, da.Array) else mask,)
+
     return returns
 
 
@@ -913,17 +944,34 @@ def get_rms(residual):
 
 def get_residual(cube, model, planemask=None):
     '''
-    calculate the residual of the fit to the cube
-    :param cube: a SpectralCube object
+    Calculate the residual of the fit to the cube.
+    :param cube: a SpectralCube object, potentially with dask enabled
     :param model: ndarray, a model of the cube
-    :param planemask: a 2D boolean mask specifying where to calculated. Using this can save computing time
-    :return:
+    :param planemask: a 2D boolean mask specifying where to calculate. Using this can save computing time
+    :return: residual, either as a dask array (if dask is enabled) or a numpy array
     '''
+    # Get the cube data as a dask array or numpy array
+    data = cube.filled_data[:].value  # dask array if dask is enabled, numpy array otherwise
+
+    # Calculate residual with or without a planemask
     if planemask is None:
-        residual = cube.filled_data[:].value - model
+        residual = data - model
     else:
-        residual = cube.filled_data[:].value[:,planemask] - model[:,planemask]
+        # If dask, apply the mask in a memory-efficient way
+        if isinstance(data, da.Array):
+            planemask_expanded = da.from_array(planemask, chunks=data.chunksize[1:])
+            residual = data[:, planemask_expanded] - model[:, planemask]
+        else:
+            # Non-dask (numpy array), use direct masking
+            residual = data[:, planemask] - model[:, planemask]
+
+    # If residual is a dask array, compute only if needed (e.g., for direct use in numpy context)
+    if isinstance(residual, da.Array):
+        residual = residual.compute()
+
+    # Run garbage collection for memory management
     gc.collect()
+
     return residual
 
 

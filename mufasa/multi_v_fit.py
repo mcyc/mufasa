@@ -13,12 +13,19 @@ import warnings
 from datetime import datetime
 
 from astropy import units as u
+from astropy.convolution import Gaussian2DKernel, convolve
+from astropy.stats import mad_std
+
 from scipy import ndimage as ndi
 
 from spectral_cube import SpectralCube
+from spectral_cube.lower_dimensional_structures import Projection
+
+from pyspeckit.spectrum.units import SpectroscopicAxis
+
 from skimage.morphology import remove_small_objects, disk, opening, binary_erosion, remove_small_holes, binary_dilation
-from astropy.convolution import Gaussian2DKernel, convolve
-from astropy.stats import mad_std
+from dask.array.core import Array as daskArray
+import dask.array
 
 from . import signals
 from . import moment_guess as momgue
@@ -157,9 +164,59 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None, res
         return chisq, np.sum(mask, axis=0)
 
 
+def register_pcube(pcube, mod_info):
+    pcube.unit = "K"
+    if np.isnan(pcube.wcs.wcs.restfrq):
+        # Specify the rest frequency not present
+        pcube.xarr.refX = mod_info.freq_dict[linename] * u.Hz
+    pcube.xarr.velocity_convention = 'radio'
+
+    # always register the fitter just in case different lines are used
+    fitter = mod_info.fitter
+    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
+    logger.debug("number of parameters is {0}".format(fitter.npars))
+    logger.debug("the line to fit is {0}".format(mod_info.linenames))
+    return pcube
+
 def setup_cube(cube, mod_info, return_spectral_cube=False):
+
     if hasattr(cube, 'spectral_axis'):
+        # if it's a SpectralCube object
         pcube = pyspeckit.Cube(cube=cube)
+
+        if isinstance(cube._data, dask.array.Array):
+            logger.info("SpectralCube uses dask")
+            # load the entire array onto pcube
+            pcube.data = cube._data.compute()
+            pcube.data = cube._data.compute()
+
+
+        if False:# #isinstance(cube._data, np.ndarray):
+            logger.info("SpectralCube does not use dask")
+            pcube = pyspeckit.Cube(cube=cube)
+
+        elif False: # isinstance(cube._data, dask.array.Array):
+            logger.info("SpectralCube uses dask")
+
+            if cube.spectral_axis.flags['OWNDATA']:
+                xarr = SpectroscopicAxis(cube.spectral_axis,
+                                         unit=cube.spectral_axis.unit,
+                                         refX=cube.wcs.wcs.restfrq,
+                                         refX_unit='Hz')
+            else:
+                xarr = SpectroscopicAxis(cube.spectral_axis.copy(),
+                                         unit=cube.spectral_axis.unit,
+                                         refX=cube.wcs.wcs.restfrq,
+                                         refX_unit='Hz')
+
+            pcube = pyspeckit.Cube(cube=cube._data.compute(), xarr=xarr, header=cube.header)
+
+            if (cube.unit in ('undefined', u.dimensionless_unscaled)
+                    and 'BUNIT' in cube._meta):
+                pcube.unit = cube._meta['BUNIT']
+            else:
+                pcube.unit = cube.unit
+
     elif isinstance(cube, str):
         cubename = cube
         if return_spectral_cube:
@@ -195,7 +252,7 @@ def setup_cube(cube, mod_info, return_spectral_cube=False):
         return pcube
 
 
-def cubefit_simp(cube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
+def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
 
     logger.debug("using cubefit_simp")
@@ -213,7 +270,9 @@ def cubefit_simp(cube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh
     taumin = mod_info.taumin
     eps = mod_info.eps
 
-    pcube = setup_cube(cube, mod_info, return_spectral_cube=False)
+    #pcube = setup_cube(cube, mod_info, return_spectral_cube=False)
+
+    register_pcube(pcube, mod_info)
 
     multicore = validate_n_cores(multicore)
 
@@ -224,9 +283,13 @@ def cubefit_simp(cube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh
     peaksnr, planemask, kwargs = handle_snr(pcube, snr_min, planemask, **kwargs)
 
     if maskmap is not None:
-        maskmap *= planemask * footprint_mask
+        maskmap = maskmap & planemask & footprint_mask
     else:
-        maskmap = planemask * footprint_mask
+        maskmap = planemask & footprint_mask
+
+    logger.info(f"maskmap type: {type(maskmap)}")
+    maskmap = maskmap.compute()
+    logger.info(f"maskmap type: {type(maskmap)}")
 
     v_peak_hwidth = 10
     v_guess = guesses[::4]
@@ -264,8 +327,11 @@ def cubefit_simp(cube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh
         logger.debug("starting point: {}".format(start_from_point))
         kwargs['start_from_point'] = start_from_point
 
+    logger.info(f"Number of cores used for cubefit_simp: {multicore}")
+
     # add all the pcube.fiteach kwargs)
     kwargs['multicore'] = multicore
+    kwargs['maskmap'] = maskmap
     kwargs['use_neighbor_as_guess'] = False
     kwargs['limitedmax'] = [True, True, True, True] * ncomp
     kwargs['maxpars'] = [vmax, sigmax, Texmax, taumax] * ncomp
@@ -273,12 +339,12 @@ def cubefit_simp(cube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh
     kwargs['minpars'] = [vmin, sigmin, Texmin, taumin] * ncomp
     kwargs = set_pyspeckit_verbosity(**kwargs)
 
-    pcube.fiteach(fittype=fittype, guesses=guesses, maskmap=maskmap, **kwargs)
+    pcube.fiteach(fittype=fittype, guesses=guesses, **kwargs)
 
     return pcube
 
 
-def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, guesses=None, errmap11name=None,
+def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=None, guesses=None, errmap11name=None,
                 multicore=None, mask_function=None, snr_min=0.0, momedgetrim=True, saveguess=False,
                 fittype='nh3_multi_v', **kwargs):
     '''
@@ -314,8 +380,10 @@ def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, gues
     taumin = mod_info.taumin
     eps = mod_info.eps
 
-    pcube, cube = setup_cube(cube, mod_info, return_spectral_cube=True)
-    cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+    #pcube, cube = setup_cube(cube, mod_info, return_spectral_cube=True)
+    #cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+
+    register_pcube(pcube, mod_info)
 
     # Specify a width for the expected velocity range in the data
     v_peak_hwidth = 4.0  # km/s (should be sufficient for GAS Orion, but may not be enough for KEYSTONE)
@@ -582,7 +650,10 @@ def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, gues
         save_guesses(pcube, paraname, guesses, savename)
 
     kwargs['maskmap'] = planemask & np.any(cube.mask.include(), axis=0) & np.all(np.isfinite(guesses), axis=0)
-    kwargs['maskmap'] &= match_pcube_mask(pcube, kwargs['maskmap'])
+    kwargs['maskmap'] = kwargs['maskmap'] & match_pcube_mask(pcube, kwargs['maskmap'])
+    if isinstance(kwargs['maskmap'], daskArray):
+        kwargs['maskmap'] = kwargs['maskmap'].compute()
+
     mask_size = np.sum(kwargs['maskmap'])
 
     if mask_size < 1:
@@ -595,6 +666,7 @@ def cubefit_gen(cube, ncomp=2, paraname=None, modname=None, chisqname=None, gues
     logger.info("Final mask size for the fitting: {0} pixels".format(mask_size))
 
     multicore = validate_n_cores(multicore)
+    logger.info(f"Number of cores used for cubefit_gen: {multicore}")
 
     # get the start point
     if "start_from_point" in kwargs:
@@ -679,6 +751,8 @@ def match_pcube_mask(pcube, maskmap):
         OK = ((~pcube.mapplot.plane.mask) &
               maskmap.astype('bool')).astype('bool')
     else:
+        if isinstance(pcube.mapplot.plane, daskArray):
+            pcube.mapplot.plane = pcube.mapplot.plane.compute()
         OK = (np.isfinite(pcube.mapplot.plane) &
               maskmap.astype('bool')).astype('bool')
     return OK
@@ -886,6 +960,8 @@ def get_start_point(maskmap, weight=None, return_xy=True):
     # if return_xy, return index in the order of xy (pcube.fiteach's convention) instead of yx
     # start_from_point is ordered in yx before it was returned upstream
     if weight is not None:
+        if isinstance(weight, Projection):
+            weight = weight.value
         # use the max position in weight within the mask as a start point
         weight = np.nan_to_num(weight * maskmap)
         try:
