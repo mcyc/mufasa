@@ -111,6 +111,8 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
     ncomp = int(data_cnv.shape[0]/npara/2)
 
     data_cnv = data_cnv.copy()
+    data_cnv[data_cnv == 0] = np.nan
+
     # clean up the maps based on vlsr errors
     if ncomp == 1:
         std_thres = 3
@@ -124,7 +126,6 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
         data_cnv = simple_para_clean(data_cnv, ncomp, npara=npara, std_thres=std_thres)
     # remove the error component
     data_cnv = data_cnv[0:npara*ncomp]
-    data_cnv[data_cnv == 0] = np.nan
 
     for i in range (0, ncomp):
         data_cnv[i*npara:i*npara+npara] = refine_each_comp(data_cnv[i*npara:i*npara+npara], mask, tau_thresh=tau_thresh)

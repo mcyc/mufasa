@@ -465,8 +465,8 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
 
 
 
-def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=False,
-                   save_para=True):
+def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=True,
+                   save_para=True, lnk_cnv_thres=10):
     """
     Perform a two-component fit iterantively through two steps. The first step fits the convovle cube use moment-based guesses
     The second setp fits fits the cube at its native spatial resolution, using the results from the first iteration for guesses.
@@ -514,15 +514,22 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
         reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
 
         pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
-        if nc == 2 and use_cnv_lnk:
+        para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
+        para_cnv[para_cnv == 0] = np.nan
+
+        if use_cnv_lnk:
             # clean up the fits with lnk maps
-            parcube, errcube, lnk10, lnk20, lnk21 = \
-                reg.ucube_cnv.get_best_2c_parcube(multicore=multicore, lnk21_thres=5, lnk20_thres=5,
-                                                  lnk10_thres=-20, return_lnks=True)
-            para_cnv = np.append(parcube, errcube, axis=0)
+            if nc == 2:
+                lnk = reg.ucube_cnv.get_AICc_likelihood(2, 1)
+            elif nc == 1:
+                lnk = reg.ucube_cnv.get_AICc_likelihood(1, 0)
+
+            # determine where the fits are bad based on local threshold, above the lnk_thresh global cutoff
+            bad = get_local_bad(lnkmap=lnk, lnk_thresh=lnk_cnv_thres, block_size=15, offset=0, bad_size_max=225)
+            bad = np.logical_or(bad, ~(lnk > lnk_cnv_thres))
+            para_cnv[:, bad] = np.nan
             clean_map = False
         else:
-            para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
             clean_map = True
 
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header,
