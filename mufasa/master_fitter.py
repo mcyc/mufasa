@@ -598,7 +598,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
         bad_thresh = 10 # threshold value ot look for realtively bad pixels
         if lnk_thresh >=bad_thresh:
             bad_thresh = lnk_thresh
-        bad = get_local_bad(lnkmap=lnk21, lnk_thresh=bad_thresh, block_size=15, offset=0, hole_size_max=225)
+        bad = get_local_bad(lnkmap=lnk21, lnk_thresh=bad_thresh, block_size=15, offset=0, bad_size_max=225)
         mask = np.logical_or(mask, bad)
 
     mask_size = np.sum(mask)
@@ -1052,7 +1052,7 @@ def get_local_bad(lnkmap, lnk_thresh=5, block_size=15, offset=0, bad_size_max=22
     binary_local = lnkmap > local_thresh
     good = binary_local & (lnkmap > lnk_thresh)
     # holes inside relative thresholds are the bad pixels
-    mask = remove_small_holes(good, hole_size_max)
+    mask = remove_small_holes(good, bad_size_max)
     mask = np.logical_xor(mask, good)
     return mask
 
