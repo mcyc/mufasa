@@ -20,6 +20,8 @@ import warnings
 import pandas as pd
 from datetime import datetime
 
+import dask.array as da
+
 try:
     from pandas import concat
 except ImportError:
@@ -500,6 +502,9 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
     proc_name = f'iter conv fits'
     reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
     reg.get_convolved_fits(ncomp, update=updateCnvFits, snr_min=snr_min, multicore=multicore) # actual fitting
+
+    nc = 1
+    pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
     reg.log_progress(process_name=proc_name, mark_start=False, n_attempted='N/A', n_success='N/A', finished=True)
 
     # use the result from the convolved cube as guesses for the full resolution fits
@@ -1395,6 +1400,12 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
     cube_res_masked = get_best_2comp_residual_SpectralCube(reg, masked=masked, window_hwidth=window_hwidth,
                                                            res_snr_cut=res_snr_cut)
 
+    if cube_res_masked.mask is None:
+        msg = "Cube_res_masked does not have a mask for res_snr_cut={}. No residual refitting will be performed".format(res_snr_cut)
+        logger.debug(msg)
+        raise SNRMaskError(msg)
+        return
+
     cube_res_cnv = cnvtool.convolve_sky_byfactor(cube_res_masked, factor=reg.cnv_factor, edgetrim_width=None,
                                                      snrmasked=False, iterrefine=False)
 
@@ -1493,6 +1504,11 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
 
     multicore = validate_n_cores(multicore)
     newmod = pcube_ref.get_modelcube(update=False, multicore=multicore)
+
+    # Convert `pcube._modelcube` to a numpy array if it is currently a dask array
+    if isinstance(pcube._modelcube, da.Array):
+        pcube._modelcube = pcube._modelcube.compute()  # Load the full array into memory
+
     pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
 
 
