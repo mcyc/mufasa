@@ -10,6 +10,7 @@ import multiprocessing
 from spectral_cube import SpectralCube
 from astropy import units as u
 from skimage.morphology import binary_dilation, remove_small_holes, remove_small_objects, square, disk
+from skimage.filters import threshold_local
 import astropy.io.fits as fits
 from copy import copy, deepcopy
 import gc
@@ -548,7 +549,7 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
 
 
 
-def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=True, method='best_neighbour'):
+def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=True, method='best_neighbour', local_bad=True):
 
     """
     Refit pixels with poor 2-component fits, as determined by the log-likelihood of 2- and 1- compoent fits, using
@@ -569,6 +570,8 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
         If True, saves the fit parameters as .fits files after refitting (default is True).
     method : str, optional
         The method used for refitting bad pixels (default is 'best_neighbour').
+    local_bad : bool
+        If True, include bad pixels found from local-thresholding
 
     Returns
     -------
@@ -590,6 +593,14 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
     mask = np.logical_or(lnk21 < lnk_thresh, lnk20 < 5)
     mask = np.logical_and(mask, lnk10 > 5)
     mask = np.logical_and(mask, np.isfinite(lnk10))
+
+    if local_bad:
+        bad_thresh = 10 # threshold value ot look for realtively bad pixels
+        if lnk_thresh >=bad_thresh:
+            bad_thresh = lnk_thresh
+        bad = get_local_bad(lnkmap=lnk21, lnk_thresh=bad_thresh, block_size=15, offset=0, bad_size_max=225)
+        mask = np.logical_or(mask, bad)
+
     mask_size = np.sum(mask)
     if mask_size > 0:
         logger.info("Attempting to refit over {} pixels to recover bad 2-comp. fits".format(mask_size))
@@ -1009,6 +1020,43 @@ def get_marginal_pix(lnkmap, lnk_thresh=5, holes_only=False, smallest_struct_siz
     else:
         mask_nosml = binary_dilation(mask_nosml)
         return np.logical_xor(mask_nosml, mask)
+
+
+def get_local_bad(lnkmap, lnk_thresh=5, block_size=15, offset=0, bad_size_max=225):
+    """
+    Identify local pixels with significantly lower relative log-likelihood (lnk) values compared to their neighbors.
+
+    Parameters
+    ----------
+    lnkmap : ndarray
+        The relative log-likelihood map
+    lnk_thresh : float, optional
+        Global threshold for the relative log-likelihood values. Only pixels with lnk values above this threshold are evaluated
+        (default is 5).
+    block_size : int, optional
+        Size of the local region (in pixels) used to compute the threshold for each pixel. Must be an odd number
+        (default is 15).
+    offset : float, optional
+        Constant subtracted from the computed local threshold to adjust sensitivity. Higher values make the threshold more lenient
+        (default is 0).
+    bad_size_max : int, optional
+        Maximum area (in pixels) for isolated regions of bad pixels. Larger regions remain unaffected
+        (default is 225).
+
+    Returns
+    -------
+    mask : ndarray
+        A boolean array of the same shape as `lnkmap`, where `True` indicates "bad" pixels.
+    """
+    local_thresh = threshold_local(lnkmap, block_size, offset=offset)
+    binary_local = lnkmap > local_thresh
+    good = binary_local & (lnkmap > lnk_thresh)
+    # holes inside relative thresholds are the bad pixels
+    mask = remove_small_holes(good, bad_size_max)
+    mask = np.logical_xor(mask, good)
+    return mask
+
+
 
 def standard_2comp_fit(reg, planemask=None, snr_min=3):
     """
