@@ -322,28 +322,142 @@ class UltraCube(object):
         return None
 
     def get_plotter(self, update=False, spec_unit='km/s', **kwargs):
+        """
+        Initialize or update the Plotter instance for visualizing fitted spectra.
+
+        Parameters
+        ----------
+        update : bool, optional
+            If True, update the existing plotter instance (default is False).
+        spec_unit : str, optional
+            The spectral unit to use for plotting the spectral axis (default is 'km/s').
+        **kwargs
+            Additional keyword arguments passed to the `Plotter` class.
+
+        Returns
+        -------
+        None
+        """
         if self.plotter is None or update:
             self.plotter = Plotter(self, fittype=self.fittype, spec_unit=spec_unit, **kwargs)
 
     def plot_spec(self, x, y, ax=None, xlab=None, ylab=None, **kwargs):
+        """
+        Plot a single spectrum at (x, y).
+
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the pixel.
+        y : int
+            Y-coordinate of the pixel.
+        ax : matplotlib.axes.Axes, optional
+            Axes object to plot on. If None, a new figure and axes are created.
+        xlab : str, optional
+            X-axis label. Default is the LSR velocity label.
+        ylab : str, optional
+            Y-axis label. Default is the main beam temperature label.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_spec`.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object.
+        ax : matplotlib.axes.Axes
+            The axes object.
+        """
         self.get_plotter()
         return self.plotter.plot_spec(x, y, ax=ax, xlab=xlab, ylab=ylab, **kwargs)
 
     def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
+        """
+        Plot a grid of spectra centered at (x, y).
+
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the central pixel.
+        y : int
+            Y-coordinate of the central pixel.
+        size : int, optional
+            Size of the grid (must be odd). Default is 3.
+        xsize : int, optional
+            Number of columns in the grid. Default is size.
+        ysize : int, optional
+            Number of rows in the grid. Default is size.
+        xlim : tuple, optional
+            X-axis limits for the plot, in their native units.
+        ylim : tuple, optional
+            Y-axis limits for the plot, in their native units.
+        figsize : tuple, optional
+            Size of the figure.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_spec_grid`.
+        """
         self.get_plotter()
-        self.plotter.plot_spec_grid(x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim, figsize=figsize, **kwargs)
+        self.plotter.plot_spec_grid(x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim, figsize=figsize,
+                                    **kwargs)
 
     def plot_fit(self, x, y, ncomp, ax=None, **kwargs):
+        """
+        Plot a model fit for a spectrum at (x, y).
+
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the pixel.
+        y : int
+            Y-coordinate of the pixel.
+        ncomp : int
+            The component number to plot.
+        ax : matplotlib.axes.Axes, optional
+            Axes object to plot on. If None, a new figure and axes are created.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_fit`.
+        """
         self.get_plotter()
         if ax is None:
-            fig, ax = self.plot_spec(x,y)
+            fig, ax = self.plot_spec(x, y)
         self.plotter.plot_fit(x, y, ax, ncomp, **kwargs)
 
     def plot_fits_grid(self, x, y, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
                        figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
+        """
+        Plot a grid of model fits centered at (x, y).
+
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the central pixel.
+        y : int
+            Y-coordinate of the central pixel.
+        ncomp : int
+            The component number to plot.
+        size : int, optional
+            Size of the grid (must be odd). Default is 3.
+        xsize : int, optional
+            Number of columns in the grid. Default is size.
+        ysize : int, optional
+            Number of rows in the grid. Default is size.
+        xlim : tuple, optional
+            X-axis limits for the plot, in their native units.
+        ylim : tuple, optional
+            Y-axis limits for the plot, in their native units.
+        figsize : tuple, optional
+            Size of the figure.
+        origin : {'lower', 'upper'}, optional
+            Origin of the grid. Default is 'lower'.
+        mod_all : bool, optional
+            Whether to plot all model components. Default is True.
+        savename : str, optional
+            If provided, save the figure to the given filename.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_fits_grid`.
+        """
         self.get_plotter()
         self.plotter.plot_fits_grid(x, y, ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
-                       figsize=figsize, origin=origin, mod_all=mod_all, savename=savename, **kwargs)
+                                    figsize=figsize, origin=origin, mod_all=mod_all, savename=savename, **kwargs)
 
 
 class UCubePlus(UltraCube):
