@@ -601,7 +601,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
     guesses, mask = get_refit_guesses(ucube, mask, ncomp=2, method='best_neighbour', refmap=lnk20)
     # re-fit and save the updated model
-    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore, return_n_good=True)
+    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, simpfit=True, multicore=multicore, return_n_good=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
@@ -610,7 +610,8 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
 
 
-def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, save_para=True, method='best_neighbour', **kwargs_marg):
+def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, save_para=True, method='best_neighbour',
+                   refit_only=True, **kwargs_marg):
     """
     Refit pixels with fits that appears marginally okay, as deterined by the specified log-likelihood threshold provided
 
@@ -663,9 +664,10 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
 
     guesses, mask = get_refit_guesses(ucube, mask=mask, ncomp=ncomp, method=method, refmap=lnkmap)
 
-    # ensure the mask doesn't extend beyond the original fit and has guesses
-    mask = np.logical_and(mask, np.isfinite(guesses).all(axis=0))
-    mask = np.logical_and(mask, reg.ucube.pcubes[str(ncomp)].has_fit)
+    if refit_only:
+        # ensure the mask doesn't extend beyond the original fit and has guesses
+        mask = np.logical_and(mask, np.isfinite(guesses).all(axis=0))
+        mask = np.logical_and(mask, reg.ucube.pcubes[str(ncomp)].has_fit)
 
     mask_size = np.sum(mask)
     if mask_size > 0:
@@ -678,7 +680,7 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
 
     # re-fit and save the updated model
     snr_min=0
-    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, None, simpfit=True, multicore=multicore, return_n_good=True)
+    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=ncomp, simpfit=True, multicore=multicore, return_n_good=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
@@ -855,7 +857,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=None, finished=True)
         return
 
-    n_good = replace_bad_pix(reg.ucube, mask, snr_min, final_guess, lnk21=None, simpfit=simpfit,
+    n_good = replace_bad_pix(reg.ucube, mask, snr_min, final_guess, ncomp=2, simpfit=simpfit,
                              multicore=multicore, return_n_good=True)
 
     if save_para:
@@ -864,7 +866,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
     reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
 
 
-def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, multicore=True, return_n_good=False):
+def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=True, multicore=True, return_n_good=False):
     """
     Refit pixels marked by the mask as "bad" and adopt the new model if it is determined to be better.
 
@@ -902,7 +904,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
         ucube_new = UCube.UltraCube(ucube.cubefile, fittype=ucube.fittype)
         # fit using simpfit (and take the provided guesses as they are)
         try:
-            ucube_new.fit_cube(ncomp=[2], simpfit=simpfit, maskmap=mask, snr_min=snr_min,
+            ucube_new.fit_cube(ncomp=[ncomp], simpfit=simpfit, maskmap=mask, snr_min=snr_min,
                                guesses=guesses, multicore=multicore)
         except SNRMaskError:
             logger.info("No valid pixel to refit with snr_min={}."
@@ -913,7 +915,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
                 return
 
         # do a model comparison between the new two component fit verses the original one
-        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, 2, 2, ucube_B=ucube)
+        lnk_NvsO = UCube.calc_AICc_likelihood(ucube_new, ncomp, ncomp, ucube_B=ucube)
 
         good_mask = np.logical_and(lnk_NvsO > 0, mask)
 
@@ -921,8 +923,8 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, lnk21=None, simpfit=True, mul
 
         logger.info("Replacing {} bad pixels with better fits".format(n_good))
         # replace the values
-        replace_para(ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask, multicore=multicore)
-        replace_rss(ucube, ucube_new, ncomp=2, mask=good_mask)
+        replace_para(ucube.pcubes[str(ncomp)], ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
+        replace_rss(ucube, ucube_new, ncomp=ncomp, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
         n_good=0

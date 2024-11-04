@@ -329,12 +329,7 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
     impose_lim(guesses[2::4], Texmin, Texmax, eps)
     impose_lim(guesses[3::4], taumin, taumax, eps)
 
-    valid = np.logical_and(maskmap, np.all(np.isfinite(guesses), axis=0))
-    if 'start_from_point' not in kwargs:
-        indx_g = np.argwhere(maskmap)
-        start_from_point = (indx_g[0, 1], indx_g[0, 0])
-        logger.debug("starting point: {}".format(start_from_point))
-        kwargs['start_from_point'] = start_from_point
+    kwargs['start_from_point'] = get_start_point(maskmap, weight=None)
 
     logger.info(f"Number of cores used for cubefit_simp: {multicore}")
 
