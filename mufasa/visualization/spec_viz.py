@@ -7,7 +7,23 @@ from pyspeckit.spectrum.units import SpectroscopicAxis
 # =======================================================================================================================
 
 class Plotter(object):
+
     def __init__(self, ucube, fittype, ncomp_list=None, spec_unit='km/s'):
+        """
+        Initialize the Plotter class.
+
+        Parameters
+        ----------
+        ucube : UltraCube
+            The UltraCube object containing the spectral cube and parameter cubes.
+        fittype : str
+            The type of model fit to use ('nh3_multi_v' or 'n2hp_multi_v').
+        ncomp_list : list of int, optional
+            List of component numbers to plot. If None, all components are used.
+        spec_unit : str, optional
+            The spectral unit for the cube. Default is 'km/s'.
+        """
+
         self.ucube = ucube
         self.cube = self.ucube.cube.with_spectral_unit(spec_unit, velocity_convention='radio')
         # need to check and see if cube has the right unit
@@ -38,15 +54,65 @@ class Plotter(object):
             for n in ncomp_list:
                 self.parcubes[str(n)] = self.ucube.pcubes[str(n)].parcube
 
-    def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
 
+    def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
+        """
+        Plot a grid of spectra centered at (x, y).
+
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the central pixel.
+        y : int
+            Y-coordinate of the central pixel.
+        size : int, optional
+            Size of the grid (must be odd). Default is 3.
+        xsize : int, optional
+            Number of columns in the grid. Default is size.
+        ysize : int, optional
+            Number of rows in the grid. Default is size.
+        xlim : tuple, optional
+            X-axis limits for the plot, in their native units.
+        ylim : tuple, optional
+            Y-axis limits for the plot, in their native units.
+        figsize : tuple, optional
+            Size of the figure.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_spec_grid`.
+        """
         # add defaults that can be superseded
         kwargs = {'xlab': self.xlab, 'ylab': self.ylab, **kwargs}
 
         self.fig, self.axs = \
             plot_spec_grid(self.cube, x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim, figsize=figsize, **kwargs)
 
+
     def plot_spec(self, x, y, ax=None, xlab=None, ylab=None, **kwargs):
+        """
+        Plot a single spectrum at (x, y).
+
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the pixel.
+        y : int
+            Y-coordinate of the pixel.
+        ax : matplotlib.axes.Axes, optional
+            Axes object to plot on. If None, a new figure and axes are created.
+        xlab : str, optional
+            X-axis label. Default is the LSR velocity label.
+        ylab : str, optional
+            Y-axis label. Default is the main beam temperature label.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_spec`.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The figure object.
+        ax : matplotlib.axes.Axes
+            The axes object.
+        """
         spc = self.cube[:, y, x]
         if xlab is None:
             xlab = self.xlab
@@ -55,15 +121,64 @@ class Plotter(object):
         self.fig, self.axs = plot_spec(spc, xarr=self.xarr, ax=ax, xlab=xlab, ylab=ylab, **kwargs)
         return self.fig, self.axs
 
+
     def plot_fit(self, x, y, ax=None, ncomp=None, **kwargs):
+        """
+        Plot a model fit for a spectrum at (x, y).
+
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the pixel.
+        y : int
+            Y-coordinate of the pixel.
+        ax : matplotlib.axes.Axes, optional
+            Axes object to plot on. If None, a new figure and axes are created.
+        ncomp : int
+            The component number to plot.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_model`.
+        """
         if ax is None:
             self.fig, ax = plt.subplots()
             self.axs = ax
         plot_model(self.parcubes[str(ncomp)][:, y, x], self.model_func, self.xarr, ax, ncomp, **kwargs)
 
+
     def plot_fits_grid(self, x, y, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
                        figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
+        """
+        Plot a grid of model fits centered at (x, y).
 
+        Parameters
+        ----------
+        x : int
+            X-coordinate of the central pixel.
+        y : int
+            Y-coordinate of the central pixel.
+        ncomp : int
+            The component number to plot.
+        size : int, optional
+            Size of the grid (must be odd). Default is 3.
+        xsize : int, optional
+            Number of columns in the grid. Default is size.
+        ysize : int, optional
+            Number of rows in the grid. Default is size.
+        xlim : tuple, optional
+            X-axis limits for the plot.
+        ylim : tuple, optional
+            Y-axis limits for the plot.
+        figsize : tuple, optional
+            Size of the figure.
+        origin : {'lower', 'upper'}, optional
+            Origin of the grid. Default is 'lower'.
+        mod_all : bool, optional
+            Whether to plot all model components. Default is True.
+        savename : str, optional
+            If provided, save the figure to the given filename.
+        **kwargs : dict
+            Additional keyword arguments passed to `plot_fits_grid`.
+        """
         # add defaults that can be superseded
         kwargs = {'xlab': self.xlab, 'ylab': self.ylab, **kwargs}
 
@@ -74,9 +189,26 @@ class Plotter(object):
                            **kwargs)
 
 # =======================================================================================================================
-
+# None-plotting functions
 
 def get_cube_slab(cube, vZoomLims=(-5, 20)):
+    """
+    Extract a spectral slab from the cube over the specified velocity range.
+
+    Parameters
+    ----------
+    cube : SpectralCube
+        The spectral cube to extract the slab from.
+    vZoomLims : tuple of float, optional
+        The velocity limits for the slab, in km/s. Default is (-5, 20).
+
+    Returns
+    -------
+    cube_s : SpectralCube
+        The extracted spectral slab.
+    xarr : SpectroscopicAxis
+        The corresponding spectroscopic axis for the slab.
+    """
     # currently incomplete. it will be used to save some computation time when calculating the model and plotting
     cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
     cube_s = cube.spectral_slab(vZoomLims[0] * u.km / u.s, vZoomLims[1] * u.km / u.s)
@@ -87,9 +219,36 @@ def get_cube_slab(cube, vZoomLims=(-5, 20)):
     return cube_s, xarr
 
 # =======================================================================================================================
+# None-class functions
 
 def plot_spec(spc, xarr=None, ax=None, fill=False, xlab=None, ylab=None, **kwargs):
+    """
+    Plot a spectrum.
 
+    Parameters
+    ----------
+    spc : Spectrum
+        The spectrum to plot.
+    xarr : SpectroscopicAxis, optional
+        The spectroscopic axis to use for the x-axis. If None, the spectrum's spectral axis is used.
+    ax : matplotlib.axes.Axes, optional
+        Axes object to plot on. If None, a new figure and axes are created.
+    fill : bool, optional
+        Whether to fill the area under the curve. Default is False.
+    xlab : str, optional
+        X-axis label.
+    ylab : str, optional
+        Y-axis label.
+    **kwargs : dict
+        Additional keyword arguments passed to `ax.plot` or `ax.fill_between`.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object, if `ax` is None.
+    ax : matplotlib.axes.Axes
+        The axes object.
+    """
     if 'c' in kwargs:
         if 'color' in kwargs:
             raise TypeError("Got both 'color' and 'c', which are aliases of one another")
@@ -124,8 +283,29 @@ def plot_spec(spc, xarr=None, ax=None, fill=False, xlab=None, ylab=None, **kwarg
     if return_fig:
         return fig, ax
 
-def get_spec_grid(size=3, xsize=None, ysize=None, figsize=None):
 
+def get_spec_grid(size=3, xsize=None, ysize=None, figsize=None):
+    """
+    Create a grid of subplots for spectra.
+
+    Parameters
+    ----------
+    size : int, optional
+        Size of the grid (must be odd). Default is 3.
+    xsize : int, optional
+        Number of columns in the grid. Default is size.
+    ysize : int, optional
+        Number of rows in the grid. Default is size.
+    figsize : tuple, optional
+        Size of the figure.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object.
+    axs : numpy.ndarray of matplotlib.axes.Axes
+        The array of axes objects.
+    """
     if size % 2 == 0 and size > 0:
         raise ValueError("Size provided must be an odd, positive integer that is not zero.")
 
@@ -140,9 +320,44 @@ def get_spec_grid(size=3, xsize=None, ysize=None, figsize=None):
 
     return fig, axs
 
+
 def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None,
                    origin='lower', **kwargs):
+    """
+    Plot a grid of spectra from the cube centered at (x, y).
 
+    Parameters
+    ----------
+    cube : SpectralCube
+        The spectral cube to plot.
+    x : int
+        X-coordinate of the central pixel.
+    y : int
+        Y-coordinate of the central pixel.
+    size : int, optional
+        Size of the grid (must be odd). Default is 3.
+    xsize : int, optional
+        Number of columns in the grid. Default is size.
+    ysize : int, optional
+        Number of rows in the grid. Default is size.
+    xlim : tuple, optional
+        X-axis limits for the plot.
+    ylim : tuple, optional
+        Y-axis limits for the plot.
+    figsize : tuple, optional
+        Size of the figure.
+    origin : {'lower', 'upper'}, optional
+        Origin of the grid. Default is 'lower'.
+    **kwargs : dict
+        Additional keyword arguments passed to `plot_spec`.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object.
+    axs : numpy.ndarray of matplotlib.axes.Axes
+        The array of axes objects.
+    """
     # grab the x y labels and ensure it wasn't passed downstream
     if 'xlab' in kwargs:
         xlab = kwargs['xlab']
@@ -197,8 +412,26 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
 
     return fig, axs
 
-def plot_model(para, model_func, xarr, ax, ncomp, **kwargs):
 
+def plot_model(para, model_func, xarr, ax, ncomp, **kwargs):
+    """
+    Plot a model fit for a spectrum.
+
+    Parameters
+    ----------
+    para : numpy.ndarray
+        The parameter array for the model.
+    model_func : function
+        The model function to use for the fit.
+    xarr : SpectroscopicAxis
+        The spectroscopic axis for the x-axis.
+    ax : matplotlib.axes.Axes
+        Axes object to plot on.
+    ncomp : int
+        The number of components in the model.
+    **kwargs : dict
+        Additional keyword arguments passed to `plot_spec`.
+    """
     for i in range(ncomp):
         pp = para[i * 4:(i + 1) * 4]
         mod = model_func(xarr, *pp)
@@ -209,9 +442,56 @@ def plot_model(para, model_func, xarr, ax, ncomp, **kwargs):
     mod_tot = model_func(xarr, *para)
     plot_spec(mod_tot, xarr, ax, c='0.1', zorder=30, **kwargs)
 
+
 def plot_fits_grid(cube, para, model_func, x, y, xarr, ncomp, size=3, xsize=None, ysize=None, xlim=None, ylim=None,
                    figsize=None, origin='lower', mod_all=True, savename=None, **kwargs):
+    """
+    Plot a grid of model fits from the cube centered at (x, y).
 
+    Parameters
+    ----------
+    cube : SpectralCube
+        The spectral cube to plot.
+    para : numpy.ndarray
+        The parameter array for the model.
+    model_func : function
+        The model function to use for the fit.
+    x : int
+        X-coordinate of the central pixel.
+    y : int
+        Y-coordinate of the central pixel.
+    xarr : SpectroscopicAxis
+        The spectroscopic axis for the x-axis.
+    ncomp : int
+        The number of components in the model.
+    size : int, optional
+        Size of the grid (must be odd). Default is 3.
+    xsize : int, optional
+        Number of columns in the grid. Default is size.
+    ysize : int, optional
+        Number of rows in the grid. Default is size.
+    xlim : tuple, optional
+        X-axis limits for the plot.
+    ylim : tuple, optional
+        Y-axis limits for the plot.
+    figsize : tuple, optional
+        Size of the figure.
+    origin : {'lower', 'upper'}, optional
+        Origin of the grid. Default is 'lower'.
+    mod_all : bool, optional
+        Whether to plot all model components. Default is True.
+    savename : str, optional
+        If provided, save the figure to the given filename.
+    **kwargs : dict
+        Additional keyword arguments passed to `plot_model`.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object.
+    axs : numpy.ndarray of matplotlib.axes.Axes
+        The array of axes objects.
+    """
     fig, axs = plot_spec_grid(cube, x, y, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
                               figsize=figsize, origin=origin, **kwargs)
 
