@@ -515,6 +515,10 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
 
         pcube_cnv = reg.ucube_cnv.pcubes[str(nc)]
         para_cnv = np.append(pcube_cnv.parcube, pcube_cnv.errcube, axis=0)
+
+        # establish where the new guesses should be extrapolated to
+        mask = np.any(np.isfinite(para_cnv),axis=0)
+        mask = remove_small_holes(mask)
         para_cnv[para_cnv == 0] = np.nan
 
         if use_cnv_lnk:
@@ -533,7 +537,7 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
             clean_map = True
 
         guesses = gss_rf.guess_from_cnvpara(para_cnv, reg.ucube_cnv.cube.header, reg.ucube.cube.header,
-                                            clean_map=clean_map, tau_thresh=1)
+                                            clean_map=clean_map, tau_thresh=1, mask=mask)
 
         n_pix = np.all(np.isfinite(guesses), axis=0).sum()
 

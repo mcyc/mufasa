@@ -349,7 +349,7 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpola
         mask = mask_finite
         mask = mask_cleaning(mask)
 
-    def interpolate(map, mask):
+    def interpolate_scipy(map, mask):
         # interpolate over the dmask footprint
         xline = np.arange(map.shape[1])
         yline = np.arange(map.shape[0])
@@ -361,12 +361,16 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpola
         zi = C(X*mask,Y*mask)
         return zi
 
-    def interpolate_via_cnv(map):
+    def interpolate_via_cnv(map, mask):
         mask_finite = np.isfinite(map)
         kernel = Gaussian2DKernel(2.5/2.355)
         zi = convolve(map, kernel, boundary='extend')
         # only populate pixels where the original map was finite
         zi[mask_finite] = map[mask_finite]
+
+        # interpolate further to fill the mask if the mask is much larger than the kernel
+        zi = interpolate.iter_expand(zi, mask=mask)
+
         return zi
 
     if scipy_interpolate:
@@ -376,16 +380,16 @@ def refine_guess(map, min=None, max=None, mask=None, disksize=1, scipy_interpola
         logger.warning(warn_msg)
         try:
             # interpolate the mask
-            zi = interpolate(map, mask)
+            zi = interpolate_scipy(map, mask)
         except QhullError as e:
             logger.warning("qhull input error found; astropy convolve will be used instead")
-            zi = interpolate_via_cnv(map) # use astropy convolve as a proxy for interpolation
+            zi = interpolate_via_cnv(map, mask) # use astropy convolve as a proxy for interpolation
             
         except ValueError as e:
             logger.error("ValueError found (no points given); astropy convolve will be used instead")
-            zi = interpolate_via_cnv(map)
+            zi = interpolate_via_cnv(map, mask)
     else:
-        zi = interpolate_via_cnv(map)
+        zi = interpolate_via_cnv(map, mask)
     return zi
 
 def refine_2c_guess(guesses, f_sigv = 0.5):
