@@ -412,7 +412,7 @@ def get_fits(reg, ncomp, **kwargs):
 
 
 def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
-                     refit_marg=True, multicore=True):
+                     refit_marg=True, expand_fit=True, multicore=True):
     """
     Perform a two-component fit for the cube hold within the Region object
 
@@ -456,8 +456,18 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
         refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
 
     if refit_marg:
-        refit_marginal(reg, ncomp=2, lnk_thresh=5, holes_only=False, multicore=True,
+        refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=True,
                        method='best_neighbour')
+        refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=True,
+                       method='best_neighbour')
+
+    if expand_fit:
+        n_good_total = mf.expand_fits(reg, ncomp=1, lnk_thresh=10, max_iter=25, r_expand=1, save_para=True)
+        n_good_total = mf.expand_fits(reg, ncomp=2, lnk_thresh=10, max_iter=25, r_expand=1, save_para=True)
+        mf.refit_marginal(reg, 1, lnk_thresh=5, multicore=True, save_para=True)
+        mf.refit_marginal(reg, 2, lnk_thresh=5, multicore=True, save_para=True)
+        n_good_total = mf.expand_fits(reg, ncomp=1, lnk_thresh=5, max_iter=25, r_expand=1, save_para=True)
+        n_good_total = mf.expand_fits(reg, ncomp=2, lnk_thresh=5, max_iter=25, r_expand=1, save_para=True)
 
     save_best_2comp_fit(reg, multicore=multicore)
 
@@ -623,7 +633,8 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
     guesses, mask = get_refit_guesses(ucube, mask, ncomp=2, method='best_neighbour', refmap=lnk20)
     # re-fit and save the updated model
-    good_mask = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, simpfit=True, multicore=multicore, return_n_good=True)
+    good_mask = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, simpfit=True,
+                                multicore=multicore, return_good_mask=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
