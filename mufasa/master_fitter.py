@@ -467,12 +467,12 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
         else:
             max_iter = 25
 
-        n_good_total = mf.expand_fits(reg, ncomp=1, lnk_thresh=10, max_iter=max_iter, r_expand=1, save_para=True)
-        n_good_total = mf.expand_fits(reg, ncomp=2, lnk_thresh=10, max_iter=max_iter, r_expand=1, save_para=True)
-        mf.refit_marginal(reg, 1, lnk_thresh=5, multicore=True, save_para=True)
-        mf.refit_marginal(reg, 2, lnk_thresh=5, multicore=True, save_para=True)
-        n_good_total = mf.expand_fits(reg, ncomp=1, lnk_thresh=5, max_iter=max_iter, r_expand=1, save_para=True)
-        n_good_total = mf.expand_fits(reg, ncomp=2, lnk_thresh=5, max_iter=max_iter, r_expand=1, save_para=True)
+        n_good_total = expand_fits(reg, ncomp=1, lnk_thresh=10, max_iter=max_iter, r_expand=1, save_para=True)
+        n_good_total = expand_fits(reg, ncomp=2, lnk_thresh=10, max_iter=max_iter, r_expand=1, save_para=True)
+        refit_marginal(reg, 1, lnk_thresh=5, multicore=True, save_para=True)
+        refit_marginal(reg, 2, lnk_thresh=5, multicore=True, save_para=True)
+        n_good_total = expand_fits(reg, ncomp=1, lnk_thresh=5, max_iter=max_iter, r_expand=1, save_para=True)
+        n_good_total = expand_fits(reg, ncomp=2, lnk_thresh=5, max_iter=max_iter, r_expand=1, save_para=True)
 
     save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
 
