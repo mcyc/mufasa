@@ -623,12 +623,12 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
     guesses, mask = get_refit_guesses(ucube, mask, ncomp=2, method='best_neighbour', refmap=lnk20)
     # re-fit and save the updated model
-    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, simpfit=True, multicore=multicore, return_n_good=True)
+    good_mask = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, simpfit=True, multicore=multicore, return_n_good=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
-    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=good_mask.sum(), finished=True)
 
 
 
@@ -702,12 +702,12 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
 
     # re-fit and save the updated model
     snr_min=0
-    n_good = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=ncomp, simpfit=True, multicore=multicore, return_n_good=True)
+    good_mask = replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=ncomp, simpfit=True, multicore=multicore, return_good_mask=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
-    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=good_mask.sum(), finished=True)
 
 
 
@@ -879,16 +879,149 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=None, finished=True)
         return
 
-    n_good = replace_bad_pix(reg.ucube, mask, snr_min, final_guess, ncomp=2, simpfit=simpfit,
-                             multicore=multicore, return_n_good=True)
+    good_mask = replace_bad_pix(reg.ucube, mask, snr_min, final_guess, ncomp=2, simpfit=simpfit,
+                             multicore=multicore, return_good_mask=True)
 
     if save_para:
         save_updated_paramaps(reg.ucube, ncomps=[2, 1])
 
-    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=n_good, finished=True)
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=None, n_success=good_mask.sum(), finished=True)
 
 
-def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=True, multicore=True, return_n_good=False):
+def expand_fits(reg, ncomp, lnk_thresh=5, max_iter=5, r_expand=1, fill_mask=None, lnkmap=None, multicore=True, snr_min=0,
+               save_para=True):
+    """
+        Expand fits in a region by incrementally fitting pixels beyond a defined log-likelihood threshold boundary.
+
+        This function iteratively expands fitted regions by attempting to fit pixels beyond a boundary set by the
+        relative log-likelihood threshold.
+
+        Parameters
+        ----------
+        reg : Region object
+            The region object containt the data cube and the fitting model
+        ncomp : int
+            Number of components in the model to fit in each pixel.
+        lnk_thresh : float, optional
+            Relative log-likelihood threshold used to define the boundary for expansion. Pixels with log-likelihood
+            values above this threshold are considered for expansion (default is 5).
+        max_iter : int, optional
+            Maximum number of expansion iterations to perform. Each iteration attempts to fit the next layer of pixels
+            beyond the current boundary (default is 1).
+        r_expand : int, optional
+            Number of pixels to expand in each direction during each iteration (default is 1).
+        fill_mask : ndarray, optional
+            Boolean array that defines the outer boundary for expansion. Expansion is limited to pixels within this mask
+            (default is None, which implies no additional mask constraint).
+        lnkmap : ndarray, optional
+            A precomputed array of relative log-likelihood values. Providing this saves computation time by avoiding
+            recalculation (default is None, which triggers computation on demand).
+        multicore : bool or int, optional
+            Whether to use multiple cores for parallel processing. If True, automatically selects available cores;
+            if an integer is provided, it specifies the number of cores (default is True).
+        snr_min : float, optional
+            Minimum signal-to-noise ratio threshold for successful fits. Fits below this threshold are not considered "good"
+            (default is 0).
+        save_para : bool, optional
+            If True, saves updated parameter maps after fitting. Useful for keeping track of intermediate fit results
+            (default is True).
+
+        Returns
+        -------
+        int
+            The total number of successfully fitted pixels across all iterations.
+
+        Examples
+        --------
+        >>> n_good_total = expand_fits(reg, ncomp=2, lnk_thresh=10, max_iter=3, r_expand=1, multicore=4)
+        >>> print(f"Total good fits: {n_good_total}")
+
+        """
+
+    logger.info("Begin fitting expanded footprints")
+    multicore = validate_n_cores(multicore)
+    logger.debug(f'Using {multicore} cores.')
+
+    proc_name = f'expand_fit_{ncomp}comp'
+    reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
+
+    if lnkmap is None:
+        lnkmap = reg.ucube.get_AICc_likelihood(ncomp, ncomp - 1)
+
+    if fill_mask is None:
+        fill_mask = np.ones(lnkmap.shape, dtype=bool)
+
+    def expand_mask(lnkmap, lnk_thresh, fill_mask, r=1):
+        # expand the mask and return the outer most layer
+        mask = lnkmap > lnk_thresh
+        mask_xor = np.logical_xor(mask, binary_dilation(mask, footprint=disk(r)))
+        return mask_xor & fill_mask
+
+    def fit(reg, lnkmap, mask, ncomp, multicore, r=2, snr_min=0):
+        # fit the pixels in the mask using best_neighbour guesses, returen number of good fits
+        guesses, mask = get_refit_guesses(reg.ucube, mask, ncomp=ncomp, method='best_neighbour', refmap=lnkmap,
+                                          structure=neighbours.disk_neighbour(r))
+        return replace_bad_pix(reg.ucube, mask, snr_min, guesses, ncomp=ncomp, simpfit=True, multicore=multicore,
+                                  return_good_mask=True)
+
+    # locations to fit
+    mask_fit = expand_mask(lnkmap=lnkmap, lnk_thresh=lnk_thresh, fill_mask=fill_mask, r=r_expand)
+
+    # location of the attempted fits
+    mask_attempted = mask_fit
+
+    if mask_fit.sum() < 1:
+        logger.info(f"No pixel qualified for new fits for fitting expansion.")
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=0,
+                         finished=True)
+        return 0
+    good_mask = fit(reg, lnkmap=lnkmap, mask=mask_fit, ncomp=ncomp, multicore=multicore, r=r_expand+1)
+    bad_mask = np.logical_and(mask_fit, ~good_mask)
+    bad_twice = np.zeros(bad_mask.shape, dtype=bool)
+    n_good = good_mask.sum()
+    n_attempt = mask_fit.sum()
+    n_good_total = n_good
+
+    i = 0
+    # iterate as long as there are good pixels to fit or if max_iter is reached
+    while (i < max_iter) and (n_good > 0):
+        i += 1
+        lnkmap[mask_fit] = reg.ucube.get_AICc_likelihood(ncomp, ncomp - 1, planemask=mask_fit)
+        mask_fit = expand_mask(lnkmap=lnkmap, lnk_thresh=lnk_thresh, fill_mask=fill_mask, r=r_expand)
+
+        # only attempt to fit pixels that haven't been fitted, or only had one failed attempt
+        mask_fit = np.logical_and(mask_fit, ~mask_attempted)
+        mask_fit = np.logical_or(mask_fit, bad_mask & ~bad_twice)
+
+        if mask_fit.sum() == 0:
+            break
+        # update the number of attempted and good fits
+        good_mask = fit(reg, lnkmap=lnkmap, mask=mask_fit, ncomp=ncomp, multicore=True, r=r_expand+1)
+        bad_mask = np.logical_and(mask_fit, ~good_mask)
+        bad_twice = np.logical_or(bad_twice, bad_mask)
+
+        # update where fits were attempted
+        mask_attempted = np.logical_or(mask_attempted, mask_fit)
+
+        n_good = good_mask.sum()
+        n_attempt = mask_fit.sum()
+        n_good_total += n_good
+
+        logger.debug(f"Number of good fits at iteration {i} of expand fit: {n_good}/{n_attempt}")
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=mask_attempted.sum(), n_success=n_good_total,
+                         finished=False)
+
+    if save_para:
+        save_updated_paramaps(reg.ucube, ncomps=[2, 1])
+
+    n_attempt_total = mask_attempted.sum()
+    logger.info(f"Total good fits from expand fits for {ncomp} comp: {n_good_total}/{n_attempt_total}")
+
+    reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_attempt_total, n_success=n_good_total, finished=True)
+    return n_good_total
+
+
+def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=True, multicore=True, return_good_mask=False):
     """
     Refit pixels marked by the mask as "bad" and adopt the new model if it is determined to be better.
 
@@ -909,7 +1042,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=
     multicore : bool or int, optional
         Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
         If an integer is provided, it specifies the number of CPU cores to use.
-    return_n_good : bool
+    return_good_mask : bool
         If True, return the number of pixels with good fits
 
     Returns
@@ -931,8 +1064,8 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=
         except SNRMaskError:
             logger.info("No valid pixel to refit with snr_min={}."
                         " Please consider trying a lower snr_min value.".format(snr_min))
-            if return_n_good:
-                return 0
+            if return_good_mask:
+                return np.zeros((1,1), dtype=bool)
             else:
                 return
 
@@ -941,18 +1074,16 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=
 
         good_mask = np.logical_and(lnk_NvsO > 0, mask)
 
-        n_good = good_mask.sum()
-
-        logger.info("Replacing {} bad pixels with better fits".format(n_good))
+        logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
         # replace the values
         replace_para(ucube.pcubes[str(ncomp)], ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
         replace_rss(ucube, ucube_new, ncomp=ncomp, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
-        n_good=0
+        np.zeros((1,1), dtype=bool)
 
-    if return_n_good:
-        return n_good
+    if return_good_mask:
+        return good_mask
 
 
 
@@ -969,8 +1100,12 @@ def replace_rss(ucube, ucube_ref, ncomp, mask):
         else:
             ucube.get_AICc(ncomp=ncomp, update=True, planemask=mask)
 
-def get_refit_guesses(ucube, mask, ncomp, method='best_neighbour', refmap=None):
+def get_refit_guesses(ucube, mask, ncomp, method='best_neighbour', refmap=None, structure=None):
     #get refit guesses from the surrounding pixels
+
+    if structure is None:
+        structure = neighbours.square_neighbour(1)
+
     guesses = copy(ucube.pcubes[str(ncomp)].parcube)
     guesses[guesses == 0] = np.nan
     # remove the bad pixels from the fitted parameters
@@ -984,7 +1119,7 @@ def get_refit_guesses(ucube, mask, ncomp, method='best_neighbour', refmap=None):
         # use the nearest neighbour with the highest lnk20 value for guesses
         # neighbours.square_neighbour(1) gives the 8 closest neighbours
         maxref_coords = neighbours.maxref_neighbor_coords(mask=mask, ref=refmap, fill_coord=(0, 0),
-                                                          structure=neighbours.square_neighbour(1))
+                                                          structure=structure)
         ys, xs = zip(*maxref_coords)
         guesses[:, mask] = guesses[:, ys, xs]
         mask = np.logical_and(mask, np.all(np.isfinite(guesses), axis=0))
