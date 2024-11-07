@@ -494,8 +494,12 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     if max_expand_iter != False:
         if max_expand_iter == True:
             max_expand_iter = None
+        # perform expand fits
         fit_surroundings(reg, ncomps=[1, 2], snr_min=snr_min, max_iter=max_expand_iter, fill_mask=None,
                          multicore=multicore, match_footprint=True)
+        if refit_bad_pix:
+            # have another pass of quality assurance
+            refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
 
     save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
 
