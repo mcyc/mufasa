@@ -412,34 +412,64 @@ def get_fits(reg, ncomp, **kwargs):
 
 
 def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
-                     refit_marg=True, expand_fit=True, multicore=True):
+                     refit_marg=True, max_expand_iter=None, multicore=True):
     """
-    Perform a two-component fit for the cube hold within the Region object
+    Perform a two-component fit on the data cube within a Region object.
+
+    This function applies a two-component fit to the spectral data, with optional adjustments for refining poor or
+    marginal fits, recovering wide separation components, and expanding fits to surrounding regions based on
+    signal-to-noise thresholds.
 
     Parameters
     ----------
     reg : Region object
-        A Region object with the cube to be fitted
+        A Region object containing the data cube to be fitted.
     snr_min : float, optional
-        Minimum peak signal-to-noise ratio required for fitting (default is 0.0).
+        Minimum peak signal-to-noise ratio required for fitting. Only regions with a peak SNR above this threshold
+        are considered for fitting (default is 0.0). If set to 0.0, attempts to fit all pixels using guesses from
+        pre-existing fits.
     recover_wide : bool, optional
-        If True, attempts to recover spectral components that has large velocity seperation (default is True).
+        If True, attempts to recover spectral components with large velocity separation (default is True).
     planemask : ndarray, optional
-        2D mask specifying which pixels to fit. Using a mask can save computing time by peforming targed fits
-        (default is None). If provided, this mask will superseed the provided planemask
+        2D mask specifying which pixels to fit, allowing for targeted fitting within selected regions. If provided,
+        this mask overrides any existing `planemask` within the Region object (default is None).
     updateCnvFits : bool, optional
-        If True, peform fits to the conovled cube first, even if a fit has been performed before (default is True).
+        If True, performs fits on the convolved cube first, even if previous fits exist, to update or refine results
+        (default is True).
     refit_bad_pix : bool, optional
-        If True, refits any pixels with poor fits (default is True).
+        If True, refits pixels with poor fits to improve fit quality (default is True).
     refit_marg : bool, optional
-        If True, refits any pixels with fits that are only marginally good (default is True).
+        If True, refits pixels with marginally acceptable fits for better accuracy (default is True).
+    max_expand_iter : int, bool, or None, optional
+        Controls the maximum number of iterations for expanding the fitted regions:
+        - If an integer, sets the exact number of expansion iterations.
+        - If True or None, expands until no further expansion is possible, with limited expansion if `snr_min` > 3
+          and larger expansion if `snr_min` is low.
+        - If False, disables expansion entirely.
     multicore : bool or int, optional
-        Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
-        If an integer is provided, it specifies the number of CPU cores to use.
+        Number of CPU cores to use for parallel processing. If True, uses all available CPUs minus one. If an integer
+        is provided, it specifies the exact number of CPU cores to use (default is True).
 
     Returns
     -------
+    Region object
+        Returns the modified `reg` object with updated fit results.
 
+    Notes
+    -----
+    - The function first performs an initial two-component fit on the region, then optionally refits pixels with low SNR,
+      wide separation, or marginal quality.
+    - Further expansion of fits to surrounding pixels is possible if `max_expand_iter` is specified. When set to None or True,
+      expansion proceeds with limited iterations if `snr_min` > 3, or more extensive iterations if `snr_min` is low.
+    - If `match_footprint` is True within `fit_surroundings`, it attempts to align the fitted region’s footprints across
+      components.
+    - Final results are saved, with the best two-component fit retained based on log-likelihood thresholds.
+
+    Examples
+    --------
+    >>> updated_reg = master_2comp_fit(region, snr_min=3.0, recover_wide=False, max_expand_iter=5, multicore=4)
+    >>> # Performs a 2-component fit on the region with a minimum SNR of 3.0, without attempting wide recovery,
+    >>> # and expands fits for 5 iterations.
     """
 
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
@@ -456,23 +486,16 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
         refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
 
     if refit_marg:
-        refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=True,
+        refit_marginal(reg, ncomp=1, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
-        refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=True,
+        refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
 
-    if expand_fit:
-        if snr_min >=3:
-            max_iter = 2
-        else:
-            max_iter = 25
-
-        n_good_total = expand_fits(reg, ncomp=1, lnk_thresh=10, max_iter=max_iter, r_expand=1, save_para=True)
-        n_good_total = expand_fits(reg, ncomp=2, lnk_thresh=10, max_iter=max_iter, r_expand=1, save_para=True)
-        refit_marginal(reg, 1, lnk_thresh=5, multicore=True, save_para=True)
-        refit_marginal(reg, 2, lnk_thresh=5, multicore=True, save_para=True)
-        n_good_total = expand_fits(reg, ncomp=1, lnk_thresh=5, max_iter=max_iter, r_expand=1, save_para=True)
-        n_good_total = expand_fits(reg, ncomp=2, lnk_thresh=5, max_iter=max_iter, r_expand=1, save_para=True)
+    if max_expand_iter != False:
+        if max_expand_iter == True:
+            max_expand_iter = None
+        fit_surroundings(reg, ncomps=[1, 2], snr_min=snr_min, max_iter=max_expand_iter, fill_mask=None,
+                         multicore=multicore, match_footprint=True)
 
     save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
 
@@ -905,56 +928,61 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
 
 
 def expand_fits(reg, ncomp, lnk_thresh=5, max_iter=5, r_expand=1, fill_mask=None, lnkmap=None, multicore=True, snr_min=0,
-               save_para=True):
+               save_para=True, return_niter=False):
     """
-        Expand fits in a region by incrementally fitting pixels beyond a defined log-likelihood threshold boundary.
+    Expand fits in a region by incrementally fitting pixels beyond a defined log-likelihood threshold boundary.
 
-        This function iteratively expands fitted regions by attempting to fit pixels beyond a boundary set by the
-        relative log-likelihood threshold.
+    This function iteratively expands fitted regions by attempting to fit pixels beyond a boundary set by the
+    relative log-likelihood threshold.
 
-        Parameters
-        ----------
-        reg : Region object
-            The region object containt the data cube and the fitting model
-        ncomp : int
-            Number of components in the model to fit in each pixel.
-        lnk_thresh : float, optional
-            Relative log-likelihood threshold used to define the boundary for expansion. Pixels with log-likelihood
-            values above this threshold are considered for expansion (default is 5).
-        max_iter : int, optional
-            Maximum number of expansion iterations to perform. Each iteration attempts to fit the next layer of pixels
-            beyond the current boundary (default is 1).
-        r_expand : int, optional
-            Number of pixels to expand in each direction during each iteration (default is 1).
-        fill_mask : ndarray, optional
-            Boolean array that defines the outer boundary for expansion. Expansion is limited to pixels within this mask
-            (default is None, which implies no additional mask constraint).
-        lnkmap : ndarray, optional
-            A precomputed array of relative log-likelihood values. Providing this saves computation time by avoiding
-            recalculation (default is None, which triggers computation on demand).
-        multicore : bool or int, optional
-            Whether to use multiple cores for parallel processing. If True, automatically selects available cores;
-            if an integer is provided, it specifies the number of cores (default is True).
-        snr_min : float, optional
-            Minimum signal-to-noise ratio threshold for successful fits. Fits below this threshold are not considered "good"
-            (default is 0).
-        save_para : bool, optional
-            If True, saves updated parameter maps after fitting. Useful for keeping track of intermediate fit results
-            (default is True).
+    Parameters
+    ----------
+    reg : Region object
+        The region object containing the data cube and the fitting model.
+    ncomp : int
+        Number of components in the model to fit in each pixel.
+    lnk_thresh : float, optional
+        Relative log-likelihood threshold used to define the boundary for expansion. Pixels with log-likelihood
+        values above this threshold are considered for expansion (default is 5).
+    max_iter : int, optional
+        Maximum number of expansion iterations to perform. Each iteration attempts to fit the next layer of pixels
+        beyond the current boundary (default is 5).
+    r_expand : int, optional
+        Number of pixels to expand in each direction during each iteration (default is 1).
+    fill_mask : ndarray, optional
+        Boolean array that defines the outer boundary for expansion. Expansion is limited to pixels within this mask
+        (default is None, which implies no additional mask constraint).
+    lnkmap : ndarray, optional
+        A precomputed 2D array (i.e., map) of relative log-likelihood values. Supplying this map saves computation time by avoiding
+        recalculating these values. If None, the function will compute the map as needed (default is None).
+    multicore : bool or int, optional
+        Whether to use multiple cores for parallel processing. If True, automatically selects available cores;
+        if an integer is provided, it specifies the number of cores (default is True).
+    snr_min : float, optional
+        Minimum signal-to-noise ratio threshold for successful fits. Fits below this threshold are not considered "good"
+        (default is 0).
+    save_para : bool, optional
+        If True, saves updated parameter maps after fitting. Useful for keeping track of intermediate fit results
+        (default is True).
+    return_niter : bool, optional
+        If True, returns both the total number of successfully fitted pixels and the number of iterations performed
+        (default is False).
 
-        Returns
-        -------
-        int
-            The total number of successfully fitted pixels across all iterations.
+    Returns
+    -------
+    int or tuple of (int, int)
+        If `return_niter` is False, returns the total number of successfully fitted pixels across all iterations.
+        If `return_niter` is True, returns a tuple containing the total number of successfully fitted pixels and
+        the number of iterations completed.
 
-        Examples
-        --------
-        >>> n_good_total = expand_fits(reg, ncomp=2, lnk_thresh=10, max_iter=3, r_expand=1, multicore=4)
-        >>> print(f"Total good fits: {n_good_total}")
+    Examples
+    --------
+    >>> n_good_total = expand_fits(reg, ncomp=2, lnk_thresh=10, max_iter=3, r_expand=1, multicore=4)
+    >>> print(f"Total good fits: {n_good_total}")
 
-        """
+    """
 
-    logger.info("Begin fitting expanded footprints")
+    logger.debug("Begin fitting expanded footprints")
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
@@ -962,6 +990,7 @@ def expand_fits(reg, ncomp, lnk_thresh=5, max_iter=5, r_expand=1, fill_mask=None
     reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
 
     if lnkmap is None:
+        # note: assume ncomp - 1 has been fitted already
         lnkmap = reg.ucube.get_AICc_likelihood(ncomp, ncomp - 1)
 
     if fill_mask is None:
@@ -990,7 +1019,11 @@ def expand_fits(reg, ncomp, lnk_thresh=5, max_iter=5, r_expand=1, fill_mask=None
         logger.info(f"No pixel qualified for new fits for fitting expansion.")
         reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=0, n_success=0,
                          finished=True)
-        return 0
+        if return_niter:
+            return 0, 0, 0
+        else:
+            return 0, 0
+
     good_mask = fit(reg, lnkmap=lnkmap, mask=mask_fit, ncomp=ncomp, multicore=multicore, r=r_expand+1)
     bad_mask = np.logical_and(mask_fit, ~good_mask)
     bad_twice = np.zeros(bad_mask.shape, dtype=bool)
@@ -1034,7 +1067,150 @@ def expand_fits(reg, ncomp, lnk_thresh=5, max_iter=5, r_expand=1, fill_mask=None
     logger.info(f"Total good fits from expand fits for {ncomp} comp: {n_good_total}/{n_attempt_total}")
 
     reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_attempt_total, n_success=n_good_total, finished=True)
-    return n_good_total
+
+    if return_niter:
+        return n_good_total, n_attempt_total, i
+    else:
+        return n_good_total, n_attempt_total
+
+
+def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=True, fill_mask=None, multicore=True,
+                     match_footprint=True):
+    """
+    Expand fits around a region based on model log-likelihood thresholds and target signal-to-noise depth.
+
+    This function iteratively expands fitted regions by incrementally adjusting thresholds, expanding boundaries
+    based on signal-to-noise ratios and log-likelihood values, and aligning footprints across multiple components.
+
+    Parameters
+    ----------
+    reg : Region object
+        The region containing data and models to be fitted and expanded.
+    ncomps : list of int, optional
+        Specifies the number of components for each model to fit in the region. Each component count in the list
+        is processed in ascending order, expanding the fit boundaries accordingly (default is [1, 2]).
+    snr_min : float, optional
+        Minimum signal-to-noise ratio threshold, used to dynamically adjust `max_iter` if not explicitly set.
+        Higher values restrict expansions to higher-SNR regions only. If `snr_min` is less than 3, expansion may
+        extend to lower SNR areas (default is 3).
+    max_iter : int, optional
+        Maximum number of iterations for expanding the fitted regions. If `None`, defaults based on `snr_min`:
+        a high `snr_min` will limit expansion, while a low `snr_min` allows for more iterations (default is None).
+    save_para : bool, optional
+        If True, saves the fitted parameter maps after each iteration (default is True).
+    fill_mask : ndarray, optional
+        Boolean array defining the boundary for expansion; only pixels within this mask are considered for expansion.
+        Defaults to the region’s default mask if None.
+    multicore : bool or int, optional
+        Enables or sets the number of cores for parallel processing. If True, uses available cores automatically;
+        if an integer, specifies the number of cores explicitly (default is True).
+    match_footprint : bool, optional
+        If True, aligns the fitted regions' footprints for different models by updating the `fill_mask` after each fit,
+        ensuring consistent regions across component models. This parameter affects `max_iter`, setting it to `max_iter_fill`
+        (default is True).
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    - Expansion proceeds by adjusting `lnk_thresh` for robustness: starting with a high threshold (10) for reliable fits,
+      followed by a standard threshold (5) and optionally lower thresholds if `snr_min` is below 3.
+    - If `match_footprint` is True, the function will use `max_iter_fill` to expand each model component’s footprint
+      and attempt to match it with the previous component’s footprint.
+    - The `max_iter` parameter dynamically controls the extent of expansion based on `snr_min`, promoting efficient
+      use of resources while ensuring sufficient expansion depth.
+
+    Examples
+    --------
+    >>> fit_surroundings(region, ncomps=[1, 2], snr_min=0, max_iter=10, multicore=4)
+    >>> # Expands and fits regions with up to 2 components, filling as much of the map as the maximum iterations allow.
+    """
+
+    logger.info("Begin expand fitting the surroundings")
+    multicore = validate_n_cores(multicore)
+    logger.debug(f'Using {multicore} cores.')
+
+    # whether or not to expand regions with expected lnk < 5
+    low_signal = True
+    if snr_min > 0:
+        low_signal = False
+
+    # the maximum number of iterations for ncomp beyond the smallest one if match_footprint is True
+    max_iter_fill = 100
+
+    # set default iteration number
+    if max_iter is None:
+        if snr_min >= 3:
+            max_iter = 1
+        else:
+            max_iter = max_iter_fill
+    elif max_iter > max_iter_fill:
+        # match max_iter_fill to the user provided value if the latter is larger
+        max_iter_fill = max_iter
+
+    if fill_mask is None:
+        fill_mask = np.any(reg.ucube.cube.mask.include(), axis=0)
+
+    # sort the ncomp list in asending order so the lowest compoent gets processed first
+    ncomps.sort()
+
+    for i, ncomp in enumerate(ncomps):
+        proc_name = f'expand_fit_{ncomp}comp'
+        reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
+
+        m_iter = max_iter
+        if match_footprint:
+            if i > 0:
+                # use max_iter_fill in attempt to match the footprints
+                m_iter = max_iter_fill
+
+                # update fill_mask if matching refittin footprint (up to max_iter) is desired
+                ncomp_previous = str(ncomps[i-1])
+                if i > 1:
+                    fill_mask = np.logical_or(fill_mask, reg.ucube.pcubes[ncomp_previous].has_fit)
+                else:
+                    fill_mask = reg.ucube.pcubes[ncomp_previous].has_fit
+
+        n_good_total = 0
+        n_attempt_total = 0
+        kwargs = dict(ncomp=ncomp, save_para=save_para, fill_mask=fill_mask, multicore=multicore, return_niter=True, snr_min=snr_min)
+
+        # start expanding with a lnk_thresh of 10 for extra robustness
+        lnk_thresh = 10
+        # refit marginal first to ensure quality
+        n_good, n_attempt, i = expand_fits(reg, lnk_thresh=lnk_thresh, max_iter=m_iter, r_expand=1, **kwargs)
+        n_good_total += n_good
+        n_attempt_total += n_attempt
+        m_iter -= i
+
+        # expand to a threshold of 5 for standard robustness
+        if m_iter > 0 and n_good>0:
+            lnk_thresh = 5
+            n_good, n_attempt, i =  expand_fits(reg, lnk_thresh=lnk_thresh, max_iter=max_iter, r_expand=1, **kwargs)
+            n_good_total += n_good
+            n_attempt_total += n_attempt
+            m_iter -= i
+
+        # expand to lower thresholds with larger expansions
+        if low_signal:
+
+            if m_iter > 0 and n_good > 0:
+                n_good, n_attempt, i =  expand_fits(reg, lnk_thresh=0, max_iter=max_iter, r_expand=2, **kwargs)
+                n_good_total += n_good
+                n_attempt_total += n_attempt
+                m_iter -= i
+
+            if m_iter > 0 and n_good > 0:
+                n_good, n_attempt, i =  expand_fits(reg, lnk_thresh=-20, max_iter=max_iter, r_expand=3, **kwargs)
+                n_good_total += n_good
+                n_attempt_total += n_attempt
+                m_iter -= i
+
+        reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_attempt_total, n_success=n_good_total,
+                         finished=True)
+
 
 
 def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=True, multicore=True, return_good_mask=False):
