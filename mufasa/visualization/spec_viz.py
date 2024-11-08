@@ -8,8 +8,7 @@ import warnings
 # =======================================================================================================================
 
 class Plotter(object):
-
-    def __init__(self, ucube, fittype, ncomp_list=None, spec_unit='km/s'):
+    def __init__(self, ucube, fittype, ncomp_list=None, spec_unit='km/s', bunit=None):
         """
         Initialize the Plotter class.
 
@@ -23,20 +22,55 @@ class Plotter(object):
             List of component numbers to plot. If None, all components are used.
         spec_unit : str, optional
             The spectral unit for the cube. Default is 'km/s'.
+        bunit : str or Quantity, optional
+            The desired unit for the cube's data (e.g., 'K' for brightness temperature or 'Jy' for flux).
         """
-
         self.ucube = ucube
         self.cube = self.ucube.cube.with_spectral_unit(spec_unit, velocity_convention='radio')
-        # need to check and see if cube has the right unit
         self.xarr = SpectroscopicAxis(self.cube.spectral_axis.value,
                                       unit=spec_unit,
                                       refX=self.cube._header['RESTFRQ'],
                                       velocity_convention='radio')
 
-        # the following need to be consistent with the data provided
-        self.xlab = r"$v_{\mathrm{LSR}}$ (km s$^{-1}$)"
-        self.ylab = r"$T_{\mathrm{MB}}$ (K)"
+        # Convert bunit to a Unit if provided as a string
+        if isinstance(bunit, str):
+            bunit = u.Unit(bunit)
 
+        # Set cube's unit and y-axis label
+        if bunit is not None:
+            if hasattr(self.cube, 'unit') and (self.cube.unit is not None and self.cube.unit != ''):
+                try:
+                    # Attempt to convert the cube's unit to bunit
+                    self.cube = self.cube.to(bunit)
+                    self.ylab = f"Intensity ({bunit.to_string()})"
+                except u.UnitConversionError:
+                    warnings.warn(f"Incompatible units: cube's unit ({self.cube.unit}) cannot be converted to {bunit}.")
+                    self.ylab = f"Intensity ({self.cube.unit.to_string()})"
+            else:
+                # Cube has no unit; assume bunit as the unit and set the label accordingly
+                warnings.warn("Cube has no unit attribute; setting y-axis label to specified bunit.")
+                self.ylab = f"Intensity ({bunit.to_string()})"
+        else:
+            # No bunit specified; set y label based on cube's unit if available
+            if hasattr(self.cube, 'unit') and (self.cube.unit is not None and self.cube.unit != ''):
+                if self.cube.unit.is_equivalent(u.K):
+                    self.ylab = r"$T_{\mathrm{MB}}$ (K)"
+                elif self.cube.unit.is_equivalent(u.Jy):
+                    self.ylab = r"Flux Density (Jy)"
+                elif self.cube.unit.is_equivalent(u.mJy):
+                    self.ylab = r"Flux Density (mJy)"
+                else:
+                    # Generic label if unit is unknown or unsupported
+                    self.ylab = f"Intensity ({self.cube.unit.to_string()})"
+            else:
+                # No unit in cube and no bunit specified, set to generic label
+                warnings.warn("Cube data has no unit attribute and no bunit specified; setting y-axis label to 'Intensity'.")
+                self.ylab = "Intensity"
+
+        # Set the x-axis label
+        self.xlab = r"$v_{\mathrm{LSR}}$ (km s$^{-1}$)"
+
+        # Handle the fittype selection
         if fittype == "nh3_multi_v":
             from ..spec_models.ammonia_multiv import ammonia_multi_v
             self.model_func = ammonia_multi_v
@@ -46,14 +80,15 @@ class Plotter(object):
         else:
             raise ValueError(f"{fittype} is not one of the currently accepted fittypes.")
 
+        # Process ncomp_list for parcubes
         self.parcubes = {}
-
         if ncomp_list is None:
             for key in self.ucube.pcubes:
                 self.parcubes[key] = self.ucube.pcubes[key].parcube
         else:
             for n in ncomp_list:
                 self.parcubes[str(n)] = self.ucube.pcubes[str(n)].parcube
+
 
 
     def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
