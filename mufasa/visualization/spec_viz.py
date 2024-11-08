@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import astropy.units as u
 from pyspeckit.spectrum.units import SpectroscopicAxis
+import warnings
 
 
 # =======================================================================================================================
@@ -373,17 +374,24 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
     xpad = int(xsize / 2)
     ypad = int(ysize / 2)
 
-    # get a subcube
+    # Get a subcube
     scube = cube[:, y - ypad: y + ypad + 1, x - xpad: x + xpad + 1]
 
     if ylim is None:
         ymax = scube.max()
         ylim = (None, ymax * 1.1)
 
-    # plot spectra over the grid
+    # Ensure user-provided xlim and ylim have compatible units with data
+    xlim = ensure_units_compatible(xlim, scube.spectral_axis.unit)
+    ylim = ensure_units_compatible(ylim, scube.unit)
+
+    # Strip units from xlim and ylim if they are Quantities
+    xlim = strip_units(xlim)
+    ylim = strip_units(ylim)
+
+    # Existing code for plotting the spectra over the grid
     for index, ax in np.ndenumerate(axs):
         yi, xi = index
-
         if origin == 'lower':
             yi = ysize - 1 - yi
         elif origin != 'upper':
@@ -403,7 +411,7 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
     if ylim is not None:
         ax.set_ylim(ylim)
 
-    # provide a common labeling ax
+    # Provide a common labeling ax
     fig.add_subplot(111, frameon=False, zorder=-100)
     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
     plt.grid(False)
@@ -503,12 +511,67 @@ def plot_fits_grid(cube, para, model_func, x, y, xarr, ncomp, size=3, xsize=None
         for j in range(y - ypad, y + ypad + 1):
             for i in range(x - xpad, x + xpad + 1):
                 plot_model(para[:, j, i], model_func, xarr, ax=axs[j - y + ypad, i - x + xpad], ncomp=ncomp, lw=1)
-
     else:
-        # plot the central pixel only
+        # Plot the central pixel only
         plot_model(para[:, y, x], model_func, xarr, ax=axs[ypad, xpad], ncomp=ncomp, lw=1)
 
     if savename is not None:
         fig.savefig(savename, bbox_inches='tight')
 
     return fig, axs
+
+
+#=======================
+
+def strip_units(lim):
+    """
+    Helper function to strip units from a limit tuple if it contains Quantity.
+
+    Parameters
+    ----------
+    lim : tuple or None
+        A tuple of limits (min, max) which may contain Quantity instances with units.
+
+    Returns
+    -------
+    tuple
+        A tuple with units stripped, containing only numeric values.
+    """
+    if lim is not None:
+        lim = tuple(val.value if isinstance(val, u.Quantity) else val for val in lim)
+    return lim
+
+
+def ensure_units_compatible(lim, data_unit, suppress_warning=False):
+    """
+    Ensure the limits have compatible units with the data, converting if needed.
+    If the data has no units, strip units from the limits directly and issue a warning if desired.
+
+    Parameters
+    ----------
+    lim : tuple or None
+        The limit tuple (min, max) to be checked and potentially converted.
+    data_unit : astropy.units.Unit or None
+        The unit of the data to which the limits should be compatible.
+    suppress_warning : bool, optional
+        If True, suppresses warnings when stripping units from limits.
+
+    Returns
+    -------
+    tuple
+        Limits in compatible units with data, or stripped of units if data has no units.
+    """
+    if lim is not None:
+        # Strip units if data has no units, and issue a warning if not suppressed
+        if data_unit is None:
+            for val in lim:
+                if isinstance(val, u.Quantity) and not suppress_warning:
+                    warnings.warn("Data has no units; stripping units from provided limit.")
+            lim = strip_units(lim)
+        else:
+            # Convert each limit to match data units if it's a Quantity with a different unit
+            lim = tuple(
+                val.to(data_unit) if (val is not None and isinstance(val, u.Quantity) and val.unit != data_unit) else val
+                for val in lim
+            )
+    return lim
