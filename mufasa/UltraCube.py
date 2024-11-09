@@ -248,7 +248,7 @@ class UltraCube(object):
         if calc_model:
             if multicore is None: multicore = self.n_cores
             # update model mask
-            mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=self.n_cores) > 0
+            mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=multicore) > 0
             logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
             gc.collect()
             self.include_model_mask(mod_mask)
@@ -257,7 +257,7 @@ class UltraCube(object):
     def get_residual(self, ncomp, multicore=None):
         if multicore is None: multicore = self.n_cores
         compID = str(ncomp)
-        model = self.pcubes[compID].get_modelcube(multicore=self.n_cores)
+        model = self.pcubes[compID].get_modelcube(multicore=multicore)
         self.residual_cubes[compID] = get_residual(self.cube, model)
         gc.collect()
         return self.residual_cubes[compID]
