@@ -391,6 +391,9 @@ def get_convolved_fits(reg, ncomp, update=True, **kwargs):
     kwargs: passed to UCubePlus.fit_cube by reg.ucube_cnv.get_model_fit
     '''
 
+    kwdf = dict(multicore=True)
+    kwargs = {**kwdf, **kwargs}
+
     if not hasattr(reg, 'ucube_cnv'):
         reg.get_convolved_cube(update=True, multicore=kwargs['multicore'])
     else:
