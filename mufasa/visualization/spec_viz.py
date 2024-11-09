@@ -2,13 +2,13 @@ import numpy as np
 from matplotlib import pyplot as plt
 import astropy.units as u
 from pyspeckit.spectrum.units import SpectroscopicAxis
+import warnings
 
 
 # =======================================================================================================================
 
 class Plotter(object):
-
-    def __init__(self, ucube, fittype, ncomp_list=None, spec_unit='km/s'):
+    def __init__(self, ucube, fittype, ncomp_list=None, spec_unit='km/s', bunit=None):
         """
         Initialize the Plotter class.
 
@@ -22,20 +22,55 @@ class Plotter(object):
             List of component numbers to plot. If None, all components are used.
         spec_unit : str, optional
             The spectral unit for the cube. Default is 'km/s'.
+        bunit : str or Quantity, optional
+            The desired unit for the cube's data (e.g., 'K' for brightness temperature or 'Jy' for flux).
         """
-
         self.ucube = ucube
         self.cube = self.ucube.cube.with_spectral_unit(spec_unit, velocity_convention='radio')
-        # need to check and see if cube has the right unit
         self.xarr = SpectroscopicAxis(self.cube.spectral_axis.value,
                                       unit=spec_unit,
                                       refX=self.cube._header['RESTFRQ'],
                                       velocity_convention='radio')
 
-        # the following need to be consistent with the data provided
-        self.xlab = r"$v_{\mathrm{LSR}}$ (km s$^{-1}$)"
-        self.ylab = r"$T_{\mathrm{MB}}$ (K)"
+        # Convert bunit to a Unit if provided as a string
+        if isinstance(bunit, str):
+            bunit = u.Unit(bunit)
 
+        # Set cube's unit and y-axis label
+        if bunit is not None:
+            if hasattr(self.cube, 'unit') and (self.cube.unit is not None and self.cube.unit != ''):
+                try:
+                    # Attempt to convert the cube's unit to bunit
+                    self.cube = self.cube.to(bunit)
+                    self.ylab = f"Intensity ({bunit.to_string()})"
+                except u.UnitConversionError:
+                    warnings.warn(f"Incompatible units: cube's unit ({self.cube.unit}) cannot be converted to {bunit}.")
+                    self.ylab = f"Intensity ({self.cube.unit.to_string()})"
+            else:
+                # Cube has no unit; assume bunit as the unit and set the label accordingly
+                warnings.warn("Cube has no unit attribute; setting y-axis label to specified bunit.")
+                self.ylab = f"Intensity ({bunit.to_string()})"
+        else:
+            # No bunit specified; set y label based on cube's unit if available
+            if hasattr(self.cube, 'unit') and (self.cube.unit is not None and self.cube.unit != ''):
+                if self.cube.unit.is_equivalent(u.K):
+                    self.ylab = r"$T_{\mathrm{MB}}$ (K)"
+                elif self.cube.unit.is_equivalent(u.Jy):
+                    self.ylab = r"Flux Density (Jy)"
+                elif self.cube.unit.is_equivalent(u.mJy):
+                    self.ylab = r"Flux Density (mJy)"
+                else:
+                    # Generic label if unit is unknown or unsupported
+                    self.ylab = f"Intensity ({self.cube.unit.to_string()})"
+            else:
+                # No unit in cube and no bunit specified, set to generic label
+                warnings.warn("Cube data has no unit attribute and no bunit specified; setting y-axis label to 'Intensity'.")
+                self.ylab = "Intensity"
+
+        # Set the x-axis label
+        self.xlab = r"$v_{\mathrm{LSR}}$ (km s$^{-1}$)"
+
+        # Handle the fittype selection
         if fittype == "nh3_multi_v":
             from ..spec_models.ammonia_multiv import ammonia_multi_v
             self.model_func = ammonia_multi_v
@@ -45,14 +80,15 @@ class Plotter(object):
         else:
             raise ValueError(f"{fittype} is not one of the currently accepted fittypes.")
 
+        # Process ncomp_list for parcubes
         self.parcubes = {}
-
         if ncomp_list is None:
             for key in self.ucube.pcubes:
                 self.parcubes[key] = self.ucube.pcubes[key].parcube
         else:
             for n in ncomp_list:
                 self.parcubes[str(n)] = self.ucube.pcubes[str(n)].parcube
+
 
 
     def plot_spec_grid(self, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=None, figsize=None, **kwargs):
@@ -373,17 +409,24 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
     xpad = int(xsize / 2)
     ypad = int(ysize / 2)
 
-    # get a subcube
+    # Get a subcube
     scube = cube[:, y - ypad: y + ypad + 1, x - xpad: x + xpad + 1]
 
     if ylim is None:
         ymax = scube.max()
         ylim = (None, ymax * 1.1)
 
-    # plot spectra over the grid
+    # Ensure user-provided xlim and ylim have compatible units with data
+    xlim = ensure_units_compatible(xlim, scube.spectral_axis.unit)
+    ylim = ensure_units_compatible(ylim, scube.unit)
+
+    # Strip units from xlim and ylim if they are Quantities
+    xlim = strip_units(xlim)
+    ylim = strip_units(ylim)
+
+    # Existing code for plotting the spectra over the grid
     for index, ax in np.ndenumerate(axs):
         yi, xi = index
-
         if origin == 'lower':
             yi = ysize - 1 - yi
         elif origin != 'upper':
@@ -403,7 +446,7 @@ def plot_spec_grid(cube, x, y, size=3, xsize=None, ysize=None, xlim=None, ylim=N
     if ylim is not None:
         ax.set_ylim(ylim)
 
-    # provide a common labeling ax
+    # Provide a common labeling ax
     fig.add_subplot(111, frameon=False, zorder=-100)
     plt.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
     plt.grid(False)
@@ -503,12 +546,67 @@ def plot_fits_grid(cube, para, model_func, x, y, xarr, ncomp, size=3, xsize=None
         for j in range(y - ypad, y + ypad + 1):
             for i in range(x - xpad, x + xpad + 1):
                 plot_model(para[:, j, i], model_func, xarr, ax=axs[j - y + ypad, i - x + xpad], ncomp=ncomp, lw=1)
-
     else:
-        # plot the central pixel only
+        # Plot the central pixel only
         plot_model(para[:, y, x], model_func, xarr, ax=axs[ypad, xpad], ncomp=ncomp, lw=1)
 
     if savename is not None:
         fig.savefig(savename, bbox_inches='tight')
 
     return fig, axs
+
+
+#=======================
+
+def strip_units(lim):
+    """
+    Helper function to strip units from a limit tuple if it contains Quantity.
+
+    Parameters
+    ----------
+    lim : tuple or None
+        A tuple of limits (min, max) which may contain Quantity instances with units.
+
+    Returns
+    -------
+    tuple
+        A tuple with units stripped, containing only numeric values.
+    """
+    if lim is not None:
+        lim = tuple(val.value if isinstance(val, u.Quantity) else val for val in lim)
+    return lim
+
+
+def ensure_units_compatible(lim, data_unit, suppress_warning=False):
+    """
+    Ensure the limits have compatible units with the data, converting if needed.
+    If the data has no units, strip units from the limits directly and issue a warning if desired.
+
+    Parameters
+    ----------
+    lim : tuple or None
+        The limit tuple (min, max) to be checked and potentially converted.
+    data_unit : astropy.units.Unit or None
+        The unit of the data to which the limits should be compatible.
+    suppress_warning : bool, optional
+        If True, suppresses warnings when stripping units from limits.
+
+    Returns
+    -------
+    tuple
+        Limits in compatible units with data, or stripped of units if data has no units.
+    """
+    if lim is not None:
+        # Strip units if data has no units, and issue a warning if not suppressed
+        if data_unit is None:
+            for val in lim:
+                if isinstance(val, u.Quantity) and not suppress_warning:
+                    warnings.warn("Data has no units; stripping units from provided limit.")
+            lim = strip_units(lim)
+        else:
+            # Convert each limit to match data units if it's a Quantity with a different unit
+            lim = tuple(
+                val.to(data_unit) if (val is not None and isinstance(val, u.Quantity) and val.unit != data_unit) else val
+                for val in lim
+            )
+    return lim
