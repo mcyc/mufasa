@@ -208,7 +208,7 @@ class UltraCube(object):
             self.pcubes[str(nc)] = self.load_pcube()
             self.pcubes[str(nc)] = fit_cube(self.cube, self.pcubes[str(nc)], fittype=self.fittype, simpfit=simpfit, ncomp=nc, **kwargs)
 
-            if hasattr(self.pcubes[str(nc)],'parcube'):
+            if self.pcubes[str(nc)].has_fit.sum() > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
                 mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=kwargs['multicore']) > 0
                 self.include_model_mask(mod_mask)
