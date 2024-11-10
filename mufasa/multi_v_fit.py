@@ -13,6 +13,7 @@ import warnings
 from datetime import datetime
 
 from astropy import units as u
+from astropy.units import UnitConversionError
 from astropy.convolution import Gaussian2DKernel, convolve
 from astropy.stats import mad_std
 
@@ -175,11 +176,26 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None, res
 
 
 def register_pcube(pcube, mod_info):
-    pcube.unit = "K"
-    if np.isnan(pcube.wcs.wcs.restfrq):
-        # Specify the rest frequency not present
+
+    # unit check and conversion
+    if hasattr(pcube, "unit"):
+        if pcube.unit is None or pcube.unit == '':
+            logger.warning("The cube doesn't have a unit. The fitting will proceed assume it has a unit of K")
+            pcube.unit = 'K'
+        elif pcube.unit != 'K':
+            raise ValueError(f"The cube should have units of K rather than {pcube.unit}")
+    else:
+        logger.warning("The cube doesn't have a unit. The fitting will proceed assume it has a unit of K")
+
+    # spectral unit check and conversion
+    if pcube.xarr.refX is None or np.isnan(pcube.wcs.wcs.restfrq):
+        # Specify the reference rest frequency if not present
+        logger.warning("The cube has no reference rest frequency."
+                       " The rest frequency of the spectral model will be used instead")
         pcube.xarr.refX = mod_info.freq_dict[linename] * u.Hz
-    pcube.xarr.velocity_convention = 'radio'
+
+    if pcube.xarr.velocity_convention is None:
+        pcube.xarr.velocity_convention = 'radio'
 
     # always register the fitter just in case different lines are used
     fitter = mod_info.fitter
@@ -188,6 +204,8 @@ def register_pcube(pcube, mod_info):
     logger.debug("the line to fit is {0}".format(mod_info.linenames))
     return pcube
 
+# setup_cube is depreciated
+'''
 def setup_cube(cube, mod_info, return_spectral_cube=False):
 
     if hasattr(cube, 'spectral_axis'):
@@ -260,7 +278,7 @@ def setup_cube(cube, mod_info, return_spectral_cube=False):
         return pcube, cube
     else:
         return pcube
-
+'''
 
 def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
@@ -280,6 +298,7 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
     taumin = mod_info.taumin
     eps = mod_info.eps
 
+    # deprecated and no longer needed
     #pcube = setup_cube(cube, mod_info, return_spectral_cube=False)
 
     register_pcube(pcube, mod_info)

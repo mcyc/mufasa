@@ -16,6 +16,7 @@ from copy import copy
 import pyspeckit
 import gc
 from astropy import units as u
+from astropy.units import UnitConversionError
 import scipy.ndimage as nd
 
 import dask.array as da
@@ -97,7 +98,8 @@ class UltraCube(object):
 
     def load_cube(self, fitsfile):
         """
-        Load a SpectralCube from a .fits file.
+        Load a SpectralCube from a .fits file. The function converts units in such that the cube has a unit and spectral unit of
+        K and km/s, respectively
 
         Parameters
         ----------
@@ -109,24 +111,63 @@ class UltraCube(object):
         None
         """
         cube = SpectralCube.read(fitsfile, use_dask=True)
+        cube = to_K(cube)
 
-        if np.isnan(cube._wcs.wcs.restfrq):
-            # Specify the rest frequency not present
-            cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
+
+
+        if cube.spectral_axis.unit.is_equivalent(u.Hz):
+            # assign rest frequency from the model before spectral axis velocity conversion
+            if not hasattr(cube.wcs.wcs, 'restfrq') or np.isnan(cube.wcs.wcs.restfrq):
+                logger.warning("The cube has no reference rest frequency. "
+                               "The rest frequency of the spectral model will be used instead")
+                cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
+
         self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
-    def load_pcube(self):
+
+    def load_pcube(self, pcube_ref=None):
         """
-        Load a pyspeckit cube from a .fits file.
+        Load a cube into a pyspeckit.SpectralCube object from a .fits file.
 
         Parameters
         ----------
+        pcube_ref : pyspeckit.SpectralCube
+            A pyspeckit.SpectralCube object that works with the same data cube. If provided, the new pcube's cube attribute
+            will be pointed towards this reference cube to avoid reduandance and save memory
 
         Returns
         -------
-        pyspeckit Spectral Cube
+        pcube : pyspeckit.SpectralCube
+            The pyspeckit.SpectralCube object needed work with the fitting
         """
-        return pyspeckit.Cube(filename=self.cubefile)
+
+        # read the cube first as a SpectralCube object to performe unit conversion
+        # Note: dask is set to False to ensure it's compitable with some of pyspeckit's functions
+        # this loading mehod is not memory efficient, but needed workaround at the moment
+        cube_temp = SpectralCube.read(self.cubefile, dask=False)
+        cube_temp = to_K(cube_temp) # convert the unit to K
+
+        pcube = pyspeckit.Cube(cube=cube_temp)
+
+        if pcube_ref is not None:
+            if is_K(pcube_ref.unit):
+                # set pointer of the new pcube's cube to the reference one to remove redundancy and conserve memory
+                pcube.cube = pcube_ref.cube
+
+        if pcube.xarr.refX is None or np.isnan(pcube.wcs.wcs.restfrq):
+            # Specify the reference rest frequency if not present
+            logger.warning("The cube has no reference rest frequency."
+                           " The rest frequency of the spectral model will be used instead")
+            pcube.xarr.refX = mod_info.freq_dict[linename] * u.Hz
+
+        if pcube.xarr.velocity_convention is None:
+            pcube.xarr.velocity_convention = 'radio'
+
+        # premptively release memory
+        del cube_temp
+        gc.collect()
+
+        return pcube
 
 
 
@@ -205,7 +246,13 @@ class UltraCube(object):
             ncomp = [ncomp]
 
         for nc in ncomp:
-            self.pcubes[str(nc)] = self.load_pcube()
+            # initiate pcube objects for fitting and model handling
+            if self.pcubes:
+                # use a pre-existing pcube as reference
+                _, pcube_ref = next(iter(self.pcubes.items()))
+                self.pcubes[str(nc)] = self.load_pcube(pcube_ref=pcube_ref)
+            else:
+                self.pcubes[str(nc)] = self.load_pcube()
             self.pcubes[str(nc)] = fit_cube(self.cube, self.pcubes[str(nc)], fittype=self.fittype, simpfit=simpfit, ncomp=nc, **kwargs)
 
             if self.pcubes[str(nc)].has_fit.sum() > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
@@ -1096,3 +1143,85 @@ def get_Tpeak(model):
     :return:
     '''
     return np.nanmax(model, axis=0)
+
+
+def is_K(data_unit):
+    """
+    Check if a given unit is equivalent to Kelvin (K).
+
+    Parameters
+    ----------
+    data_unit : astropy.units.Unit or str
+        The unit to be checked. It can be an `astropy.units.Unit` instance or a string
+        representation of the unit.
+
+    Returns
+    -------
+    bool
+        True if the provided unit is equivalent to Kelvin (K), otherwise False.
+
+    Examples
+    --------
+    >>> from astropy import units as u
+    >>> is_K(u.K)
+    True
+    >>> is_K('K')
+    True
+    >>> is_K(u.Jy)
+    False
+    """
+
+    return data_unit == 'K' or data_unit == u.K
+
+
+def to_K(cube):
+    """
+    Convert the unit of a spectral cube to Kelvin (K).
+
+    This function attempts to convert the unit of a `spectral_cube.SpectralCube` object
+    to brightness temperature (K) using the Rayleigh-Jeans approximation. If the cube's
+    current unit is not convertible, it will handle the error by either warning the user
+    or raising a `UnitConversionError`.
+
+    Parameters
+    ----------
+    cube : spectral_cube.SpectralCube
+        A `SpectralCube` object whose unit needs to be converted to Kelvin (K).
+
+    Returns
+    -------
+    spectral_cube.SpectralCube
+        A new `SpectralCube` object with its unit set to Kelvin (K).
+
+    Raises
+    ------
+    UnitConversionError
+        If the cube's unit cannot be converted to Kelvin (K) and it is not possible to
+        forcefully assign a unit.
+
+    Notes
+    -----
+    If the cube does not have an assigned unit, a unit of Kelvin (K) will be assumed and
+    a warning will be issued.
+
+    Examples
+    --------
+    >>> from spectral_cube import SpectralCube
+    >>> import astropy.units as u
+    >>> cube = SpectralCube.read('example_cube.fits')
+    >>> cube_in_K = to_K(cube)
+    """
+
+    try:
+        cube = cube.to(u.K)
+    except UnitConversionError:
+        if hasattr(cube, 'unit'):
+            if cube.unit is None or cube.unit == '':
+                logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+            else:
+                raise UnitConversionError(f"Cube's unit ({cube.unit}) is not convertible to K")
+        else:
+            logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+        cube._unit = u.K
+
+    return cube
