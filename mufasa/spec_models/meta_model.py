@@ -221,7 +221,9 @@ class MetaModel(object):
     
     def peakT(self, parameters, index_v=0, planemask=None, multithreaded=False):
         """
-        Estimate the peak brightness temperature of the spectral model.
+        Estimate the peak brightness temperature of the spectral model by evaluating the model at the spectral location
+        (i.e., the velocity) of the brightest hyperfine line. Note: this method only works for a single component model,
+        where the peak brightness should be located pretty close to wheree the brightest hyperfine line is
 
         Parameters
         ----------
