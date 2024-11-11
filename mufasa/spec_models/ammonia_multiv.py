@@ -123,6 +123,7 @@ def _ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background
         hyperfine models
 
     """
+    width_min = 0.01
 
     # fillingfraction is an arbitrary scaling for the data; the model will be (normal model) * fillingfraction
     if fillingfraction is None:
@@ -140,7 +141,7 @@ def _ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background
 
         lines = (1-voff_lines/ckms)*freq_dict[linename]/1e9
         tau_wts = tau_wts / (tau_wts).sum()
-        if width == 0: width = (xarr[1] - xarr[0]).value # width shouldn't be 0, saves from divide by 0 on line 150
+        if width == 0: width = width_min  # width shouldn't be 0, saves from divide by 0
         nuwidth = np.abs(width/ckms*lines)
         nuoff = xoff_v/ckms*lines
 
