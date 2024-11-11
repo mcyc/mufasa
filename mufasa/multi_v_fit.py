@@ -35,83 +35,13 @@ from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import interpolate
 from . import __version__
+from .spec_models.meta_model import MetaModel
 
 # =======================================================================================================================
 
 from .utils.mufasa_log import get_logger
 
 logger = get_logger(__name__)
-
-
-# =======================================================================================================================
-
-class MetaModel(object):
-    def __init__(self, fittype, ncomp=None):
-        self.fittype = fittype
-        self.adoptive_snr_masking = True
-
-        # the default windows for calculating moments
-        # final window for evaluating moments (center differs from pixel to pixel)
-        self.window_hwidth = 5
-        # intermediate window for filtering out satallite hyperfine lines. The window is fixed and the same
-        # throughout all pixels
-        self.central_win_hwidth = None
-
-        # a place holder for if the window becomes line specific
-        self.main_hf_moments = momgue.window_moments
-
-        if self.fittype == 'nh3_multi_v':
-            from pyspeckit.spectrum.models.ammonia_constants import freq_dict
-            from pyspeckit.spectrum.models import ammonia
-            from .spec_models import ammonia_multiv as ammv
-
-            self.linetype = 'nh3'
-            # the current implementation only fits the 1-1 lines
-            self.linenames = ["oneone"]
-
-            self.fitter = ammv.nh3_multi_v_model_generator(n_comp=ncomp, linenames=self.linenames)
-            self.freq_dict = freq_dict
-            self.rest_value = freq_dict['oneone'] * u.Hz
-            self.spec_model = ammonia._ammonia_spectrum
-
-            # set the fit parameter limits (consistent with GAS DR1) for NH3 fits
-            self.Texmin = 3.0  # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
-            self.Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
-            self.sigmin = 0.07  # km/s
-            self.sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-            # taumax = 100.0  # a reasonable upper limit for GAS data. At 10K and 1e5 cm^-3 & 3e15 cm^-2 -> 70
-            self.taumax = 30.0  # when the satellite hyperfine lines becomes optically thick
-            self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
-            self.eps = 0.001  # a small perturbation that can be used in guesses
-
-        elif self.fittype == 'n2hp_multi_v':
-            from .spec_models.n2hp_constants import freq_dict
-            from .spec_models import n2hp_multiv as n2hpmv
-
-            self.linetype = 'n2hp'
-            # the current implementation only fits the 1-0 lines
-            self.linenames = ["onezero"]
-
-            self.fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=self.linenames)
-            self.freq_dict = freq_dict
-            self.rest_value = freq_dict['onezero'] * u.Hz
-            self.spec_model = n2hpmv._n2hp_spectrum
-
-            # set the fit parameter limits (consistent with GAS DR1) for NH3 fits
-            self.Texmin = 3.0  # K; a more reasonable lower limit (5 K T_kin, 1e3 cm^-3 density, 1e13 cm^-2 column, 3km/s sigma)
-            self.Texmax = 40  # K; DR1 T_k for Orion A is < 35 K. T_k = 40 at 1e5 cm^-3, 1e15 cm^-2, and 0.1 km/s yields Tex = 37K
-            self.sigmin = 0.07  # km/s
-            self.sigmax = 2.5  # km/s; for Larson's law, a 10pc cloud has sigma = 2.6 km/s
-            self.taumax = 40.0  # when the satellite hyperfine lines becomes optically thick
-            self.taumin = 0.1  # 0.2   # note: at 1e3 cm^-3, 1e13 cm^-2, 1 km/s linewidth, 40 K -> 0.15
-            self.eps = 0.001  # a small perturbation that can be used in guesses
-
-            # overwrite default windows, since N2H+ (1-0) have a satellite line that could be fairly bright
-            self.window_hwidth = 4
-            self.central_win_hwidth = 3.5
-
-        else:
-            raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
 
 
 # =======================================================================================================================
