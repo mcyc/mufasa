@@ -1218,7 +1218,7 @@ def to_K(cube):
     """
 
     try:
-        cube = cube.to(u.K)
+        cube = cube.to(u.K, how='slice')
     except UnitConversionError:
         if hasattr(cube, 'unit'):
             if cube.unit is None or cube.unit == '':
