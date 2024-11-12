@@ -155,6 +155,7 @@ class MetaModel(object):
         else:
             raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
 
+
     def model_function(self, xarr, parameters, planemask=None, multithreaded=False):
         """
         Compute the spectral model for a given spectral axis and model parameters.
@@ -164,17 +165,17 @@ class MetaModel(object):
         xarr : pyspeckit.spectrum.units.SpectroscopicAxis
             The spectral axis along which to evaluate the model function.
         parameters : array-like
-            The model parameters for evaluation. Can be either:
+            The model parameters for evaluation. Can be:
             - A 1D array with shape (l,), representing a single set of parameters.
-            - A 3D array with shape (l, m, n), where `l` is the number of parameters per pixel,
-              and `m` and `n` represent the spatial dimensions. In this case, the function will
-              evaluate the model at each (m, n) pixel specified by `planemask`.
+            - A 2D array with shape (l, n), where `l` is the number of parameters, and `n` is the number of spatial positions.
+            - A 3D array with shape (l, m, n), where `l` is the number of parameters per pixel, and `m` and `n` represent
+              the spatial dimensions. In this case, the function will evaluate the model at each (m, n) pixel specified by `planemask`.
         planemask : array-like, optional
             A 2D mask array with shape (m, n) indicating the pixels to evaluate when `parameters` is 3D.
             Pixels with `True` in the mask will be evaluated. If None, a default mask is generated where
             all non-zero, finite values in `parameters` are considered valid.
         multithreaded : bool, optional
-            Whether to enable multithreading to evaluate pixels in parallel when `parameters` is 3D.
+            Whether to enable multithreading to evaluate pixels in parallel when `parameters` is 2D or 3D.
             Default is False.
 
         Returns
@@ -182,13 +183,36 @@ class MetaModel(object):
         np.ndarray
             The evaluated spectral model values. The output shape matches the input shape of `parameters`:
             - If `parameters` is 1D, returns a 1D array of computed values.
-            - If `parameters` is 3D, returns a 3D array with the same (m, n) spatial dimensions,
-              where each evaluated pixel contains the model values, and masked pixels are filled with NaN.
+            - If `parameters` is 2D, returns a 1D array with length `n`, containing computed values for each position.
+            - If `parameters` is 3D, returns a 2D array with shape (m, n), containing computed values for each
+              evaluated pixel in the masked region. Masked pixels are filled with NaN.
         """
 
         if parameters.ndim == 1:
             # Direct evaluation for 1D input
             return self.model_func(xarr, *parameters)
+
+        elif parameters.ndim == 2:
+            # For 2D input, transpose for easier iteration
+            pars = parameters.T
+
+            # Initialize results array for 2D output
+            results = np.full(pars.shape[0], np.nan, dtype=object)
+
+            # Define evaluation function for each position
+            def evaluate_position(i):
+                par = pars[i]
+                return self.model_func(xarr, *par)
+
+            if multithreaded:
+                with ThreadPoolExecutor() as executor:
+                    evaluated_results = list(executor.map(evaluate_position, range(len(pars))))
+                results[:] = evaluated_results
+            else:
+                for i, par in enumerate(pars):
+                    results[i] = self.model_func(xarr, *par)
+
+            return results
 
         elif parameters.ndim == 3:
             # Generate mask if not provided
@@ -198,51 +222,62 @@ class MetaModel(object):
             # Mask parameters for efficient evaluation
             pars = parameters[:, planemask].T
 
-            # Initialize results array to hold model outputs
+            # Initialize results array to hold model outputs for 3D input
             results = np.full((parameters.shape[1], parameters.shape[2]), np.nan, dtype=object)
 
-            # Define a function for evaluation of each pixel
+            # Define evaluation function for each pixel
             def evaluate_pixel(i):
                 par = pars[i]
                 return self.model_func(xarr, *par)
 
             if multithreaded:
-                # Use ThreadPoolExecutor for parallel processing
                 with ThreadPoolExecutor() as executor:
                     evaluated_results = list(executor.map(evaluate_pixel, range(len(pars))))
                 results[planemask] = evaluated_results
             else:
-                # Single-threaded loop if multithreaded is False
                 for i, par in enumerate(pars):
                     results[planemask][i] = self.model_func(xarr, *par)
 
             return results
 
-    
+
     def peakT(self, parameters, index_v=0, planemask=None, multithreaded=False):
         """
         Estimate the peak brightness temperature of the spectral model by evaluating the model at the spectral location
-        (i.e., the velocity) of the brightest hyperfine line. Note: this method only works for a single component model,
-        where the peak brightness should be located pretty close to wheree the brightest hyperfine line is
+        (i.e., the velocity) of the brightest hyperfine line. Note: this method only works for a single-component model,
+        where the peak brightness is expected to be located near the brightest hyperfine line.
 
         Parameters
         ----------
         parameters : array-like
             The model parameters to evaluate, where each element corresponds to a parameter used in the spectral model.
+            Can be:
+            - A 1D array with shape (l,), representing a single set of parameters.
+            - A 2D array with shape (l, n), where `l` is the number of parameters and `n` is the number of spatial positions.
+            - A 3D array with shape (l, m, n), where `l` is the number of parameters per pixel, and `m` and `n` represent
+              the spatial dimensions.
         index_v : int, optional
             Index of the parameter corresponding to the velocity centroid, which is 0 for all spectral models
             implemented in MUFASA. Default is 0.
         planemask : array-like, optional
-            A 2D mask array with shape (m, n) indicating the pixels to evaluate. Pixels with True in the mask will be evaluated.
-            If None, a mask is generated based on finite, non-zero values in parameters.
+            A 2D mask array with shape (m, n) indicating the pixels to evaluate when `parameters` is 3D.
+            Pixels with `True` in the mask will be evaluated. If None, a mask is generated based on finite, non-zero values
+            in `parameters`.
         multithreaded : bool, optional
-            Whether to enable multithreading to evaluate pixels in parallel. Default is False.
+            Whether to enable multithreading to evaluate pixels in parallel when `parameters` is 2D or 3D.
+            Default is False.
 
         Returns
         -------
         np.ndarray
-            A 2D array with the peak brightness temperature for each evaluated pixel in the masked region.
+            An array with the peak brightness temperature for each evaluated pixel:
+            - If `parameters` is 1D, returns a scalar representing the peak brightness temperature.
+            - If `parameters` is 2D, returns a 1D array with length `n`, containing the peak brightness temperature for each
+              position.
+            - If `parameters` is 3D, returns a 2D array with shape (m, n) containing the peak brightness temperature for each
+              evaluated pixel in the masked region. Masked pixels are filled with NaN.
         """
+
         # Function implementation
 
         # Get the velocity at the brightest hyperfine line
@@ -255,21 +290,28 @@ class MetaModel(object):
             # Direct evaluation for 1D input
             return self.model_func(nu0, *parameters)[0]
 
-        elif parameters.ndim == 3:
-            # Generate mask if not provided
-            if planemask is None:
-                planemask = np.all(np.isfinite(parameters), axis=0) & np.all(parameters != 0, axis=0)
+        else:
+            if parameters.ndim == 2:
+                pars = parameters.T
+                nu0_array = nu0.T
+                print(f"pars shape: {pars.shape}")
+                print(f"nu0_array shape: {nu0_array.shape}")
 
-            # Mask parameters and frequencies for efficient evaluation
-            pars = parameters[:, planemask].T
-            nu0_masked = nu0[:, planemask].T
+            if parameters.ndim == 3:
+                # Generate mask if not provided
+                if planemask is None:
+                    planemask = np.all(np.isfinite(parameters), axis=0) & np.all(parameters != 0, axis=0)
+
+                # Mask parameters and frequencies for efficient evaluation
+                pars = parameters[:, planemask].T
+                nu0_array = nu0[:, planemask].T
 
             # Initialize results array
-            pT = np.full(nu0_masked.shape[0], np.nan)
+            pT = np.full(nu0_array.shape[0], np.nan)
 
             # Define a function for multithreading
             def evaluate_pixel(i):
-                nu0_i = nu0_masked[i]
+                nu0_i = nu0_array[i]
                 par = pars[i]
                 return self.model_func(nu0_i, *par)[0]
 
@@ -281,10 +323,14 @@ class MetaModel(object):
             else:
                 # Single-threaded loop if multicore is False
                 for i, par in enumerate(pars):
-                    nu0_i = nu0_masked[i]
+                    nu0_i = nu0_array[i]
                     pT[i] = self.model_func(nu0_i, *par)[0]
 
-            # Reconstruct the 2D output
-            pT2D = np.full(planemask.shape, np.nan)
-            pT2D[planemask] = pT
-            return pT2D
+            if parameters.ndim == 3:
+                # Reconstruct the 2D output
+                pT2D = np.full(planemask.shape, np.nan)
+                pT2D[planemask] = pT
+                return pT2D
+
+            else:
+                return pT

@@ -4,7 +4,11 @@ from plotly.subplots import make_subplots
 import plotly.offline as pyo
 
 from ..utils import dataframe as dframe
-from ..moment_guess import peakT
+from ..moment_guess import peakT as quickPeakT
+
+#======================================================================================================================#
+from ..utils.mufasa_log import get_logger
+logger = get_logger(__name__)
 
 
 class ScatterPPV(object):
@@ -30,7 +34,7 @@ class ScatterPPV(object):
     >>> sc.plot_ppv(savename='monR2.html', vel_scale=0.5)
     """
 
-    def __init__(self, parafile, fittype, vrange=None, verr_thres=5):
+    def __init__(self, parafile, fittype, vrange=None, verr_thres=5, meta_model=None):
         """
         Initialize the ScatterPPV object by loading data from a .fits file and setting up parameters.
 
@@ -50,15 +54,26 @@ class ScatterPPV(object):
 
         self.paracube, self.header = fits.getdata(parafile, header=True)
         self.fittype = fittype
+        self.meta_model = meta_model
 
-        # get the rest frequency
-        if self.fittype == "nh3_multi_v":
-            from pyspeckit.spectrum.models.ammonia_constants import freq_dict
-            self.rest_freq = freq_dict['oneone']*1e-9 # in GHz
+        if meta_model is None:
+            # get the rest frequency
+            if self.fittype == "nh3_multi_v":
+                from pyspeckit.spectrum.models.ammonia_constants import freq_dict
+                self.rest_freq = freq_dict['oneone']*1e-9 # in GHz
 
-        elif self.fittype == "n2hp_multi_v":
-            from ..spec_models.n2hp_constants import freq_dict
-            self.rest_freq = freq_dict['onezero']*1e-9 # in GHz
+            elif self.fittype == "n2hp_multi_v":
+                from ..spec_models.n2hp_constants import freq_dict
+                self.rest_freq = freq_dict['onezero']*1e-9 # in GHz
+
+        else:
+            if fittype != meta_model.fittype:
+                msg = f"The provided fittype ({fittype}) does not match that from the MetaModel ({meta_model.fittype})." \
+                      f"MetaModel's fittype will be adopted over the provided on."
+                logger.warning(msg)
+
+            self.fittype = meta_model.fittype
+            self.rest_freq = self.meta_model.rest_value.value
 
         # structure the data in the data frame
         self.dataframe = dframe.make_dataframe(self.paracube, vrange=vrange, verr_thres=verr_thres)
@@ -69,8 +84,11 @@ class ScatterPPV(object):
         # get the relative wcs coordinates
         self.add_wcs_del()
 
+    def set_meta_model(self, meta_model):
+        self.meta_model = meta_model
 
-    def add_peakI(self, nu=None):
+
+    def add_peakI(self):
         """
         Calculate and add a peak intensity value for each model point in the DataFrame.
 
@@ -84,10 +102,18 @@ class ScatterPPV(object):
         None
         """
 
-        if nu is None:
-            nu = self.rest_freq
+        if self.meta_model is not None:
+            para = np.array(
+                [self.dataframe['vlsr'].values,
+                 self.dataframe['sigv'].values,
+                 self.dataframe['tex'].values,
+                 self.dataframe['tau'].values]
+            )
+            self.dataframe['peakT'] = self.meta_model.peakT(para)
 
-        self.dataframe['peakT'] = peakT(tex=self.dataframe['tex'], tau=self.dataframe['tau'], nu=nu)
+        else:
+            self.dataframe['peakT'] = quickPeakT(tex=self.dataframe['tex'], tau=self.dataframe['tau'], nu=self.rest_freq)
+
 
     def add_wcs_del(self, ra_ref=None, dec_ref=None, unit='arcmin'):
         """

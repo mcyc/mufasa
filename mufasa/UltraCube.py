@@ -24,6 +24,7 @@ import dask.array as da
 from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
+from .spec_models import meta_model
 from .utils.multicore import validate_n_cores
 from .visualization.spec_viz import Plotter
 #======================================================================================================================#
@@ -75,19 +76,23 @@ class UltraCube(object):
         self.n_cores = validate_n_cores(n_cores)
         self.fittype = fittype
         self.plotter = None
+        self.meta_model = None
 
         if cubefile is not None:
             self.cubefile = cubefile
             self.load_cube(cubefile)
-            return
         else:
             if hasattr(cube, 'spectral_axis'):
                 # Load from a SpectralCube instance
                 self.cube = cube
 
+        if fittype is not None:
+            # for the current usage, setting ncomp=1 is fine. Changes to MetalModel in the future will be needed
+            # to elimiate needing ncomp during its intialization
+            self.meta_model = meta_model.MetaModel(fittype=fittype, ncomp=1)
+
         if not snr_min is None:
             self.snr_min = snr_min
-
 
         if not rmsfile is None:
             self.rmsfile = rmsfile
@@ -534,7 +539,7 @@ class UCubePlus(UltraCube):
     A subclass of UltraCube that holds directory information for parameter maps and model fits.
     """
 
-    def __init__(self, cubefile, cube=None, paraNameRoot=None, paraDir=None, fittype=None, **kwargs):
+    def __init__(self, cubefile, cube=None, fittype=None, paraNameRoot=None, paraDir=None, **kwargs):
         """
         Initialize the UCubePlus object.
 
@@ -558,7 +563,7 @@ class UCubePlus(UltraCube):
         None
         """
 
-        super().__init__(cubefile, cube, fittype, **kwargs)
+        super().__init__(cubefile, cube, fittype=fittype, **kwargs)
 
         self.cubeDir = os.path.dirname(cubefile)
 
