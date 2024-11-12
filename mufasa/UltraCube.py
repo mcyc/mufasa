@@ -1214,25 +1214,49 @@ def to_K(cube):
     >>> cube = SpectralCube.read('example_cube.fits')
     >>> cube_in_K = to_K(cube)
     """
-    # only convert if the cube does not already have a unit of K
-    if cube.unit != u.K:
-        try:
-            cube = cube.to(u.K)
-        except UnitConversionError:
-            if hasattr(cube, 'unit'):
-                if cube.unit is None or cube.unit == '':
-                    logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+
+    # Decorator to handle UnitConversionError
+    def handle_unit_conversion_error(func):
+        @wraps(func)
+        def wrapper(cube, *args, **kwargs):
+            try:
+                return func(cube, *args, **kwargs)
+            except UnitConversionError:
+                if hasattr(cube, 'unit'):
+                    if cube.unit is None or cube.unit == '':
+                        logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+                    else:
+                        raise UnitConversionError(f"Cube's unit ({cube.unit}) is not convertible to K")
                 else:
-                    raise UnitConversionError(f"Cube's unit ({cube.unit}) is not convertible to K")
-            else:
-                logger.warning("The cube does not have a unit. A unit of K will be assumed.")
-            cube._unit = u.K
+                    logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+                cube._unit = u.K
+                return cube
 
-        except ValueError:
-            # allow the entire cube to be loaded temporary if the cube is large enough to rasie the error
-            cube.allow_huge_operations = True
+        return wrapper
+
+    # Decorator to handle ValueError and retry the conversion
+    def handle_value_error(func):
+        @wraps(func)
+        def wrapper(cube, *args, **kwargs):
+            try:
+                return func(cube, *args, **kwargs)
+            except ValueError:
+                # Allow the entire cube to be loaded temporarily if the cube is too large
+                logger.warning("ValueError encountered, temporarily allowing huge operations.")
+                cube.allow_huge_operations = True
+                result = func(cube, *args, **kwargs)
+                gc.collect()  # Garbage collection to free up memory
+                cube.allow_huge_operations = False
+                return result
+
+        return wrapper
+
+    # Function to convert the cube to units of K
+    @handle_value_error
+    @handle_unit_conversion_error
+    def convert_to_kelvin(cube):
+        # Only convert if the cube does not already have a unit of K
+        if cube.unit != u.K:
             cube = cube.to(u.K)
-            gc.collect()
-            cube.allow_huge_operations = False
+        return cube
 
-    return cube
