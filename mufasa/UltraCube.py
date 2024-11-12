@@ -1261,3 +1261,5 @@ def to_K(cube):
             cube = cube.to(u.K)
         return cube
 
+    return convert_to_kelvin(cube)
+
