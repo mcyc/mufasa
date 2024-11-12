@@ -118,8 +118,6 @@ class UltraCube(object):
         cube = SpectralCube.read(fitsfile, use_dask=True)
         cube = to_K(cube)
 
-
-
         if cube.spectral_axis.unit.is_equivalent(u.Hz):
             # assign rest frequency from the model before spectral axis velocity conversion
             if not hasattr(cube.wcs.wcs, 'restfrq') or np.isnan(cube.wcs.wcs.restfrq):
@@ -1193,7 +1191,8 @@ def to_K(cube, huge_operations=False):
     cube : spectral_cube.SpectralCube
         A `SpectralCube` object whose unit needs to be converted to Kelvin (K).
     huge_operations : bool
-        If True, temporary enable allow_huge_operations to load and work with the entire cube
+        If True, temporary enable allow_huge_operations to load and work with the entire cube.
+        This only applies if dask is not enabled
 
     Returns
     -------
@@ -1220,9 +1219,12 @@ def to_K(cube, huge_operations=False):
     """
 
     try:
+        if huge_operations and isinstance(cube._data, da.Array):
             cube.allow_huge_operations = huge_operations
             cube = cube.to(u.K)
             cube.allow_huge_operations = False
+        else:
+            cube = cube.to(u.K)
     except UnitConversionError:
         if hasattr(cube, 'unit'):
             if cube.unit is None or cube.unit == '':

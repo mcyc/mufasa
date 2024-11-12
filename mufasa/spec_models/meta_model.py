@@ -294,8 +294,6 @@ class MetaModel(object):
             if parameters.ndim == 2:
                 pars = parameters.T
                 nu0_array = nu0.T
-                print(f"pars shape: {pars.shape}")
-                print(f"nu0_array shape: {nu0_array.shape}")
 
             if parameters.ndim == 3:
                 # Generate mask if not provided
