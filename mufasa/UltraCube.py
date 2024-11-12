@@ -148,7 +148,7 @@ class UltraCube(object):
         # Note: dask is set to False to ensure it's compitable with some of pyspeckit's functions
         # this loading mehod is not memory efficient, but needed workaround at the moment
         cube_temp = SpectralCube.read(self.cubefile, dask=False)
-        cube_temp = to_K(cube_temp, huge_operations=True) # convert the unit to K; usge huge_operations becasue dask=False
+        cube_temp = to_K(cube_temp) # convert the unit to K;
 
         pcube = pyspeckit.Cube(cube=cube_temp)
 
@@ -1177,7 +1177,7 @@ def is_K(data_unit):
     return data_unit == 'K' or data_unit == u.K
 
 
-def to_K(cube, huge_operations=False):
+def to_K(cube):
     """
     Convert the unit of a spectral cube to Kelvin (K).
 
@@ -1190,9 +1190,6 @@ def to_K(cube, huge_operations=False):
     ----------
     cube : spectral_cube.SpectralCube
         A `SpectralCube` object whose unit needs to be converted to Kelvin (K).
-    huge_operations : bool
-        If True, temporary enable allow_huge_operations to load and work with the entire cube.
-        This only applies if dask is not enabled
 
     Returns
     -------
@@ -1217,22 +1214,25 @@ def to_K(cube, huge_operations=False):
     >>> cube = SpectralCube.read('example_cube.fits')
     >>> cube_in_K = to_K(cube)
     """
-
-    try:
-        if huge_operations and isinstance(cube._data, da.Array):
-            cube.allow_huge_operations = huge_operations
+    # only convert if the cube does not already have a unit of K
+    if cube.unit != u.K:
+        try:
             cube = cube.to(u.K)
-            cube.allow_huge_operations = False
-        else:
-            cube = cube.to(u.K)
-    except UnitConversionError:
-        if hasattr(cube, 'unit'):
-            if cube.unit is None or cube.unit == '':
-                logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+        except UnitConversionError:
+            if hasattr(cube, 'unit'):
+                if cube.unit is None or cube.unit == '':
+                    logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+                else:
+                    raise UnitConversionError(f"Cube's unit ({cube.unit}) is not convertible to K")
             else:
-                raise UnitConversionError(f"Cube's unit ({cube.unit}) is not convertible to K")
-        else:
-            logger.warning("The cube does not have a unit. A unit of K will be assumed.")
-        cube._unit = u.K
+                logger.warning("The cube does not have a unit. A unit of K will be assumed.")
+            cube._unit = u.K
+
+        except ValueError:
+            # allow the entire cube to be loaded temporary if the cube is large enough to rasie the error
+            cube.allow_huge_operations = True
+            cube = cube.to(u.K)
+            gc.collect()
+            cube.allow_huge_operations = False
 
     return cube
