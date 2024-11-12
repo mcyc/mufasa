@@ -121,7 +121,7 @@ class Region(object):
 
         self.fittype = fittype
         self.ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, cnv_factor=cnv_factor,
-                                     fittype=self.fittype, n_cores=multicore)
+                                     fittype=fittype, n_cores=multicore)
 
         # for convolving cube
         self.cnv_factor = cnv_factor
@@ -238,7 +238,8 @@ class Region(object):
         except KeyError:
             filepath = '{}/{}_{}vcomp_final.fits'.format(self.ucube.paraDir, self.ucube.paraNameRoot, ncomp)
 
-        self.ScatterPPV = scatter_3D.ScatterPPV(filepath, fittype=self.fittype, vrange=vrange, verr_thres=verr_thres)
+        self.ScatterPPV = scatter_3D.ScatterPPV(filepath, fittype=self.fittype, vrange=vrange,
+                                                verr_thres=verr_thres, meta_model=self.ucube.meta_model)
         return self.ScatterPPV.plot_ppv(label_key=label_key, savename=savename, vel_scale=vel_scale, **kwargs)
 
 
