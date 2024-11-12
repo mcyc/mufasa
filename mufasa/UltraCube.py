@@ -150,9 +150,13 @@ class UltraCube(object):
         # Note: dask is set to False to ensure it's compitable with some of pyspeckit's functions
         # this loading mehod is not memory efficient, but needed workaround at the moment
         cube_temp = SpectralCube.read(self.cubefile, dask=False)
-        cube_temp = to_K(cube_temp) # convert the unit to K
+        cube_temp = to_K(cube_temp, huge_operations=True) # convert the unit to K; usge huge_operations becasue dask=False
 
         pcube = pyspeckit.Cube(cube=cube_temp)
+
+        # premptively release memory
+        del cube_temp
+        gc.collect()
 
         if pcube_ref is not None:
             if is_K(pcube_ref.unit):
@@ -167,10 +171,6 @@ class UltraCube(object):
 
         if pcube.xarr.velocity_convention is None:
             pcube.xarr.velocity_convention = 'radio'
-
-        # premptively release memory
-        del cube_temp
-        gc.collect()
 
         return pcube
 
@@ -1179,7 +1179,7 @@ def is_K(data_unit):
     return data_unit == 'K' or data_unit == u.K
 
 
-def to_K(cube):
+def to_K(cube, huge_operations=False):
     """
     Convert the unit of a spectral cube to Kelvin (K).
 
@@ -1192,6 +1192,8 @@ def to_K(cube):
     ----------
     cube : spectral_cube.SpectralCube
         A `SpectralCube` object whose unit needs to be converted to Kelvin (K).
+    huge_operations : bool
+        If True, temporary enable allow_huge_operations to load and work with the entire cube
 
     Returns
     -------
@@ -1218,7 +1220,9 @@ def to_K(cube):
     """
 
     try:
-        cube = cube.to(u.K, how='slice')
+            cube.allow_huge_operations = huge_operations
+            cube = cube.to(u.K)
+            cube.allow_huge_operations = False
     except UnitConversionError:
         if hasattr(cube, 'unit'):
             if cube.unit is None or cube.unit == '':
