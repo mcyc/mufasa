@@ -265,6 +265,28 @@ class UltraCube(object):
                 self.include_model_mask(mod_mask)
             gc.collect()
 
+    def has_fit(self, ncomp):
+        """
+        Return a mask indicating which pixels have been fitted with a model.
+
+        Parameters
+        ----------
+        ncomp : int
+            The number of components for the model being checked. This value is used to identify the modelled
+            parameter cube (`parcube`) associated with the number of components.
+
+        Returns
+        -------
+        np.ndarray
+            A 2D boolean array with the same spatial dimensions as the data, where `True` indicates pixels
+            that have been fitted (i.e., contain non-zero, finite values in the parameter cube for the specified
+            model component) and `False` indicates pixels that were not fitted.
+        """
+        parcube = self.pcubes[str(ncomp)].parcube
+        mask = np.any(parcube != 0, axis=0)
+        mask = mask & np.any(np.isfinite(parcube), axis=0)
+        return mask
+
 
     def include_model_mask(self, mask):
         # update the mask that shows were all the models are non-zero
@@ -883,6 +905,7 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
     else:
         pass
 
+
 def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True, include_1c=True):
     # get the best 2c model justified by AICc lnk
 
@@ -908,6 +931,13 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
     errcube[:, ~mask] = np.nan
 
     if return_lnks:
+        # set lnk pixels with no fit to nan
+        mask = ucube.has_fit(ncomp=1)
+        lnk10[~mask] = np.nan
+        mask = ucube.has_fit(ncomp=2)
+        lnk20[~mask] = np.nan
+        lnk21[~mask] = np.nan
+
         return parcube, errcube, lnk10, lnk20, lnk21
     else:
         return parcube, errcube
