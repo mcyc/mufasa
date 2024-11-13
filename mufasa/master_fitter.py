@@ -1225,7 +1225,7 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
         logger.debug(f"a totoal of {m_iter} iterations were run for {ncomp} fit_surroundings")
         # finally, fill in the small holes if they exist in the mask
         fill_mask_new = remove_small_holes(fill_mask, 9)
-        if np.logical_xor(fill_mask_new, fill_mask_new):
+        if np.logical_xor(fill_mask_new, fill_mask_new).sum() > 0:
             r_expand = 2
             kwargs['fill_mask'] = fill_mask_new
             n_good, m_iter = 1, 1 # ensure one more fit
