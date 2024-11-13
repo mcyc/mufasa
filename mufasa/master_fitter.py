@@ -1184,7 +1184,8 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
         # a function to handle the expand fits during each iteration that follows
         def iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good, n_good_total, n_attempt_total, **kwargs):
             if m_iter > 0 and n_good > 0:
-                n_good, n_attempt, i = expand_fits(reg, lnk_thresh=lnk_thresh, max_iter=m_iter, r_expand=r_expand, **kwargs)
+                n_good, n_attempt, i = expand_fits(reg, lnk_thresh=lnk_thresh, max_iter=m_iter, r_expand=r_expand,
+                                                   **kwargs)
                 n_good_total += n_good
                 n_attempt_total += n_attempt
                 m_iter -= i
@@ -1194,31 +1195,31 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
         lnk_thresh = 10
         r_expand = 1
         n_good = 1
-        reg, m_iter, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+        reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
                                                               n_good_total, n_attempt_total, **kwargs)
 
         # expand to a threshold of 3 (for standard robustness) if there's enough iterations left
         lnk_thresh = 3
-        reg, m_iter, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+        reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
                                                               n_good_total, n_attempt_total, **kwargs)
 
         # expand to increasingly lower thresholds in tiers with larger expanding footprints as snr_min gets lower
         if snr_min <= 2:
             lnk_thresh = 0
             r_expand = 2
-            reg, m_iter, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
                                                                   n_good_total, n_attempt_total, **kwargs)
 
         if snr_min <= 1:
             lnk_thresh = -5
             r_expand = 3
-            reg, m_iter, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
                                                                   n_good_total, n_attempt_total, **kwargs)
 
         if snr_min <= 0:
             lnk_thresh = -20
             r_expand = 5
-            reg, m_iter, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
                                                                   n_good_total, n_attempt_total, **kwargs)
 
         logger.debug(f"a totoal of {m_iter} iterations were run for {ncomp} fit_surroundings")
@@ -1228,7 +1229,7 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
             r_expand = 2
             kwargs['fill_mask'] = fill_mask_new
             n_good, m_iter = 1, 1 # ensure one more fit
-            reg, m_iter, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
                                                                   n_good_total, n_attempt_total, **kwargs)
 
         reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_attempt_total, n_success=n_good_total,
