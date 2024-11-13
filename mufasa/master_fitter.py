@@ -1173,9 +1173,9 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
                 # update fill_mask if matching refittin footprint (up to max_iter) is desired
                 ncomp_previous = str(ncomps[i-1])
                 if i > 1:
-                    fill_mask = np.logical_or(fill_mask, reg.ucube.pcubes[ncomp_previous].has_fit)
+                    fill_mask = np.logical_or(fill_mask, reg.ucube.has_fit(ncomp_previous))
                 else:
-                    fill_mask = reg.ucube.pcubes[ncomp_previous].has_fit
+                    fill_mask = reg.ucube.has_fit(ncomp_previous)
 
         n_good_total = 0
         n_attempt_total = 0
@@ -1224,6 +1224,7 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
 
         logger.debug(f"a totoal of {m_iter} iterations were run for {ncomp} fit_surroundings")
         # finally, fill in the small holes if they exist in the mask
+        fill_mask = reg.ucube.has_fit(ncomp)
         fill_mask_new = remove_small_holes(fill_mask, 9)
         if np.logical_xor(fill_mask, fill_mask_new).sum() > 0:
             r_expand = 2
