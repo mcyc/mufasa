@@ -1098,9 +1098,10 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
         Specifies the number of components for each model to fit in the region. Each component count in the list
         is processed in ascending order, expanding the fit boundaries accordingly (default is [1, 2]).
     snr_min : float, optional
-        Minimum signal-to-noise ratio threshold, used to dynamically adjust `max_iter` if not explicitly set.
-        Higher values restrict expansions to higher-SNR regions only. If `snr_min` is less than 3, expansion may
-        extend to lower SNR areas (default is 3).
+        Minimum signal-to-noise ratio threshold, used as a proxy on the lnk depth to reach via expansion.
+        For snr_min <=>2, <=1, and <= 0, attempt to recover up to lnk >= 0, >=-5, and >=-20, respectively.
+        When `max_iter` is left at the default, snr_min > 3 will result in minimal expansion for at least the highest
+        ncomp model, depending on whether or not match_footprint is True
     max_iter : int, optional
         Maximum number of iterations for expanding the fitted regions. If `None`, defaults based on `snr_min`:
         a high `snr_min` will limit expansion, while a low `snr_min` allows for more iterations (default is None).
@@ -1140,17 +1141,12 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
     multicore = validate_n_cores(multicore)
     logger.debug(f'Using {multicore} cores.')
 
-    # whether or not to expand regions with expected lnk < 5
-    low_signal = True
-    if snr_min > 0:
-        low_signal = False
-
     # the maximum number of iterations for ncomp beyond the smallest one if match_footprint is True
     max_iter_fill = 100
 
     # set default iteration number
     if max_iter is None:
-        if snr_min >= 3:
+        if snr_min > 3:
             max_iter = 1
         else:
             max_iter = max_iter_fill
@@ -1177,44 +1173,65 @@ def fit_surroundings(reg, ncomps=[1, 2], snr_min=3, max_iter=None, save_para=Tru
                 # update fill_mask if matching refittin footprint (up to max_iter) is desired
                 ncomp_previous = str(ncomps[i-1])
                 if i > 1:
-                    fill_mask = np.logical_or(fill_mask, reg.ucube.pcubes[ncomp_previous].has_fit)
+                    fill_mask = np.logical_or(fill_mask, reg.ucube.has_fit(ncomp_previous))
                 else:
-                    fill_mask = reg.ucube.pcubes[ncomp_previous].has_fit
+                    fill_mask = reg.ucube.has_fit(ncomp_previous)
 
         n_good_total = 0
         n_attempt_total = 0
         kwargs = dict(ncomp=ncomp, save_para=save_para, fill_mask=fill_mask, multicore=multicore, return_niter=True, snr_min=snr_min)
 
+        # a function to handle the expand fits during each iteration that follows
+        def iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good, n_good_total, n_attempt_total, **kwargs):
+            if m_iter > 0 and n_good > 0:
+                n_good, n_attempt, i = expand_fits(reg, lnk_thresh=lnk_thresh, max_iter=m_iter, r_expand=r_expand,
+                                                   **kwargs)
+                n_good_total += n_good
+                n_attempt_total += n_attempt
+                m_iter -= i
+            return reg, m_iter, n_good, n_good_total, n_attempt_total
+
         # start expanding with a lnk_thresh of 10 for extra robustness
         lnk_thresh = 10
-        # refit marginal first to ensure quality
-        n_good, n_attempt, i = expand_fits(reg, lnk_thresh=lnk_thresh, max_iter=m_iter, r_expand=1, **kwargs)
-        n_good_total += n_good
-        n_attempt_total += n_attempt
-        m_iter -= i
+        r_expand = 1
+        n_good = 1
+        reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+                                                              n_good_total, n_attempt_total, **kwargs)
 
-        # expand to a threshold of 5 for standard robustness
-        if m_iter > 0 and n_good>0:
-            lnk_thresh = 5
-            n_good, n_attempt, i =  expand_fits(reg, lnk_thresh=lnk_thresh, max_iter=max_iter, r_expand=1, **kwargs)
-            n_good_total += n_good
-            n_attempt_total += n_attempt
-            m_iter -= i
+        # expand to a threshold of 3 (for standard robustness) if there's enough iterations left
+        lnk_thresh = 3
+        reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+                                                              n_good_total, n_attempt_total, **kwargs)
 
-        # expand to lower thresholds with larger expansions
-        if low_signal:
+        # expand to increasingly lower thresholds in tiers with larger expanding footprints as snr_min gets lower
+        if snr_min <= 2:
+            lnk_thresh = 0
+            r_expand = 2
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+                                                                  n_good_total, n_attempt_total, **kwargs)
 
-            if m_iter > 0 and n_good > 0:
-                n_good, n_attempt, i =  expand_fits(reg, lnk_thresh=0, max_iter=max_iter, r_expand=2, **kwargs)
-                n_good_total += n_good
-                n_attempt_total += n_attempt
-                m_iter -= i
+        if snr_min <= 1:
+            lnk_thresh = -5
+            r_expand = 3
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+                                                                  n_good_total, n_attempt_total, **kwargs)
 
-            if m_iter > 0 and n_good > 0:
-                n_good, n_attempt, i =  expand_fits(reg, lnk_thresh=-20, max_iter=max_iter, r_expand=3, **kwargs)
-                n_good_total += n_good
-                n_attempt_total += n_attempt
-                m_iter -= i
+        if snr_min <= 0:
+            lnk_thresh = -20
+            r_expand = 5
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+                                                                  n_good_total, n_attempt_total, **kwargs)
+
+        logger.debug(f"a totoal of {m_iter} iterations were run for {ncomp} fit_surroundings")
+        # finally, fill in the small holes if they exist in the mask
+        fill_mask = reg.ucube.has_fit(ncomp)
+        fill_mask_new = remove_small_holes(fill_mask, 9)
+        if np.logical_xor(fill_mask, fill_mask_new).sum() > 0:
+            r_expand = 2
+            kwargs['fill_mask'] = fill_mask_new
+            n_good, m_iter = 1, 1 # ensure one more fit
+            reg, m_iter, n_good, n_good_total, n_attempt_total = iter_exp(reg, lnk_thresh, r_expand, m_iter, n_good,
+                                                                  n_good_total, n_attempt_total, **kwargs)
 
         reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_attempt_total, n_success=n_good_total,
                          finished=True)
