@@ -1297,7 +1297,7 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=
         replace_rss(ucube, ucube_new, ncomp=ncomp, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
-        np.zeros((1,1), dtype=bool)
+        good_mask = np.zeros((1,1), dtype=bool)
 
     if return_good_mask:
         return good_mask
