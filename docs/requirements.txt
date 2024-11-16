@@ -2,3 +2,5 @@ sphinx
 sphinx-book-theme
 numpydoc
 myst-parser
+git+https://github.com/pyspeckit/pyspeckit@master#egg=pyspeckit
+git+https://github.com/keflavich/FITS_tools@master#egg=FITS_tools

@@ -7,5 +7,5 @@ build:
 
 python:
   install:
-    - method: pip  # Use setup.py to install package dependencies
-    - requirements: docs/requirements.txt  # Additional dependencies for documentation
+    - method: pip  # Install your package using setup.py
+    - requirements: docs/requirements.txt  # Install additional dependencies for docs
