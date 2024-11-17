@@ -23,13 +23,11 @@ Overview
 
 Installation
 ------------
-To install the latest version of **MUFASA**, clone its GitHub `repository <https://github.com/mcyc/mufasa>`_ and run the following command in your local directory:
+See the :doc:`Installation <installation>` page for details. To quickly install the latest version of **MUFASA**, clone its GitHub `repository <https://github.com/mcyc/mufasa>`_ and run the following command in your local repository directory:
 
 .. code-block:: bash
 
     pip install -e .
-
-For a more detailed guide, including installing stable versions, please see the :doc:`Installation Page <installation>`.
 
 
 Reference
