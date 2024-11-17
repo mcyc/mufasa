@@ -1,26 +1,34 @@
 # MUFASA
 MUlti-component Fitter for Astrophysical Spectral Applications.
 
+[![Documentation Status](https://readthedocs.org/projects/mufasa/badge/?version=latest)](https://mufasa.readthedocs.io/en/latest/)
+
+---
+
+## Documentation
+
+For detailed documentation, including installation instructions, usage examples, and API details, visit the [MUFASA Documentation on Read the Docs](https://mufasa.readthedocs.io/en/latest/).
+
+---
+
 ## Reference
 
-Please cite the following paper when using the code:
+If you use MUFASA in your work, please cite the following paper:
 1. Chen, M. C.-Y. et al. "Velocity-Coherent Filaments in NGC 1333: Evidence for Accretion Flow?" ApJ ([2020](https://ui.adsabs.harvard.edu/link_gateway/2020ApJ...891...84C/doi:10.3847/1538-4357/ab7378)).
+
+---
 
 ## Installation
 
-To install the latest version of ```MUFASA```, clone this repository and run the following in your local directory:
+To install the latest version of `MUFASA`, clone this repository and run the following in your local directory:
 
-```
+```bash
 pip install -e .
 ```
 
-To pip install a 'stable' release, run:
-```
-pip install mufasa
-```
 ### Requirements
 
-```MUFASA``` runs on ```python > v3.7``` and depends on the following packages:
+```MUFASA``` runs on ```python > v3.8``` and depends on the following packages:
 
 - ```numpy >= v1.19.2```
 - ```scipy >= v1.7.3```
@@ -35,51 +43,4 @@ If you are running a later version of Python, for example, ```Python 3.11```, yo
 
 ## Getting Started
 
-### Running 2-component fits
-
-To perform an NH<sub>3</sub> (1,1) fit automatically, up to two components, simply run the following: 
-
-```
-from mufasa import master_fitter as mf
-reg = mf.Region(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, fittype='nh3_multi_v')
-reg.master_2comp_fit(snr_min=0)
-```
-
-In the example above, ```cubePath``` is the path to the FITS data cube, ```paraNameRoot``` is the common 'root' name to all the output files, ```paraDir``` is the directory of all the outputfiles, and ```fittype``` is the name of the line model to be fitted. 
-
-```MUFASA``` currently offers two spectral line models, specified by the ```fittype``` argument:
-- ```nh3_multi_v```: multi-component NH<sub>3</sub> (1,1) model
-- ```n2hp_multi_v```: multi-component N<sub>2</sub>H<sup>+</sup> (1-0) model
-
-If one wishes to fit pixels only above a specific signal-to-noise-ratio (SNR) threshold, one can specify such a threshold using the ```snr_min``` argument.
-
-### Visualizing the Results
-
-#### Plotting Fitted Spectra
-
-To quickly plot the fitted spectra from the saved fits for position (x,y) and its surrounding pixels, run:
-
-```
-from mufasa import UltraCube as UCube
-
-# read the fits from the saved files
-ucube = UCube.UCubePlus(cubePath, paraNameRoot=paraNameRoot, paraDir=paraDir, fittype='nh3_multi_v')
-ucube.read_model_fit(ncomps=[1,2])
-
-# visualize the fitted models (2 component model in this example)
-ucube.plot_fits_grid(x,y, ncomp=2, size=3, xlim=None, ylim=None)
-```
-
-where the ```comp``` and ```size``` arguments in ```plot_fits_grid``` are the number of components in the model and the plot's grid size. For example, setting ```size=3``` results in a plot with 3x3 grid of spectral models centered on the position ```x``` and ```y```. To zoom in on the plot (e.g., to look closely at a hyperfine group), one can use the ```xlim``` and ```ylim``` arguments to constrain the plot's x and y limits.
-
-#### Plotting in PPV with 3D Scatter
-
-To visualize the best-fit models in position-position-velocity (PPV) space, run: 
-```
-reg.plot_ppv_scatter(savepath, vel_scale=0.5)
-```
-where ```savepath``` is the file path to save the plot as an HTML file and ```vel_scale``` is the scale factor for the velocity axis for the visualization relative to the x and y axes, with x normalized to 1. 
-
-
-
-
+To get started quickly, please see MUFASA's [Quick Start](https://mufasa.readthedocs.io/en/latest/index.html#quick-start) on Read the Docs.

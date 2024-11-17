@@ -6,7 +6,7 @@
 MUFASA Documentation
 ====================
 
-Welcome to the documentation for **MUFASA**: the MUlti-component Fitter for Astrophysical Spectral Applications. MUFASA is a Python library designed to streamline the analysis and fitting of astrophysical spectral data. Whether you're processing spectral cubes, visualizing datasets, or performing multi-component fits, MUFASA offers a robust toolkit for astrophysical research.
+Welcome to the documentation for **MUFASA**: the MUlti-component Fitter for Astrophysical Spectral Applications. MUFASA is a Python library designed to automate spectral-fitting with multi-component models, particularly for molecular specifies with hyperfine lines. MUFASA also offers visualzation tools for the fits and special modules for costume pipe building to meet special user cases.
 
 Overview
 ========
@@ -16,9 +16,10 @@ Overview
 - **Multi-Component Spectral Fitting**:
   Fit complex spectral data with multiple components to extract detailed information.
 - **Data Visualization**:
-  Generate plots and visualizations to interpret spectral data effectively.
+  Generate plots and and 3D visualizations to interpret the spectral model effectively.
 - **Data Manipulation**:
-  Tools to handle and process astrophysical datasets for analysis.
+  Tools to handle and process astrophysical unstructred (e.g., images) and strucgtured (e.g., tables) datasets for analysis.
+
 
 Installation
 ------------
@@ -28,11 +29,15 @@ To install the latest version of **MUFASA**, clone its GitHub `repository <https
 
     pip install -e .
 
-Alternatively, to install the latest release from PyPI:
+For a more detailed guide, including installing stable versions, please see the :doc:`Installation Page <installation>`.
 
-.. code-block:: bash
 
-    pip install mufasa
+Reference
+------------
+Please cite the following paper when publishing with MUFASA-generated data products:
+
+- Chen, M. C.-Y. et al. "Velocity-Coherent Filaments in NGC 1333: Evidence for Accretion Flow?" ApJ (`2020 <https://ui.adsabs.harvard.edu/abs/2020ApJ...891...84C/abstract>`_).
+
 
 Quick Start
 -----------
@@ -51,8 +56,8 @@ To perform an NH₃ (1,1) fit automatically, up to two components, simply run th
 Supported Line Models
 ^^^^^^^^^^^^^^^^^^^^^
 
-- `nh3_multi_v`: Multi-component NH₃ (1,1) model.
-- `n2hp_multi_v`: Multi-component N₂H⁺ (1-0) model.
+- NH₃ (1,1) multi-component model (``fittype='nh3_multi_v'``)
+- N₂H⁺ (1-0) multi-component model (``fittype='n2hp_multi_v'``)
 
 Visualizing the Results
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -70,40 +75,26 @@ To quickly plot the fitted spectra from the saved fits for position `(x, y)` and
     ucube.read_model_fit(ncomps=[1, 2])
     ucube.plot_fits_grid(x, y, ncomp=2, size=3, xlim=None, ylim=None)
 
-Plotting Arguments
-""""""""""""""""""
-- **`ncomp`**: Number of components in the model.
-- **`size`**: Size of the plot grid (e.g., `size=3` results in a 3x3 grid centered on position `(x, y)`).
-- **`xlim` and `ylim`**: Constrain the plot's x and y limits.
-
-Plotting in PPV with 3D Scatter
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-To visualize the best-fit models in position-position-velocity (PPV) space, run:
-
-.. code-block:: python
-
-    reg.plot_ppv_scatter(savepath, vel_scale=0.5)
-
-Scatter Plot Arguments
-""""""""""""""""""""""
-- **`savepath`**: File path to save the plot as an HTML file.
-- **`vel_scale`**: Scale factor for the velocity axis relative to the x and y axes.
-
-For more detailed information, advanced examples, and contributing guidelines, visit the `MUFASA GitHub repository <https://github.com/mcyc/mufasa>`_.
-
-API Reference
-=============
-Explore the API documentation to learn about MUFASA’s modules, classes, and methods:
+Guides to MUFASA
+=================
+To learn more about MUFASA’s modules, classes, and methods, explore the following guides:
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+
+   introduction
+   installation
+   usage
+
+
+API Documentation
+=================
+For detailed API documentation, refer to the following:
+
+.. toctree::
+   :maxdepth: 2
 
    api/index
-   api/modules
-   api/mufasa.UltraCube
-   api/mufasa.master_fitter
-   api/mufasa.aic
-   api/mufasa.spec_models
-   api/mufasa.utils
+
+For more detailed information, visit the `MUFASA GitHub repository <https://github.com/mcyc/mufasa>`_.
+
