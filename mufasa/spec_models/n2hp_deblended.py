@@ -10,7 +10,7 @@ Ammonia inversion transition: deblended fitter (Hyperfine-removed)
 #=======================================================================================================================
 
 from pyspeckit.spectrum.models import hyperfine
-from n2hp_constants import (line_names, freq_dict)
+from .n2hp_constants import (line_names, freq_dict)
 #=======================================================================================================================
 
 

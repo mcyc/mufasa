@@ -35,7 +35,48 @@ logger = get_logger(__name__)
 
 class UltraCube(object):
     """
-    A framework to handle multi-component fits and their results for spectral cubes.
+    A framework to manage and fit multi-component spectral models for spectral cubes.
+
+    This class provides tools to handle:
+    - Loading and managing spectral cubes,
+    - Fitting spectral models with multiple components,
+    - Generating diagnostic and visualization tools for fits,
+    - Calculating residuals, chi-squared, and AICc metrics.
+
+    Attributes
+    ----------
+    pcubes : dict
+        Holds pyspeckit cubes for each model fit.
+    residual_cubes : dict
+        Stores residual cubes for each component fitted.
+    rms_maps : dict
+        Root-mean-square (RMS) maps of residuals.
+    Tpeak_maps : dict
+        Peak temperature maps from fitted models.
+    chisq_maps : dict
+        Chi-squared maps for fitted models.
+    rchisq_maps : dict
+        Reduced chi-squared maps.
+    rss_maps : dict
+        Residual sum of squares maps.
+    NSamp_maps : dict
+        Number of samples per pixel.
+    AICc_maps : dict
+        Corrected Akaike Information Criterion maps for model evaluation.
+    master_model_mask : np.ndarray, optional
+        Boolean mask indicating regions with fitted models.
+    snr_min : float
+        Minimum signal-to-noise ratio for attempting fits.
+    cnv_factor : int
+        Convolution factor for spatial resolution adjustments.
+    n_cores : int
+        Number of CPU cores used for parallel processing.
+    fittype : str
+        Spectral model type used for fitting.
+    plotter : Plotter
+        Visualization tool for fits.
+    meta_model : MetaModel
+        Metadata handler for spectral models.
     """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
@@ -45,20 +86,24 @@ class UltraCube(object):
         Parameters
         ----------
         cubefile : str, optional
-            Path to the .fits cube file.
+            Path to the .fits cube file. If None, the cube parameter is used.
         cube : SpectralCube, optional
-            A spectral cube object. Used if `cubefile` is not provided.
+            A spectral cube object to initialize the UltraCube.
         fittype : str, optional
-            Keyword for the spectral model to be fitted. Currently available options are: "" and "".
+            Type of spectral model to be fitted.
         snr_min : float, optional
             Minimum peak signal-to-noise ratio for attempting fits.
         rmsfile : str, optional
             Path to the file containing RMS values for the cube.
         cnv_factor : int, optional
-            Factor by which to spatially convolve the cube (default is 2).
-        n_cores : bool or int, optional
-            Number of cores to use for main computing tasks, including model fitting (default is True,
-            which uses all available CPUs minus 1). If an integer is provided, it specifies the number of CPU cores to use.
+            Factor by which to spatially convolve the cube. Default is 2.
+        n_cores : int, optional
+            Number of CPU cores to use for computation. Default is all available cores minus one.
+
+        Raises
+        ------
+        ValueError
+            If both `cubefile` and `cube` are None.
         """
 
         # to hold pyspeckit cubes for fitting
@@ -102,19 +147,33 @@ class UltraCube(object):
     def make_header2D(self):
         return mvf.make_header(ndim=2, ref_header=self.cube.header)
 
-    def load_cube(self, fitsfile):
+    def load_pcube(self, pcube_ref=None):
         """
-        Load a SpectralCube from a .fits file. The function converts units in such that the cube has a unit and spectral unit of
-        K and km/s, respectively
+        Load a SpectralCube as a pyspeckit.SpectralCube object.
 
         Parameters
         ----------
-        fitsfile : str
-            Path to the .fits cube file.
+        pcube_ref : pyspeckit.SpectralCube, optional
+            An existing pyspeckit cube object. If provided, the loaded cube's
+            data pointer will be linked to this reference cube to conserve memory.
 
         Returns
         -------
-        None
+        pyspeckit.SpectralCube
+            The loaded pyspeckit cube for spectral model fitting.
+
+        Notes
+        -----
+        - The cube is first loaded as a SpectralCube to ensure proper unit
+          conversions.
+        - Memory is conserved when `pcube_ref` is provided by linking data pointers.
+        - The method handles rest frequency assignment and velocity convention
+          updates.
+
+        Raises
+        ------
+        ValueError
+            If the cube file cannot be loaded or its units are incompatible.
         """
         cube = SpectralCube.read(fitsfile, use_dask=True)
         cube = to_K(cube)
@@ -182,15 +241,26 @@ class UltraCube(object):
         Parameters
         ----------
         savename : str, optional
-            Path to save the convolved cube. If None, the cube is not saved.
+            Path to save the convolved cube. If None, the convolved cube is not saved.
         factor : int, optional
-            Factor by which to convolve the cube spatially. If None, the default `cnv_factor` is used.
+            Factor by which to spatially convolve the cube. If None, the default `self.cnv_factor` is used.
         edgetrim_width : int, optional
-            Width of the edge to be trimmed after convolution before the fit (default is 5).
+            Number of pixels to trim at the edges after convolution. Default is 5.
 
         Returns
         -------
         None
+
+        Notes
+        -----
+        - Convolution reduces the spatial resolution by the specified factor.
+        - The resulting convolved cube is stored in `self.cube_cnv`.
+        - This method uses the `convolve_sky_byfactor` function to perform spatial convolution.
+
+        Raises
+        ------
+        ValueError
+            If the cube cannot be convolved due to incompatible dimensions or data types.
         """
         if factor is None:
             factor = self.cnv_factor
@@ -225,16 +295,27 @@ class UltraCube(object):
         Parameters
         ----------
         ncomp : int or list of int
-            Number of components for the model to fit. If a list is provided, multiple fits are performed.
+            Number of components for the model. If a list is provided, fits are performed for each component.
         simpfit : bool, optional
             Whether to use a simplified fitting method (`cubefit_simp`) instead of the general fitting method (`cubefit_gen`).
-        **kwargs
-            Additional keyword arguments passed to `pyspeckit.Cube.fiteach`.
+        **kwargs : dict, optional
+            Additional keyword arguments passed to `pyspeckit.Cube.fiteach`. Includes options like `multicore` and `snr_min`.
 
         Returns
         -------
         None
+
+        Notes
+        -----
+        - The `multicore` parameter in kwargs controls parallel processing. By default, the number of cores set in `self.n_cores` is used.
+        - Fit results are stored in `self.pcubes` for each component.
+
+        Raises
+        ------
+        TypeError
+            If `ncomp` is not an integer or a list of integers.
         """
+
 
         if not 'multicore' in kwargs:
             kwargs['multicore'] = self.n_cores
@@ -326,8 +407,32 @@ class UltraCube(object):
             gc.collect()
             self.include_model_mask(mod_mask)
 
-
     def get_residual(self, ncomp, multicore=None):
+        """
+        Calculate the residual cube by subtracting the fitted model from the data.
+
+        Parameters
+        ----------
+        ncomp : int
+            Number of components used in the fitted model.
+        multicore : int or bool, optional
+            Number of cores to use for computation. Defaults to `self.n_cores`.
+
+        Returns
+        -------
+        np.ndarray or dask.array.Array
+            Residual array representing the difference between the data and the model fit.
+
+        Notes
+        -----
+        - Residual cubes are stored in `self.residual_cubes` for reuse.
+        - Residuals are computed for pixels with valid model fits.
+
+        Raises
+        ------
+        ValueError
+            If no model fit is available for the specified number of components.
+        """
         if multicore is None: multicore = self.n_cores
         compID = str(ncomp)
         model = self.pcubes[compID].get_modelcube(multicore=multicore)
@@ -426,8 +531,8 @@ class UltraCube(object):
             If True, update the existing plotter instance (default is False).
         spec_unit : str, optional
             The spectral unit to use for plotting the spectral axis (default is 'km/s').
-        **kwargs
-            Additional keyword arguments passed to the `Plotter` class.
+        **kwargs : dict, optional
+            Additional keyword arguments passed to the `Plotter` class for initialization.
 
         Returns
         -------
@@ -557,7 +662,23 @@ class UltraCube(object):
 
 class UCubePlus(UltraCube):
     """
-    A subclass of UltraCube that holds directory information for parameter maps and model fits.
+    A subclass of UltraCube that includes directory management for parameter maps and model fits.
+
+    Attributes
+    ----------
+    paraNameRoot : str
+        Root name for parameter map files. Derived from the cube filename if not provided.
+    paraDir : str
+        Directory where parameter maps are stored. Created if it does not exist.
+    paraPaths : dict
+        Dictionary mapping component numbers to file paths for saved parameter maps.
+
+    Methods
+    -------
+    read_model_fit(ncomps, read_conv=False, **kwargs)
+        Load model fits from disk or perform fitting if files do not exist.
+    get_model_fit(ncomp, update=True, **kwargs)
+        Load or perform model fitting for the specified number of components.
     """
 
     def __init__(self, cubefile, cube=None, fittype=None, paraNameRoot=None, paraDir=None, **kwargs):
@@ -606,20 +727,30 @@ class UCubePlus(UltraCube):
 
     def read_model_fit(self, ncomps, read_conv=False, **kwargs):
         """
-        Load the model fits if they exist; otherwise, perform the fitting.
+        Load model fits if they exist; otherwise, perform the fitting.
 
         Parameters
         ----------
         ncomps : list of int
-            List of the number of components in the model to be loaded.
+            List of the number of components to load or fit.
         read_conv : bool, optional
-            Whether or not to load the convolved cube fits too if available (default is False).
-        **kwargs
-            Additional keyword arguments passed to `pyspeckit.Cube.fiteach` if the fitting needs to be updated.
+            If True, attempts to read fits for convolved cubes as well. Default is False.
+        **kwargs : dict, optional
+            Additional keyword arguments passed to the fitting methods.
 
         Returns
         -------
         None
+
+        Notes
+        -----
+        - If fits files are not found, the fitting process is triggered, and results are saved to disk.
+        - File paths for each component are stored in `self.paraPaths`.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the specified fit files are not found and fitting cannot proceed.
         """
 
         for nc in ncomps:
@@ -719,8 +850,8 @@ def save_fit(pcube, savename, ncomp, header_note=None):
         The path where the .fits file will be saved.
     ncomp : int
         The number of components in the model.
-    header_note : str
-        One card (line) notes to put in the header
+    header_note : str, optional
+        A single-line comment to include in the FITS header metadata.
 
     Returns
     -------

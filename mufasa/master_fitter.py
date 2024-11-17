@@ -19,7 +19,6 @@ from time import ctime
 from datetime import timezone, datetime
 import warnings
 import pandas as pd
-from datetime import datetime
 
 import dask.array as da
 
@@ -46,7 +45,7 @@ logger = get_logger(__name__)
 
 class Region(object):
     """
-    A class to represent a region of a spectral cube and perform analysis on it.
+    A class to represent the observed spectral cube to perform the model fits
 
     Attributes
     ----------
@@ -54,58 +53,53 @@ class Region(object):
         Path to the spectral cube FITS file.
     paraNameRoot : str
         Root string used for naming output files.
-    paraDir : str
-        Directory to store output files.
+    paraDir : str, optional
+        Directory to store output files. Defaults to the same directory as the input cube.
     fittype : str
-        Type of fitting to use.
-    ucube : UCubePlus
+        Type of spectral model used for fitting (e.g., 'nh3_multi_v').
+    ucube : UltraCube
         UltraCube object for handling spectral cube operations.
     cnv_factor : int
-        Number of beam-widths to convolve by.
+        Integer multiples of the beam-widths to spatially convolve the cube by.
     progress_log_name : str
         Path to the progress log CSV file.
     progress_log : pandas.DataFrame
-        DataFrame to log the progress of different processes.
+        DataFrame logging the progress of processes, including time, attempts, and successes.
+        This is the dataframe that will be soaved to the CSV file named above.
     """
-
 
     def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, initialize_logging=True,
                  multicore=True, **kwargs):
         """
-        Initialize region object
+        Initialize the Region object for spectral cube analysis.
 
         Parameters
         ----------
         cubePath : str
             Path to the spectral cube FITS file.
         paraNameRoot : str
-            A common root string to name the output .fits files.
+            Root string to name output FITS files.
         paraDir : str, optional
-            Directory to store output files (default is None, in which case outputs are saved in the same directory as the input cube).
+            Directory to store output files. Defaults to the same directory as the input cube.
         cnv_factor : int, optional
-            The factor spatially convolve the cube if needed by the interative fitting process (default is 2).
+            The factor by which to spatially convolve the cube if required for fitting. Defaults to 2.
         fittype : str, optional
-            The spectral model to use for the fit (default is 'nh3_multi_v').
+            Spectral model type to use for fitting. Defaults to 'nh3_multi_v'.
         initialize_logging : bool, optional
-            Whether to initialize logging (default is True).
+            Whether to initialize logging for the Region object. Defaults to True.
         multicore : bool or int, optional
-            Number of CPU cores to use for parallel processing (default is True, which uses all available CPUs minus 1).
-            If an integer is provided, it specifies the number of CPU cores to use.
-
+            Number of CPU cores to use for parallel processing. Defaults to True, which uses all available CPUs minus 1.
+            If an integer is provided, it specifies the number of cores to use.
         **kwargs : dict, optional
-        Additional keyword arguments passed to the logging initialization.
-
-            :param cubePath (str): path to spectral cube
-            :param paraNameRoot (str): string to prepend to output file names
-            :param paraDir (str, optional): directory to output files. Defaults to None.
-            :param cnv_factor (int, optional): nuber of beam-widths to convolve by. Defaults to 2.
-            :param multicore (int, optional): number of cpu cores to use. Defaults to None.
-
-            kwargs are passed to init_logging:
-                :param logfile: file to save to (default mufasa.log)
-                :param console_level: minimum logging level to print to screen (default logging.INFO)
-                :param file_level: minimum logging level to save to file (default logging.INFO)
-                :param log_pyspeckit_to_file: whether to include psypeckit outputs in log file (default False)
+            Additional keyword arguments passed to the logging initialization. These include:
+            logfile : str, optional
+                Name of the log file. Defaults to 'mufasa.log'.
+            console_level : int, optional
+                Minimum logging level for console output. Defaults to `logging.INFO`.
+            file_level : int, optional
+                Minimum logging level for file output. Defaults to `logging.INFO`.
+            log_pyspeckit_to_file : bool, optional
+                Whether to include `pyspeckit` outputs in the log file. Defaults to False.
         """
 
         if initialize_logging: init_logging(**kwargs)
@@ -140,49 +134,171 @@ class Region(object):
 
     def get_convolved_cube(self, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None,
                            multicore=True):
+        """
+        Generate a convolved version of the spectral cube and update the Region object.
+
+        Parameters
+        ----------
+        update : bool, optional
+            If True, updates the convolved cube even if it already exists. Defaults to True.
+        cnv_cubePath : str, optional
+            File path to save the convolved cube. If None, a default path is generated. Defaults to None.
+        edgetrim_width : int, optional
+            Width of the edge to trim from the cube during convolution. Defaults to 5.
+        paraNameRoot : str, optional
+            Root name for output parameter files. If None, uses the Region's `paraNameRoot`. Defaults to None.
+        paraDir : str, optional
+            Directory to store output files. Defaults to the Region's `paraDir`.
+        multicore : bool or int, optional
+            Number of CPU cores to use for parallel processing. Defaults to True, which uses all available CPUs minus 1.
+
+        Returns
+        -------
+        None
+        """
         if paraDir is None:
             paraDir = self.paraDir
         get_convolved_cube(self, update=update, cnv_cubePath=cnv_cubePath, edgetrim_width=edgetrim_width,
                            paraNameRoot=paraNameRoot, paraDir=paraDir, multicore=multicore)
 
     def get_convolved_fits(self, ncomp, **kwargs):
+        """
+        Perform fitting on the convolved spectral cube and save the results.
+
+        Parameters
+        ----------
+        ncomp : int
+            Number of components to fit in the spectral model.
+        **kwargs : dict, optional
+            Additional keyword arguments passed to `UCubePlus.fit_cube`, including:
+                update : bool, optional
+                    If True, updates the fit results even if they already exist. Defaults to True.
+                multicore : bool or int, optional
+                    Number of CPU cores to use for parallel processing. Defaults to True.
+
+        Returns
+        -------
+        None
+        """
         get_convolved_fits(self, ncomp, **kwargs)
 
     def get_fits(self, ncomp, **kwargs):
+        """
+        Perform fitting on the original spectral cube and save the results.
+
+        Parameters
+        ----------
+        ncomp : int
+            Number of components to fit in the spectral model.
+        **kwargs : dict, optional
+            Additional keyword arguments passed to `UCubePlus.fit_cube`, including:
+                update : bool, optional
+                    If True, updates the fit results even if they already exist. Defaults to True.
+                guesses : ndarray, optional
+                    Initial guesses for the model parameters.
+
+        Returns
+        -------
+        None
+        """
         get_fits(self, ncomp, **kwargs)
 
     def load_fits(self, ncomp):
-        # basically the same as get_fits(), but with update set to False to ensure the fits aren't refitted
+        """
+        Load previously saved fitting results for a given number of components.
+        Note: this function is basically the same as get_fits(), but with update set to False to ensure the fits aren't refitted
+
+        Parameters
+        ----------
+        ncomp : int
+            Number of components in the spectral model whose fits should be loaded.
+
+        Returns
+        -------
+        None
+        """
         get_fits(self, ncomp, update=False)
 
     def master_2comp_fit(self, snr_min=0.0, **kwargs):
+        """
+        Perform a comprehensive two-component fitting process on the spectral cube.
+
+        This method fits the data in multiple stages, including:
+        1. Initial fit with convolved cube.
+        2. Refining bad or marginal fits.
+        3. Recovering wide separation components.
+        4. Expanding fits to surrounding pixels.
+
+        Parameters
+        ----------
+        snr_min : float, optional
+            Minimum signal-to-noise ratio required for fitting. Default is 0.0.
+        **kwargs : dict, optional
+            Additional keyword arguments controlling the fitting process:
+                recover_wide : bool, optional
+                    If True, attempts to recover wide separation components. Defaults to True.
+                planemask : ndarray, optional
+                    2D mask specifying which pixels to fit. Defaults to None.
+                updateCnvFits : bool, optional
+                    If True, updates convolved fits even if they already exist. Defaults to True.
+                refit_bad_pix : bool, optional
+                    If True, refits pixels with poor quality fits. Defaults to True.
+                refit_marg : bool, optional
+                    If True, refits pixels with marginal fits. Defaults to True.
+                max_expand_iter : int, bool, or None, optional
+                    Maximum number of iterations for expanding the fitted region. Defaults to None.
+                multicore : bool or int, optional
+                    Number of CPU cores to use for parallel processing. Defaults to True.
+
+        Returns
+        -------
+        Region
+            Updated Region object with refined fitting results.
+
+        Notes
+        -----
+        - This method uses multiple passes to refine the fitting results.
+        - The expanded fits use local guesses from neighboring pixels.
+        """
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
     def standard_2comp_fit(self, planemask=None):
+        """
+        Perform a two-component fit on the spectral cube using default moment-based guesses.
+
+        Parameters
+        ----------
+        planemask : ndarray, optional
+            2D mask specifying which spatial pixels to fit. Defaults to None.
+
+        Returns
+        -------
+        None
+        """
         standard_2comp_fit(self, planemask=planemask)
 
     def read_best_fits(self, ncomp=2, header=True):
         """
-        Read the saved .fits file containing the fitted parameters for the best models up to `ncomp` components, output by MUFASA.
+        Read the best-fit parameters for up to `ncomp` components from the saved FITS file.
 
         Parameters
         ----------
         ncomp : int, optional
-            The maximum number of components in the model to read. Default is 2.
+            Maximum number of components in the model to read. Defaults to 2.
         header : bool, optional
-            If True, includes the header information from the .fits file in the output. Default is True.
+            If True, includes the FITS header in the returned data. Defaults to True.
 
         Returns
         -------
         data : numpy.ndarray
-            The data array containing the fitted parameters from the .fits file.
+            Data array containing the fitted parameters.
         hdr : astropy.io.fits.Header, optional
-            The header of the .fits file, included if `header` is True.
+            FITS file header, included if `header` is True.
 
         Notes
         -----
-        This method constructs the file path based on the specified number of components (`ncomp`) and reads the .fits file
-        generated by MUFASA, which contains the fitted model parameters. If `header` is True, both the data and header are returned.
+        - Constructs the file path based on the specified number of components (`ncomp`) and reads the corresponding FITS file.
+        - The data represents the fitted model parameters for the specified component count.
         """
 
         filepath = "{}_final.fits".format(os.path.splitext(self.ucube.paraPaths[str(ncomp)])[0])
@@ -191,44 +307,34 @@ class Region(object):
     def plot_ppv_scatter(self, ncomp=2, label_key='peakT', savename=None, vel_scale=0.8, vrange=None, verr_thres=5,
                          **kwargs):
         """
-        Generate a 3D scatter plot of the position-position-velocity (PPV) data from MUFASA generaged fitted parameters for the
-        best model, up to 'ncomp' of components.
+        Generate a 3D scatter plot of the position-position-velocity (PPV) data from the best-fit model.
 
         Parameters
         ----------
         ncomp : int, optional
-            The number of components in the model to be plotted.
+            Number of components in the model to be plotted. Defaults to 2.
         label_key : str, optional
-            DataFrame column to color each data point by, e.g., 'peakT' for peak intensity or clustering labels. Default is 'peakT'.
+            Column in the DataFrame used to color points, e.g., 'peakT' for peak intensity. Defaults to 'peakT'.
         savename : str, optional
-            The file path to save the 3D plot as an HTML file. If None, the plot will not be saved. Default is None.
+            Path to save the 3D plot as an HTML file. If None, the plot is not saved. Defaults to None.
         vel_scale : float, optional
-            Scale factor for the velocity axis relative to the x and y axes, with x normalized to 1. Default is 0.8.
+            Scale factor for the velocity axis relative to spatial axes. Defaults to 0.8.
         vrange : tuple of float, optional
-            Velocity range to clip the data (in km/s).
+            Velocity range (in km/s) for clipping the data. Defaults to None.
         verr_thres : float, optional
-            The velocity error threshold (in km/s) to filter the data. Data with errors above this threshold is excluded.
-        kwargs : dict, optional
-            Additional keyword arguments are passed to `plot_ppv`, allowing customization of the PPV scatter plot.
-
-            Key options include:
-            - `xyunit` : {'arcmin', 'pix'}, optional
-                Units for x & y coordinates, either in arcminutes or pixels. Default is 'arcmin'.
-            - `auto_open_html` : bool, optional
-                If True, automatically opens the saved HTML file in a browser after saving. Default is True.
-
-            For a complete list of options, refer to `plot_ppv`.
+            Velocity error threshold (in km/s) to filter the data. Points with errors above this threshold are excluded. Defaults to 5.
+        **kwargs : dict, optional
+            Additional options passed to `plot_ppv` for plot customization.
 
         Returns
         -------
         plotly.graph_objs.Figure
-            The generated 3D scatter plot figure.
+            Generated 3D scatter plot.
 
         Notes
         -----
-        This method initializes a `ScatterPPV` instance using the FITS file specified by `self.ucube.paraPaths` for the
-        selected component count (`ncomp`). It then calls the `plot_ppv` method to generate the PPV scatter plot, allowing
-        for optional customization through `savename`, `vel_scale`, and `kwargs`.
+        - Initializes a `ScatterPPV` instance using the fitted parameters and calls `plot_ppv`.
+        - Allows customization of plot appearance through additional arguments.
         """
 
         from .visualization import scatter_3D
@@ -246,35 +352,38 @@ class Region(object):
     def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds', n_attempted=None,
                      n_success=None, finished=False, cores=None):
         """
-        Log the progress of a process with start and completion times, including the number of attempted and successful fits.
+        Log the progress of a process, including start/completion times, and attempt/success counts.
 
         Parameters
         ----------
         process_name : str
-            Name of the process to log.
+            Name of the process being logged.
         mark_start : bool, optional
-            If True, marks the start of the process. Default is False.
+            If True, marks the start of the process. Defaults to False.
         save : bool, optional
-            If True, saves the log to a CSV file. Default is True.
+            If True, saves the log to a CSV file. Defaults to True.
         timespec : str, optional
-            Specifies the level of detail for the timestamp. Default is 'seconds'.
-            Options include 'seconds', 'milliseconds', etc.
+            Specifies the level of detail for the timestamp. Defaults to 'seconds'.
         n_attempted : int, optional
-            Number of attempted fits, corresponds to 'attempted fits (pix)'. Default is None.
+            Number of attempted fits. Defaults to None.
         n_success : int, optional
-            Number of successful fits, corresponds to 'successful fits (pix)'. Default is None.
+            Number of successful fits. Defaults to None.
         finished : bool, optional
-            If True and `mark_start` is False, records the time elapsed in 'total runtime (dd:hh:mm:ss)' and clears `self.timestamp`. Default is False.
+            If True, marks the process as completed and calculates total runtime. Defaults to False.
         cores : int, optional
-            Number of cores used, corresponds to 'cores used'. Default is None.
+            Number of cores used for the process. Defaults to None.
+
+        Returns
+        -------
+        None
 
         Notes
         -----
-        - When `mark_start` is True, the 'last completed' column is set to the current timestamp and 'total runtime (dd:hh:mm:ss)' is set to "in progress".
-        - When `mark_start` is False and `finished` is True, the function calculates the runtime from the recorded start time (`self.timestamp`) and records it in a simplified format.
-        - The `self.timestamp` attribute is cleared only if `mark_start` is False and `finished` is True.
-        - If the DataFrame `self.progress_log` does not exist, it will be initialized with default columns.
+        - When `mark_start` is True, the start time is logged, and progress is marked as "in progress".
+        - When `finished` is True, calculates runtime from the start time and marks the process as complete.
+        - Progress is saved to the CSV file specified by `self.progress_log_name`.
         """
+
         if mark_start:
             # Mark the start time
             self.timestamp = datetime.now()
@@ -362,6 +471,36 @@ class Region(object):
 
 def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None,
                        multicore=True):
+    """
+    Generate and save a convolved version of the spectral cube for a given region.
+
+    Parameters
+    ----------
+    reg : Region
+        Region object containing the spectral cube and associated parameters.
+    update : bool, optional
+        If True, regenerates the convolved cube even if it exists. Defaults to True.
+    cnv_cubePath : str, optional
+        File path to save the convolved cube. If None, a default path is generated. Defaults to None.
+    edgetrim_width : int, optional
+        Width of the edge to trim from the cube during convolution. Defaults to 5.
+    paraNameRoot : str, optional
+        Root name for parameter output files. Defaults to None.
+    paraDir : str, optional
+        Directory to store output files. Defaults to None.
+    multicore : bool or int, optional
+        Number of CPU cores to use for parallel processing. Defaults to True.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    - The convolved cube is saved in the directory specified by `paraDir`.
+    - Updates the `ucube_cnv` attribute of the Region object with the convolved cube.
+    """
+
     if cnv_cubePath is None:
         root = "conv{0}Xbeam".format(int(np.rint(reg.cnv_factor)))
         reg.cnv_cubePath = "{0}_{1}.fits".format(os.path.splitext(reg.cubePath)[0], root)
@@ -386,11 +525,29 @@ def get_convolved_cube(reg, update=True, cnv_cubePath=None, edgetrim_width=5, pa
 
 
 def get_convolved_fits(reg, ncomp, update=True, **kwargs):
-    '''
-    update (bool) : call reg.get_convolved_cube even if reg has ucube_cnv attribute
+    """
+    Fit a model to the convolved cube and save the results.
 
-    kwargs: passed to UCubePlus.fit_cube by reg.ucube_cnv.get_model_fit
-    '''
+    Parameters
+    ----------
+    reg : Region
+        Region object containing the spectral cube and associated parameters.
+    ncomp : int
+        Number of components to fit in the spectral model.
+    update : bool, optional
+        If True, fits the convolved cube even if results already exist. Defaults to True.
+    **kwargs : dict, optional
+        Additional keyword arguments passed to `UCubePlus.fit_cube`.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    - The convolved fits are saved in the directory specified by `paraDir`.
+    - Updates the `ucube_cnv` attribute of the Region object with the convolved cube fit results.
+    """
 
     kwdf = dict(multicore=True)
     kwargs = {**kwdf, **kwargs}
@@ -408,6 +565,27 @@ def get_convolved_fits(reg, ncomp, update=True, **kwargs):
 
 
 def get_fits(reg, ncomp, **kwargs):
+    """
+    Fit a model to the original spectral cube and save the results.
+
+    Parameters
+    ----------
+    reg : Region
+        Region object containing the spectral cube and associated parameters.
+    ncomp : int
+        Number of components to fit in the spectral model.
+    **kwargs : dict, optional
+        Additional keyword arguments passed to `UCubePlus.fit_cube`.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    - The fits are saved in the directory specified by `paraDir`.
+    """
+
     reg.ucube.get_model_fit(ncomp, **kwargs)
 
 
@@ -1305,6 +1483,37 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=
 
 
 def replace_rss(ucube, ucube_ref, ncomp, mask):
+    """
+    Replace RSS-related maps in a `UltraCube` object for specific components.
+
+    This function updates the `rss_maps`, `NSamp_maps`, and `AICc_maps` of the input `ucube` object
+    with the corresponding values from a reference `ucube_ref` object for a specified number of components.
+    The updates are applied only to pixels indicated by the `mask`.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        The `UltraCube` object whose RSS-related maps will be updated.
+    ucube_ref : UltraCube
+        The reference `UltraCube` object containing the updated RSS-related map values.
+    ncomp : int
+        The number of components for which the RSS-related maps will be updated.
+    mask : numpy.ndarray
+        A 2D boolean mask indicating the spatial pixels where the maps should be updated. Only `True` pixels
+        in the mask are modified.
+
+    Notes
+    -----
+    - If an RSS-related map does not exist for the specified number of components (`ncomp`), the function logs a
+      debug message and skips that update.
+    - The function automatically recalculates the `AICc` map for the specified number of components using the
+      updated data.
+
+    Examples
+    --------
+    >>> replace_rss(ucube, ucube_ref, ncomp=2, mask=mask)
+    >>> # Updates the RSS-related maps of `ucube` for 2 components using values from `ucube_ref` at masked locations.
+    """
     compID = str(ncomp)
 
     attrs = ['rss_maps', 'NSamp_maps', 'AICc_maps']
@@ -1318,7 +1527,59 @@ def replace_rss(ucube, ucube_ref, ncomp, mask):
             ucube.get_AICc(ncomp=ncomp, update=True, planemask=mask)
 
 def get_refit_guesses(ucube, mask, ncomp, method='best_neighbour', refmap=None, structure=None):
-    #get refit guesses from the surrounding pixels
+    """
+    Generate initial guesses for refitting based on neighboring pixels or convolution.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        The `UltraCube` object containing the spectral data and fitted parameters.
+    mask : numpy.ndarray
+        A 2D boolean mask indicating the pixels to be refitted.
+    ncomp : int
+        The number of components for which the guesses are being generated.
+    method : {'best_neighbour', 'convolved'}, optional
+        The method used for generating guesses:
+        - 'best_neighbour': Uses the nearest neighbor with the highest reference value from `refmap`.
+        - 'convolved': Uses a Gaussian convolution to interpolate guesses from surrounding pixels.
+        Defaults to 'best_neighbour'.
+    refmap : numpy.ndarray, optional
+        A 2D array of reference values used to identify the best neighbor for each pixel in the mask.
+        Required if `method='best_neighbour'`.
+    structure : numpy.ndarray, optional
+        A binary structure defining the neighborhood for finding the best neighbor.
+        Defaults to a 3x3 square neighborhood.
+
+    Returns
+    -------
+    guesses : numpy.ndarray
+        A 3D array of guesses with shape (parameters, y, x), where `parameters` corresponds to
+        the number of parameters in the model.
+    mask : numpy.ndarray
+        A 2D boolean mask indicating the valid pixels with generated guesses.
+
+    Raises
+    ------
+    ValueError
+        If `refmap` is not provided when `method='best_neighbour'`.
+    TypeError
+        If `refmap` is not a numpy array.
+
+    Notes
+    -----
+    - When using the 'best_neighbour' method, the function identifies the neighbor with the maximum value
+      in `refmap` for each masked pixel and uses its parameters as the guess.
+    - When using the 'convolved' method, a Gaussian kernel is applied to interpolate guesses for each parameter.
+    - If no valid neighbors or guesses can be found, the corresponding pixel in the `mask` is set to `False`.
+
+    Examples
+    --------
+    >>> guesses, updated_mask = get_refit_guesses(ucube, mask, ncomp=2, method='best_neighbour', refmap=lnkmap)
+    >>> # Uses the best neighbor method to generate guesses for 2-component fitting.
+
+    >>> guesses, updated_mask = get_refit_guesses(ucube, mask, ncomp=1, method='convolved')
+    >>> # Uses convolution to generate guesses for 1-component fitting.
+    """
 
     if structure is None:
         structure = neighbours.square_neighbour(1)
@@ -1668,6 +1929,39 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
 
 
 def save_map(map, header, savename, overwrite=True):
+    """
+    Save a 2D map as a FITS file.
+
+    Parameters
+    ----------
+    map : numpy.ndarray
+        The 2D array containing the map data to be saved.
+    header : astropy.io.fits.Header
+        The FITS header to include with the saved map.
+    savename : str
+        The file path where the FITS file will be saved.
+    overwrite : bool, optional
+        Whether to overwrite an existing file with the same name. Defaults to True.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    - This function creates a Primary HDU with the given data and header and writes it to the specified file.
+    - If `overwrite` is set to False and a file with the same name exists, an `OSError` will be raised.
+
+    Examples
+    --------
+    >>> from astropy.io import fits
+    >>> import numpy as np
+    >>> data = np.random.random((100, 100))
+    >>> hdr = fits.Header()
+    >>> hdr['BUNIT'] = 'K'  # Example header keyword
+    >>> save_map(data, hdr, 'output_map.fits')
+    >>> # Saves `data` with the specified header to 'output_map.fits'.
+    """
     fits_map = fits.PrimaryHDU(data=map, header=header)
     fits_map.writeto(savename, overwrite=overwrite)
 
@@ -1676,6 +1970,49 @@ def save_map(map, header, savename, overwrite=True):
 
 
 def get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=3, savefit=True, planemask=None):
+    """
+    Generate initial guesses for fitting a two-component spectral model with wide velocity separation.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the spectral cube and associated fit results.
+    window_hwidth : float, optional
+        Half-width (in km/s) of the velocity window used for moment-based guesses. Defaults to 3.5.
+    snr_min : float, optional
+        Minimum signal-to-noise ratio for selecting pixels to refit. Defaults to 3.
+    savefit : bool, optional
+        If True, saves the residual fit results to disk. Defaults to True.
+    planemask : numpy.ndarray, optional
+        Boolean mask specifying which spatial pixels to fit. Pixels outside the mask are excluded. Defaults to None.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 2D array of shape `(n_parameters, spatial_dim_1, spatial_dim_2)` containing the initial parameter guesses
+        for the two-component fit.
+
+    Raises
+    ------
+    SNRMaskError
+        If no valid pixels meet the signal-to-noise threshold for fitting.
+    StartFitError
+        If no pixels successfully start fitting due to poor initial guesses or insufficient signal.
+
+    Notes
+    -----
+    - The function prioritizes using residual fits to generate guesses. If residual fitting fails, it falls back
+      to moment-based guesses from the spectral cube.
+    - The method refines guesses to ensure they are within parameter limits and compatible with the model.
+
+    Examples
+    --------
+    >>> from region import Region
+    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
+    >>> guesses = get_2comp_wide_guesses(reg, window_hwidth=4.0, snr_min=2.5)
+    >>> # Generates initial guesses for two-component wide separation fits.
+    """
+
     if not hasattr(reg, 'ucube_res_cnv'):
         # fit the residual with the one component model if this has not already been done.
         try:
@@ -1730,11 +2067,52 @@ def get_2comp_wide_guesses(reg, window_hwidth=3.5, snr_min=3, savefit=True, plan
 
 
 def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=3, savefit=True, planemask=None):
-    # fit the residual of the best fitted model (note, this approach may not hold well if the two-slab model
-    # insufficiently at describing the observation. Luckily, however, this fit is only to provide initial guess for the
-    # final fit)
-    # the default window_hwidth = 3.5 is about half-way between the main hyperfine and the satellite
-    # note res_snr_cut is only used for moment guess and not the actual recovery fit.
+    """
+    Fit the convolved residual of the best-fit two-component spectral model with a one-component model.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the spectral cube and associated fit results.
+    window_hwidth : float, optional
+        Half-width (in km/s) of the velocity window used for moment-based guesses. Defaults to 3.5.
+        This value is approximately half the separation between the main hyperfine and satellite components.
+    res_snr_cut : float, optional
+        Minimum signal-to-noise ratio for residual peak intensity to include a pixel in the fitting.
+        This threshold is applied only during the generation of moment-based guesses and not during
+        the actual recovery fit. Defaults to 3.
+    savefit : bool, optional
+        If True, saves the fit results of the convolved residual to disk. Defaults to True.
+    planemask : numpy.ndarray, optional
+        Boolean mask specifying which spatial pixels to fit. If provided, fitting is restricted to these pixels.
+        Defaults to None.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    SNRMaskError
+        If no pixels meet the signal-to-noise threshold or mask criteria for fitting.
+    StartFitError
+        If no pixels successfully start fitting due to poor initial guesses or insufficient signal.
+
+    Notes
+    -----
+    - This function fits the residual of the best-fit two-component model using a one-component model.
+    - The approach assumes that the two-component model sufficiently describes the data; however, if the model
+      is inadequate, the results may not accurately capture the true residual structure.
+    - The purpose of this fit is solely to provide initial guesses for subsequent, more detailed fits.
+    - If no valid pixels meet the SNR threshold (`res_snr_cut`), the function raises an `SNRMaskError`.
+
+    Examples
+    --------
+    >>> from region import Region
+    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
+    >>> fit_best_2comp_residual_cnv(reg, window_hwidth=4.0, res_snr_cut=2.5, savefit=True)
+    >>> # Fits the convolved residual of the two-component model using a one-component model.
+    """
 
     # need a mechanism to make sure reg.ucube.pcubes['1'], reg.ucube.pcubes['2'] exists
     cube_res_cnv = get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=window_hwidth, res_snr_cut=res_snr_cut)
@@ -1807,8 +2185,48 @@ def fit_best_2comp_residual_cnv(reg, window_hwidth=3.5, res_snr_cut=3, savefit=T
 
 
 def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut=3):
-    # convolved residual cube.If masked is True, only convolve over where 'excessive' residual is
-    # above a peak SNR value of res_snr_cut masked
+    """
+    Generate a convolved residual cube for the best-fit two-component spectral model.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the spectral cube and associated fit results.
+    masked : bool, optional
+        If True, masks the convolved residual cube to include only regions where the residual
+        exceeds a signal-to-noise threshold (`res_snr_cut`). Defaults to True.
+    window_hwidth : float, optional
+        Half-width (in km/s) of the velocity window used to define the residual region for masking.
+        Defaults to 3.5.
+    res_snr_cut : float, optional
+        Minimum signal-to-noise ratio for a residual peak to be considered excessive and included in the mask.
+        Only applied when `masked=True`. Defaults to 3.
+
+    Returns
+    -------
+    SpectralCube
+        The convolved residual cube.
+
+    Raises
+    ------
+    SNRMaskError
+        If the residual cube has no regions exceeding the specified signal-to-noise threshold.
+
+    Notes
+    -----
+    - The convolved residual cube is computed from the best-fit two-component model by subtracting the model
+      from the original spectral cube and applying a convolution with the Region's convolution factor.
+    - When `masked=True`, the function restricts the convolution to regions where the residual peak SNR exceeds
+      the specified `res_snr_cut`, which helps focus on significant residuals.
+    - The velocity window defined by `window_hwidth` is used to identify residual regions around the spectral features.
+
+    Examples
+    --------
+    >>> from region import Region
+    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
+    >>> residual_cube = get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=4.0, res_snr_cut=2.5)
+    >>> # Returns the convolved residual cube, masking regions with low signal-to-noise residuals.
+    """
 
     cube_res_masked = get_best_2comp_residual_SpectralCube(reg, masked=masked, window_hwidth=window_hwidth,
                                                            res_snr_cut=res_snr_cut)
@@ -1826,7 +2244,51 @@ def get_best_2comp_residual_cnv(reg, masked=True, window_hwidth=3.5, res_snr_cut
 
 
 def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, res_snr_cut=5):
-    # return residual cube as SpectralCube oobject
+    """
+    Generate the residual spectral cube for the best-fit two-component model.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the spectral cube and associated fit results.
+    masked : bool, optional
+        If True, masks the residual cube to include only regions where the residual exceeds a
+        signal-to-noise threshold (`res_snr_cut`). Defaults to True.
+    window_hwidth : float, optional
+        Half-width (in km/s) of the velocity window used to define the residual region for masking.
+        Defaults to 3.5.
+    res_snr_cut : float, optional
+        Minimum signal-to-noise ratio for a residual peak to be considered excessive and included in the mask.
+        Only applied when `masked=True`. Defaults to 5.
+
+    Returns
+    -------
+    SpectralCube
+        The residual spectral cube, optionally masked based on the signal-to-noise threshold.
+
+    Notes
+    -----
+    - The function calculates the residual cube by subtracting the best-fit two-component model
+      from the original spectral cube.
+    - When `masked=True`, only regions where the residual peak signal-to-noise ratio exceeds `res_snr_cut`
+      are included in the returned cube.
+    - The `window_hwidth` parameter defines the velocity range for determining residual peaks
+      near spectral features.
+    - This function assumes that the one- and two-component parameter cubes (`reg.ucube.pcubes['1']`
+      and `reg.ucube.pcubes['2']`) have already been generated and are accessible.
+
+    Raises
+    ------
+    SNRMaskError
+        If no regions meet the specified `res_snr_cut` threshold when `masked=True`.
+
+    Examples
+    --------
+    >>> from region import Region
+    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
+    >>> residual_cube = get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=4.0, res_snr_cut=3)
+    >>> # Returns the residual spectral cube, masking regions with low signal-to-noise residuals.
+    """
     # need a mechanism to make sure reg.ucube.pcubes['1'], reg.ucube.pcubes['2'] exists
 
     res_cube = get_best_2comp_residual(reg)
@@ -1873,6 +2335,36 @@ def get_best_2comp_residual_SpectralCube(reg, masked=True, window_hwidth=3.5, re
 
 
 def get_best_2comp_residual(reg):
+    """
+    Calculate the residual cube for the best-fit two-component model.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the original spectral cube and fitted model results.
+
+    Returns
+    -------
+    SpectralCube
+        A spectral cube representing the residuals, calculated as the difference between the original
+        data and the best-fit two-component model.
+
+    Notes
+    -----
+    - The residual cube is computed by subtracting the best-fit model from the original spectral data.
+    - The best-fit model is determined by comparing the log-likelihood of the one-component and two-component
+      fits at each pixel.
+    - This function assumes that the one- and two-component parameter cubes (`reg.ucube.pcubes['1']`
+      and `reg.ucube.pcubes['2']`) have been generated and are accessible.
+
+    Examples
+    --------
+    >>> from region import Region
+    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
+    >>> residual = get_best_2comp_residual(reg)
+    >>> # Returns a SpectralCube object representing the residual between the data and the best-fit model.
+    """
+
     modbest = get_best_2comp_model(reg)
     best_res = reg.ucube.cube._data - modbest
     res_cube = SpectralCube(best_res, reg.ucube.cube.wcs)
@@ -1881,6 +2373,35 @@ def get_best_2comp_residual(reg):
 
 
 def get_best_2comp_snr_mod(reg):
+    """
+    Calculate the signal-to-noise ratio (SNR) map for the best-fit two-component model.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the original spectral cube and fitted model results.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 2D array representing the peak signal-to-noise ratio (SNR) of the best-fit two-component model
+        for each pixel in the spatial dimensions of the cube.
+
+    Notes
+    -----
+    - The SNR is computed as the peak intensity of the best-fit model divided by the root mean square (RMS) noise
+      of the residual cube.
+    - The best-fit model is determined based on a comparison of log-likelihood values for one-component
+      and two-component fits.
+    - The RMS noise is calculated directly from the residual cube.
+
+    Examples
+    --------
+    >>> from region import Region
+    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
+    >>> snr_map = get_best_2comp_snr_mod(reg)
+    >>> # Returns a 2D array of SNR values for the best-fit model.
+    """
     modbest = get_best_2comp_model(reg)
     res_cube = get_best_2comp_residual(reg)
     best_rms = UCube.get_rms(res_cube._data)
@@ -1888,7 +2409,37 @@ def get_best_2comp_snr_mod(reg):
 
 
 def get_best_2comp_model(reg):
-    # get the log-likelihood between the fits
+    """
+    Retrieve the best-fit model cube for the given Region object, selecting between one- and two-component fits
+    based on log-likelihood values.
+
+    Parameters
+    ----------
+    reg : Region
+        The Region object containing the original spectral cube and the fitted model results.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 3D array representing the data cube of the best-fit model for each pixel, where the third dimension
+        corresponds to the spectral axis.
+
+    Notes
+    -----
+    - The best-fit model is determined using log-likelihood thresholds:
+      - One-component fits are selected if their relative log-likelihood (`lnk10`) exceeds 5.
+      - Two-component fits are selected if their relative log-likelihood (`lnk21`) exceeds 5 and their
+        relative log-likelihood compared to the noise model (`lnk20`) also exceeds 5.
+    - The function combines the model cubes for one- and two-component fits into a single "best" model cube
+      by assigning the appropriate model to each spatial pixel.
+
+    Examples
+    --------
+    >>> from region import Region
+    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
+    >>> best_model = get_best_2comp_model(reg)
+    >>> # Returns a 3D NumPy array representing the best-fit model cube.
+    """
     lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
 
     mod1 = reg.ucube.pcubes['1'].get_modelcube()
@@ -1908,7 +2459,42 @@ def get_best_2comp_model(reg):
 
 
 def replace_para(pcube, pcube_ref, mask, multicore=None):
-    import multiprocessing
+    """
+    Replace parameter values in a parameter cube with those from a reference cube for specific pixels.
+
+    This function updates the `parcube`, `errcube`, and `has_fit` attributes of the input `pcube` based on a mask,
+    using the corresponding values from the reference cube (`pcube_ref`).
+
+    Parameters
+    ----------
+    pcube : pyspeckit.cube.ParCube
+        The parameter cube to be updated. This cube contains the current fitted parameters and their errors.
+    pcube_ref : pyspeckit.cube.ParCube
+        The reference parameter cube containing the values to replace in `pcube`.
+    mask : numpy.ndarray
+        A boolean 2D array indicating the spatial pixels to update. Pixels with `True` in the mask will be updated.
+    multicore : int or None, optional
+        Number of cores to use for parallel computation. Defaults to None, in which case a single core is used.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    - Updates the following attributes of `pcube`:
+      - `parcube` (fitted parameters)
+      - `errcube` (parameter errors)
+      - `has_fit` (boolean map indicating successful fits)
+    - Also updates the `_modelcube` attribute of `pcube` with the corresponding model values from `pcube_ref`.
+    - If `multicore` is specified, it controls the parallelism when computing the model cube from `pcube_ref`.
+
+    Examples
+    --------
+    >>> replace_para(pcube, pcube_ref, mask, multicore=4)
+    >>> # Updates `pcube` with values from `pcube_ref` for pixels specified by `mask`.
+
+    """
 
     # replace values in masked pixels with the reference values
     pcube.parcube[:, mask] = deepcopy(pcube_ref.parcube[:, mask])
@@ -1926,6 +2512,35 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
 
 
 def get_skyheader(cube_header):
+    """
+    Generate a 2D sky projection header from a 3D spectral cube header.
+
+    This function extracts the celestial (spatial) WCS information from a 3D FITS header
+    and constructs a 2D header suitable for spatial operations.
+
+    Parameters
+    ----------
+    cube_header : astropy.io.fits.Header
+        The FITS header of the 3D spectral cube, containing WCS information.
+
+    Returns
+    -------
+    astropy.io.fits.Header
+        A 2D FITS header containing only the celestial WCS information from the input 3D header.
+
+    Notes
+    -----
+    - The function retains the spatial resolution and axis sizes (`NAXIS1` and `NAXIS2`) from the input 3D header.
+    - The returned header is useful for spatial projections and visualizations.
+
+    Examples
+    --------
+    >>> from astropy.io import fits
+    >>> cube_header = fits.getheader("spectral_cube.fits")
+    >>> sky_header = get_skyheader(cube_header)
+    >>> print(sky_header)
+    """
+
     # a quick method to convert 3D header to 2D
     from astropy import wcs
     hdr = cube_header

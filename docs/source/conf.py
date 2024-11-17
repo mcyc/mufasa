@@ -8,33 +8,41 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../../src'))  # Adjust if your source is in a different folder
+sys.path.insert(0, os.path.abspath('../../'))  # Adjust based on your `mufasa` location
 
 project = 'MUFASA'
+release = 'v1.4.0'
 copyright = '2024, Mike Chen'
 author = 'Mike Chen'
-release = 'v1.4'
 
-# -- General configuration ---------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+# Use the theme directly
+html_theme = 'bootstrap-astropy'
+#html_theme = 'sphinx-astropy'
 
+# Remove the incorrect `html_theme_path` assignment
+# It is unnecessary to specify the path manually when using a known installed theme.
+
+# Optional theme customizations
+html_theme_options = {
+    'logotext1': 'MUFA',  # Custom text
+    'logotext2': 'SA',    # Highlighted part of the name
+    'logotext3': ':docs', # Additional tagline
+}
+
+# Add logo if available
+html_logo = 'path/to/logo.png'  # Update with the actual path
+html_favicon = 'path/to/favicon.ico'  # Update with the actual path
+
+# Extensions to enable
 extensions = [
-    'sphinx.ext.autodoc',       # Automatically generate documentation from docstrings
-    'sphinx.ext.napoleon',      # Support for NumPy and Google style docstrings
-    'sphinx.ext.intersphinx',   # Links to other projects (e.g., NumPy, Astropy)
-    'numpydoc',                 # For advanced NumPy-style parsing
+    'sphinx.ext.autodoc',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.napoleon',
+    'nbsphinx',  # For Jupyter Notebook integration (optional)
 ]
 
-
-templates_path = ['_templates']
-exclude_patterns = []
-
-
-
-# -- Options for HTML output -------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
-
-#html_theme = 'alabaster'
-#html_theme = 'sphinx_rtd_theme'
-html_theme = "sphinx_book_theme"
-html_static_path = ['_static']
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'astropy': ('https://docs.astropy.org/en/stable/', None),
+}
