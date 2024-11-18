@@ -92,7 +92,9 @@ For detailed API documentation, refer to the following:
 .. toctree::
    :maxdepth: 2
 
-   api/index
+   api/modules
+
+
 
 For more detailed information, visit the `MUFASA GitHub repository <https://github.com/mcyc/mufasa>`_.
 

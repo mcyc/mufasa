@@ -1,0 +1,16 @@
+/* Light mode navbar */
+html[data-theme="light"] .navbar {
+    background-color: #EEEEEE !important;
+}
+
+/* Dark mode navbar */
+html[data-theme="dark"] .navbar {
+    background-color: #222831 !important;
+}
+
+.navbar-brand img {
+    max-height: 100px; /* Adjust as needed */
+    width: auto;
+}
+
+

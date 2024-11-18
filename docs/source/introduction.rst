@@ -1,4 +1,4 @@
-Introduction to MUFASA
+Introduction
 ======================
 
 What is MUFASA?

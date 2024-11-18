@@ -8,30 +8,41 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../../'))  # Adjust based on your `mufasa` location
+sys.path.insert(0, os.path.abspath('../mufasa'))
+sys.path.insert(0, os.path.abspath('../../mufasa'))
 
 project = 'MUFASA'
-release = 'v1.4.0'
+release = 'v1.4.0-dev'
 copyright = '2024, Mike Chen'
 author = 'Mike Chen'
 
-# Use the theme directly
-html_theme = 'bootstrap-astropy'
-#html_theme = 'sphinx-astropy'
+from sphinx_astropy.conf.v2 import *  # Enable confv2
 
-# Remove the incorrect `html_theme_path` assignment
-# It is unnecessary to specify the path manually when using a known installed theme.
-
-# Optional theme customizations
+# Theme configuration
+html_theme = "pydata_sphinx_theme"
 html_theme_options = {
-    'logotext1': 'MUFA',  # Custom text
-    'logotext2': 'SA',    # Highlighted part of the name
-    'logotext3': ':docs', # Additional tagline
+    "show_nav_level": 2,          # Display navigation up to this level
+    "navigation_depth": 4,        # Sidebar depth
+    "collapse_navigation": True,  # Collapsible sidebar
+    "navbar_align": "left",
+    "github_url": "https://github.com/mcyc/mufasa",  # Link to GitHub
+    "show_prev_next": False,      # Hide prev/next buttons
+    "logo": {
+        "text": "MUFASA",  # Add the title text
+    }
 }
 
-# Add logo if available
-html_logo = 'path/to/logo.png'  # Update with the actual path
-html_favicon = 'path/to/favicon.ico'  # Update with the actual path
+# Custom logo
+html_favicon = '_static/favicon.ico'
+html_logo = "_static/logo.png"  # Path to your logo
+
+# Add paths to static files
+html_static_path = ["_static"]
+
+# Customize CSS (optional)
+html_css_files = ["custom.css"]
+
+html_title = "MUFASA DOC"
 
 # Extensions to enable
 extensions = [
@@ -39,6 +50,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.napoleon',
     'nbsphinx',  # For Jupyter Notebook integration (optional)
+    'sphinx_copybutton',  # Add the copybutton extension
 ]
 
 intersphinx_mapping = {
@@ -46,3 +58,21 @@ intersphinx_mapping = {
     'numpy': ('https://numpy.org/doc/stable/', None),
     'astropy': ('https://docs.astropy.org/en/stable/', None),
 }
+
+exclude_patterns = [
+    'api/mufasa/__pycache__/*',
+    'api/mufasa/tests/*',
+]
+
+add_module_names = False
+
+# For using Astropy's Bootstrap
+# Use the theme directly
+#html_theme = 'bootstrap-astropy'
+#html_theme = 'sphinx-astropy'
+
+# Optional theme customizations
+#html_theme_options = {
+#    'logotext1': 'MUFA',  # Custom text
+#    'logotext2': 'SA',    # Highlighted part of the name
+#}
