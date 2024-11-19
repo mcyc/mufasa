@@ -691,14 +691,8 @@ class UCubePlus(UltraCube):
         Directory where parameter maps are stored. Created if it does not exist.
     paraPaths : dict
         Dictionary mapping component numbers to file paths for saved parameter maps.
-
-    Methods
-    -------
-    read_model_fit(ncomps, read_conv=False, **kwargs)
-        Load model fits from disk or perform fitting if files do not exist.
-    get_model_fit(ncomp, update=True, **kwargs)
-        Load or perform model fitting for the specified number of components.
     """
+    __module__ = "mufasa.UltraCube"  # Explicitly set the module
 
     def __init__(self, cubefile, cube=None, fittype=None, paraNameRoot=None, paraDir=None, **kwargs):
         """
@@ -746,6 +740,8 @@ class UCubePlus(UltraCube):
     def read_model_fit(self, ncomps, read_conv=False, **kwargs):
         """
         Load model fits if they exist; otherwise, perform the fitting.
+
+        .. :noindex:
 
         Parameters
         ----------

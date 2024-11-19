@@ -12,8 +12,7 @@ logger = get_logger(__name__)
 
 
 class ScatterPPV(object):
-    """
-    A class to plot the fitted parameters in 3D scatter plots. Most of the data is stored in a pandas DataFrame.
+    """A class to plot the fitted parameters in 3D scatter plots. Most of the data is stored in a pandas DataFrame.
 
     Parameters
     ----------
@@ -22,12 +21,15 @@ class ScatterPPV(object):
     fittype : str
         The name of the fit model, e.g., "nh3_multi_v" or "n2hp_multi_v".
     vrange : tuple of float, optional
-        Velocity range to clip the data (in km/s). Data outside this range is excluded. Default is None.
+        Velocity range to clip the data (in km/s). Data outside this range is excluded.
+        Default is None.
     verr_thres : float, optional
-        Velocity error threshold (in km/s) to filter out data with higher errors. Data with a velocity error greater than this threshold is excluded. Default is 5.
+        Velocity error threshold (in km/s) to filter out data with higher errors.
+        Data with a velocity error greater than this threshold is excluded. Default is 5.
 
     Examples
     --------
+
     Initialize the ScatterPPV object and plot the position-position-velocity (PPV) scatter plot:
 
     >>> sc = scatter_3D.ScatterPPV("path/to/fname.fits", fittype="nh3_multi_v")
@@ -35,8 +37,7 @@ class ScatterPPV(object):
     """
 
     def __init__(self, parafile, fittype, vrange=None, verr_thres=5, meta_model=None):
-        """
-        Initialize the ScatterPPV object by loading data from a .fits file and setting up parameters.
+        """Initialize the ScatterPPV object by loading data from a .fits file and setting up parameters.
 
         For a detailed description of parameters, refer to the class docstring.
 
@@ -51,7 +52,6 @@ class ScatterPPV(object):
         verr_thres : float, optional
             The velocity error threshold (in km/s) to filter the data. Data with errors above this threshold is excluded.
         """
-
         self.paracube, self.header = fits.getdata(parafile, header=True)
         self.fittype = fittype
         self.meta_model = meta_model
@@ -89,8 +89,7 @@ class ScatterPPV(object):
 
 
     def add_peakI(self):
-        """
-        Calculate and add a peak intensity value for each model point in the DataFrame.
+        """Calculate and add a peak intensity value for each model point in the DataFrame.
 
         Parameters
         ----------
@@ -101,7 +100,6 @@ class ScatterPPV(object):
         -------
         None
         """
-
         if self.meta_model is not None:
             para = np.array(
                 [self.dataframe['vlsr'].values,
@@ -116,8 +114,7 @@ class ScatterPPV(object):
 
 
     def add_wcs_del(self, ra_ref=None, dec_ref=None, unit='arcmin'):
-        """
-        Calculate relative RA & Dec coordinates and add them to the DataFrame as columns.
+        """Calculate relative RA & Dec coordinates and add them to the DataFrame as columns.
 
         Parameters
         ----------
@@ -132,7 +129,6 @@ class ScatterPPV(object):
         -------
         None
         """
-
         if unit == 'arcmin':
             f = 60
         elif unit == 'arcsec':
@@ -150,35 +146,34 @@ class ScatterPPV(object):
         df['delt RA'] = df['delt RA'] - ra_ref
         df['delt Dec'] = df['delt Dec'] - dec_ref
 
-
-    def plot_ppv(self, label_key='peakT', vel_scale=0.8, xyunit='arcmin', savename=None, **kwargs):
+    def plot_ppv(self, label_key='peakT', savename=None, vel_scale=0.8, vrange=None, verr_thres=5, **kwargs):
         """
-        Plot the fitted model in position-position-velocity (PPV) space, with points colored by a specified key.
+        Generate a 3D scatter plot of the position-position-velocity (PPV) data from the best-fit model.
 
         Parameters
         ----------
         label_key : str, optional
-            DataFrame column to color each data point by, e.g., 'peakT' for peak intensity or clustering labels. Default is 'peakT'.
-        vel_scale : float, optional
-            Scale factor for the velocity axis relative to x & y axes, where x is normalized to 1. Default is 0.8.
-        xyunit : {'arcmin', 'pix'}, optional
-            Units for x & y coordinates. If 'arcmin', plots relative RA and Dec in arcminutes. If 'pix', plots coordinates in pixels.
-             Default is 'arcmin'.
+            Column in the DataFrame used to color points, e.g., 'peakT' for peak intensity. Defaults to 'peakT'.
         savename : str, optional
-            Path to save the plot as an HTML file. Default is None.
-        kwargs : dict, optional
-            Additional keyword arguments are passed to `plot_ppv`, allowing customization of the PPV scatter plot.
+            Path to save the 3D plot as an HTML file. If None, the plot is not saved. Defaults to None.
+        vel_scale : float, optional
+            Scale factor for the velocity axis relative to spatial axes. Defaults to 0.8.
+        vrange : tuple of float, optional
+            Velocity range (in km/s) for clipping the data. Defaults to None.
+        verr_thres : float, optional
+            Velocity error threshold (in km/s) to filter the data.
+            Points with errors above this threshold are excluded. Defaults to 5.
+        **kwargs : dict, optional
+            Additional options passed to `plot_ppv` for plot customization.
 
-            Key options include:
-            - `auto_open_html` : bool, optional
-                If True, automatically opens the saved HTML file in a browser after saving. Default is True.
-            - `mask_df`: pandas.Series or None, optional
-                Boolean mask to filter the DataFrame before plotting. Default is None.
+        Examples
+        --------
 
-        Returns
-        -------
-        fig : plotly.graph_objs.Figure
-            The created 3D scatter plot figure.
+        Initialize a ScatterPPV object and plot the PPV scatter:
+
+        >>> sc = scatter_3D.ScatterPPV("path/to/fname.fits", fittype="nh3_multi_v")
+        >>> fig = sc.plot_ppv(label_key='peakT', vel_scale=0.5)
+        >>> fig.show()
         """
 
         if label_key == 'peakT':
@@ -224,8 +219,7 @@ class ScatterPPV(object):
 
 def scatter_3D_df(dataframe, x_key, y_key, z_key, label_key=None, mask_df=None,
                   auto_open_html=True, **kwargs):
-    """
-    A wrapper for scatter_3D to quickly plot a pandas DataFrame in 3D.
+    """A wrapper for scatter_3D to quickly plot a pandas DataFrame in 3D.
 
     Parameters
     ----------
@@ -251,7 +245,6 @@ def scatter_3D_df(dataframe, x_key, y_key, z_key, label_key=None, mask_df=None,
     fig : plotly.graph_objs.Figure
         The 3D scatter plot figure.
     """
-
     if mask_df is not None:
         dataframe = dataframe[mask_df]
 
@@ -271,8 +264,7 @@ def scatter_3D(x, y, z, labels=None, nx=None, ny=None, z_scale=0.8, shadow=True,
                scene=None, xlab=None, ylab=None, zlab=None, showfig=True, kw_line=None,
                cmap='Spectral_r', auto_open_html=True, vmin=None, vmax=None,
                opacity_ranges=1, **kwargs):
-    """
-    Plot a 3D scatter plot with optional opacity scaling for point ranges.
+    """Plot a 3D scatter plot with optional opacity scaling for point ranges.
 
     Parameters
     ----------
@@ -326,7 +318,6 @@ def scatter_3D(x, y, z, labels=None, nx=None, ny=None, z_scale=0.8, shadow=True,
     fig : plotly.graph_objs.Figure
         Generated 3D scatter plot figure.
     """
-
     if fig is None:
         fig = make_subplots(rows=1, cols=1, specs=[[{'type': 'scatter3d'}]])
 

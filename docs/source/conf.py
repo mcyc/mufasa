@@ -21,8 +21,8 @@ from sphinx_astropy.conf.v2 import *  # Enable confv2
 # Theme configuration
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
-    "show_nav_level": 2,          # Display navigation up to this level
-    "navigation_depth": 4,        # Sidebar depth
+    "show_nav_level": 1,          # Display navigation up to this level
+    "navigation_depth": 2,        # Sidebar depth
     "collapse_navigation": True,  # Collapsible sidebar
     "navbar_align": "left",
     "github_url": "https://github.com/mcyc/mufasa",  # Link to GitHub
@@ -34,7 +34,7 @@ html_theme_options = {
 
 # Custom logo
 html_favicon = '_static/favicon.ico'
-html_logo = "_static/logo.png"  # Path to your logo
+html_logo = "_static/logo.svg"  # Path to your logo
 
 # Add paths to static files
 html_static_path = ["_static"]
@@ -51,6 +51,9 @@ extensions = [
     'sphinx.ext.napoleon',
     'nbsphinx',  # For Jupyter Notebook integration (optional)
     'sphinx_copybutton',  # Add the copybutton extension
+    "sphinx.ext.autosummary",  # Enables summary tables
+    "sphinx.ext.viewcode",     # Adds links to source code
+    #"sphinx_search.extension",
 ]
 
 intersphinx_mapping = {
@@ -62,7 +65,11 @@ intersphinx_mapping = {
 exclude_patterns = [
     'api/mufasa/__pycache__/*',
     'api/mufasa/tests/*',
+    'api/setup.rst',
+    'api/tests/*',
+    '**/__pycache__/*',
 ]
+
 
 add_module_names = False
 
@@ -76,3 +83,29 @@ add_module_names = False
 #    'logotext1': 'MUFA',  # Custom text
 #    'logotext2': 'SA',    # Highlighted part of the name
 #}
+
+autodoc_default_options = {
+    "members": True,
+    "inherited-members": False,  # Do not document inherited methods
+    "undoc-members": True,
+    "show-inheritance": True,
+    "private-members": False,  # Exclude private attributes (e.g., _private_var)
+    "special-members": False,  # Exclude dunder methods (e.g., __init__)
+    "special-members": "__init__",  # Include __init__ docstrings
+    "exclude-members": "__weakref__",
+    #'exclude-members': 'read_model_fit, get_model_fit',
+}
+
+
+
+autodoc_typehints = "description"  # Show type hints in descriptions
+
+#autodoc_typehints = "none"  # Disable showing type hints
+autosummary_generate = True  # Automatically generate summary tables
+
+# Enable breadcrumbs in pydata_sphinx_theme
+html_theme_options.update({
+    "show_nav_level": 1,  # Show breadcrumbs for the top-level section
+})
+
+

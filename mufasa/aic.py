@@ -11,8 +11,28 @@ from . import multi_v_fit as mvf
 
 #=======================================================================================================================
 
-def fits_comp_AICc(cubepath, modpath1, modpath2, aiccpath, likelihoodpath = None):
-    # a wrapper around fits_comp_AICc() to work with fits files
+def fits_comp_AICc(cubepath, modpath1, modpath2, aiccpath, likelihoodpath=None):
+    """
+    A wrapper function to calculate corrected Akaike Information Criterion (AICc) values
+    and save them to a FITS file.
+
+    Parameters
+    ----------
+    cubepath : str
+        Path to the data cube FITS file.
+    modpath1 : str
+        Path to the first model FITS file.
+    modpath2 : str
+        Path to the second model FITS file.
+    aiccpath : str
+        Path to save the resulting AICc FITS file.
+    likelihoodpath : str, optional
+        Path to save the likelihood FITS file, if provided.
+
+    Returns
+    -------
+    None
+    """
 
     cube = SpectralCube.read(cubepath)
     mod1, hdr1 = fits.getdata(modpath1, header = True)
@@ -32,7 +52,27 @@ def fits_comp_AICc(cubepath, modpath1, modpath2, aiccpath, likelihoodpath = None
         fits.writeto(likelihoodpath, likelyhood, cube.wcs.celestial.to_header(), overwrite=True)
 
 
-def fits_comp_chisq(cubepath, modpath1, modpath2, savepath, reduced = True):
+def fits_comp_chisq(cubepath, modpath1, modpath2, savepath, reduced=True):
+    """
+    Calculate and save chi-squared values for the given cube and model fits.
+
+    Parameters
+    ----------
+    cubepath : str
+        Path to the data cube FITS file.
+    modpath1 : str
+        Path to the first model FITS file.
+    modpath2 : str
+        Path to the second model FITS file.
+    savepath : str
+        Path to save the resulting chi-squared FITS file.
+    reduced : bool, optional
+        Whether to calculate reduced chi-squared values. Default is True.
+
+    Returns
+    -------
+    None
+    """
     cube = SpectralCube.read(cubepath)
     mod1, hdr1 = fits.getdata(modpath1, header = True)
     mod2, hdr2 = fits.getdata(modpath2, header = True)
@@ -54,21 +94,27 @@ def fits_comp_chisq(cubepath, modpath1, modpath2, savepath, reduced = True):
 
 
 def get_comp_AICc(cube, model1, model2, p1, p2):
-    '''
-    Acquire AICc values over the same samples, where BOTH of the models have none-zero values
-    :param cube: <SpectralCube>
-        The data cube
-    :param model1: <numpy array>
-        The 1st model cube
-    :param model2: <numpy array>
-        The 2nd model cube
-    :param p1:
-        Number of parameters associated with model 1
-    :param p2:
-        Number of parameters associated with model 2
-    :return:
-    '''
+    """
+    Calculate AICc values for two models over the same samples.
 
+    Parameters
+    ----------
+    cube : SpectralCube
+        The data cube.
+    model1 : numpy.ndarray
+        The first model cube.
+    model2 : numpy.ndarray
+        The second model cube.
+    p1 : int
+        Number of parameters associated with the first model.
+    p2 : int
+        Number of parameters associated with the second model.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        AICc values for the first and second models.
+    """
     mask1 = model1 > 0
     mask2 = model2 > 0
     mask = np.logical_or(mask1, mask2)
@@ -84,16 +130,23 @@ def get_comp_AICc(cube, model1, model2, p1, p2):
 
 
 def AIC(rss, p, N):
-    '''
-    Calculate the Akaike information criterion based on the provided chi-squared values
-    :param rss:
-        Residual sum of squares
-    :param p:
-        Number of parameters
-    :param N:
-        Number of samples
-    :return:
-    '''
+    """
+    Calculate the Akaike Information Criterion (AIC).
+
+    Parameters
+    ----------
+    rss : numpy.ndarray
+        Residual sum of squares.
+    p : int
+        Number of parameters.
+    N : int
+        Number of samples.
+
+    Returns
+    -------
+    numpy.ndarray
+        AIC values.
+    """
     # avoid invalid math values
     N[N==0] = np.nan
     aic = N * np.log(rss/N) + 2*p
@@ -102,23 +155,44 @@ def AIC(rss, p, N):
 
 
 def AICc(rss, p, N):
-    '''
-    Calculate the corrected Akaike information criterion based on the provided chi-squared values
-    corrected AIC (AICc) approaches that of the AIC value when chisq >> p^2
-    :param rss:
-        Residual sum of squares
-    :param p:
-        Number of parameters
-    :param N:
-    :return:
-    '''
+    """
+    Calculate the corrected Akaike Information Criterion (AICc).
+
+    Parameters
+    ----------
+    rss : numpy.ndarray
+        Residual sum of squares.
+    p : int
+        Number of parameters.
+    N : int
+        Number of samples.
+
+    Returns
+    -------
+    numpy.ndarray
+        Corrected AICc values.
+    """
     top = 2*p*(p+1)
     bottom = N - p - 1
     return AIC(rss, p, N) + top/bottom
 
 
 def likelihood(aiccA, aiccB):
-    # return the log likelihood of A relative to B
+    """
+    Calculate the log-likelihood of model A relative to model B.
+
+    Parameters
+    ----------
+    aiccA : numpy.ndarray
+        AICc values for model A.
+    aiccB : numpy.ndarray
+        AICc values for model B.
+
+    Returns
+    -------
+    numpy.ndarray
+        Log-likelihood values.
+    """
     #aiccA, aiccB = np.nan_to_num(aiccA), np.nan_to_num(aiccB)
     return -1.0*(aiccA - aiccB) / 2.0
 
