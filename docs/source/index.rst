@@ -30,7 +30,7 @@ When publishing with MUFASA-generated data products, please cite the following p
 
 Quick Install
 ~~~~~~~~~~~~~
-To quickly clone and install the latest version of **MUFASA** locally from the GitHub `source <https://github.com/mcyc/mufasa>`_:
+To quickly clone and install the latest version of **MUFASA** locally from `GitHub <https://github.com/mcyc/mufasa>`_:
 
 .. code-block:: bash
 
@@ -38,7 +38,7 @@ To quickly clone and install the latest version of **MUFASA** locally from the G
     cd mufasa
     pip install -e .
 
-For more details, see the :doc:`Installation <installation>` page.
+For more details, see the :doc:`Instal <installation>` page.
 
 Quick Start
 ~~~~~~~~~~~

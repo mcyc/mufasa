@@ -5,11 +5,12 @@ Let's help you get started quickly with **MUFASA**. Use the navigation bar on th
 
 Installation
 ------------
-If you haven't installed **MUFASA** yet, please follow the instructions in :doc:`Installation <installation>`.
+If you haven't installed **MUFASA** yet, please follow the instructions in :doc:`Instal <installation>`.
 
 Setting Up Fits
 ---------------
-To set up for spectral fits, initialize a :class:`~mufasa.master_fitter.Region` object. A :class:`~mufasa.master_fitter.Region` object manages the input data, model parameters, and output files.
+To set up for spectral fits, initialize a :class:`~mufasa.master_fitter.Region` object,
+which manages the input data, model parameters, and output files.
 
 .. code-block:: python
 
@@ -36,7 +37,7 @@ To perform automated spectral fitting, use the following example:
 .. code-block:: python
 
     # Perform an automated two-components fit
-    region.master_2comp_fit(snr_min=0)
+    region.master_2comp_fit(snr_min=3)
 
 The currently available spectral models are:
 
@@ -48,7 +49,8 @@ Visualizing Results
 
 Reading the Saved Results
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-If you have exited the fitting session already, you can quickly load the saved results by reinitializing ``region`` (see the :ref:`Fitting Spectra <fitting-spectra>` section) and running:
+If you have exited the fitting session already, you can quickly load the saved results by
+reinitializing ``region`` (see the :ref:`Fitting Spectra <fitting-spectra>` section) and running:
 
 .. code-block:: python
 

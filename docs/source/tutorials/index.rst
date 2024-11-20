@@ -1,7 +1,7 @@
 Tutorials
 =========
 
-Welcome to the tutorials section for **MUFASA**! These guides will help you get hands-on experience with the core features of **MUFASA**, from loading data to performing spectral fits and visualizing results.
+Welcome to the tutorials section for **MUFASA**! These guides will help you get hands-on experience with the core features of **MUFASA**.
 
 .. toctree::
    :hidden:
@@ -9,6 +9,7 @@ Welcome to the tutorials section for **MUFASA**! These guides will help you get 
 
    load_data_n_results
    fitting
+   save_results
    visualization
    custom_usage
 
@@ -18,10 +19,13 @@ Descriptions
   Learn how to load your input data, initialize a :class:`~mufasa.master_fitter.Region` object, and access saved fits. This tutorial is ideal for users starting their spectral analysis workflows.
 
 - :doc:`Fitting Spectra <fitting>`:
-  Step-by-step instructions for performing spectral fits with **MUFASA**, covering automated multi-component fitting and supported spectral models.
+  Learn how to perform spectral fitting with **MUFASA**, covering automated multi-component fitting and supported spectral models.
+
+- :doc:`Saving Results <fitting>`:
+  Learn how to save **MUFASA**'s fitted results.
 
 - :doc:`Visualizing Results <visualization>`:
-  Explore techniques for analyzing and visualizing your spectral fits, such as 3D scatter plots and spectral grid views.
+  Learn how to visualize your spectral fits with spectral grid plots and interactive 3D scatter plots.
 
 - :doc:`Custom Usage <custom_usage>`:
   Advanced workflows for tailoring **MUFASA** to specific use cases. (Coming soon!)
