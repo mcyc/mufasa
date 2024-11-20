@@ -1,26 +1,30 @@
-Visualization Tutorial
-=======================
+Visualization
+=============
 
-Learn how to visualize your spectral fits and data using MUFASA's built-in tools.
+This tutorial explains how to visualize spectral fits and explore the fitted parameters.
 
-Contents
---------
-
-- **Plotting Fitted Spectra**: Generate plots for spectral fits.
-- **3D Visualization**: Create interactive 3D visualizations of your data.
+Preparing for Visualization
+---------------------------
+Before visualizing your results, ensure that the data and results are properly loaded. Refer to the :doc:`Loading Data and Results <load_data_n_results>` tutorial for instructions on loading the saved results and initializing the :class:`~mufasa.master_fitter.Region` object.
 
 Plotting Fitted Spectra
 -----------------------
-To plot the fitted spectra for a specific position `(x, y)`:
+To plot the fitted spectra for a specific position ``(x, y)`` in a data cube:
 
 .. code-block:: python
 
-    from mufasa import UltraCube as UCube
+    # Plot the fits for position (x, y) on a 3x3 grid for a 2-component model
+    region.ucube.plot_fits_grid(x, y, ncomp=2, size=3, xlim=None, ylim=None)
 
-    ucube = UCube.UCubePlus(cubePath, paraNameRoot, paraDir, fittype='nh3_multi_v')
-    ucube.read_model_fit(ncomps=[1, 2])
+3D Scatter Plots
+----------------
+To visualize the fitted parameters in 3D, such as in position-position-velocity (PPV) space:
 
-    # Plot the fits for position (x, y)
-    ucube.plot_fits_grid(x=10, y=15, ncomp=2, size=3, xlim=None, ylim=None)
+.. code-block:: python
 
-More examples and explanations will be added in future updates.
+    # Create an interactive 3D scatter plot of the fitted results
+    region.plot_ppv_scatter(savepath="scatter_plot.html", vel_scale=0.5, showfig=True, auto_open_html=False)
+
+Next Steps
+----------
+For advanced visualization techniques or to build custom workflows, refer to :doc:`Custom Usage <custom_usage>`.

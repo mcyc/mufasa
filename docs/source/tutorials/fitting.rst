@@ -1,31 +1,28 @@
-Fitting Tutorial
-=================
+Fitting
+=======
 
-This tutorial guides you through the process of performing spectral fitting using MUFASA's tools.
+This tutorial demonstrates how to perform spectral fitting using **MUFASA**.
 
-Contents
---------
+Preparing for Fitting
+---------------------
+Before performing spectral fitting, ensure that your data and results are properly loaded. Refer to the :doc:`Loading Data and Results <load_data_n_results>` tutorial for detailed instructions on setting up the input data and initializing the :class:`~mufasa.master_fitter.Region` object.
 
-- **Basic Fitting**: Learn how to perform single-component and multi-component fits.
-- **Advanced Fitting Options**: Customize your fitting pipeline with additional parameters.
-
-Getting Started
----------------
-To perform a basic fit on NH₃ (1,1) data, follow these steps:
+Performing Spectral Fits
+------------------------
+Once the :class:`~mufasa.master_fitter.Region` object is set up, you can perform automated spectral fitting. For example, to fit up to 2 velocity components:
 
 .. code-block:: python
 
-    from mufasa import master_fitter as mf
-
-    # Define paths and parameters
-    cubePath = "path/to/cube.fits"
-    paraNameRoot = "results"
-    paraDir = "output_dir"
-
-    # Initialize the Region object
-    region = mf.Region(cubePath, paraNameRoot, paraDir, fittype='nh3_multi_v')
-
-    # Perform a fit
+    # Perform a two-component fit
     region.master_2comp_fit(snr_min=0)
 
-More details will be added in future updates.
+Supported Spectral Models
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The currently available spectral models are:
+
+- **NH₃ (1,1)** (2-components; ``fittype='nh3_multi_v'``)
+- **N₂H⁺ (1-0)** (2-components; ``fittype='n2hp_multi_v'``)
+
+Next Steps
+----------
+After performing a fit, consider visualizing the results to verify the quality of the fit and analyze the data further. See :doc:`Visualization <visualization>` for details.

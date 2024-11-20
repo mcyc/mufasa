@@ -6,43 +6,48 @@ Welcome to the documentation for **MUFASA**: the MUlti-component Fitter for Astr
 
 Overview
 --------
-**MUFASA** is a Python library for the analysis and fitting of astrophysical spectral data. It provides tools for:
+**MUFASA** is a Python library for automating multi-component spectral fits to astrophysical data. It provides tools for:
 
-- **Multi-Component Spectral Fitting**:
-  Fit complex spectral data with multiple velocity components to extract gas kinematics more accurate.
+- **Multi-Component Fitting**:
+  Fit complex spectral data automatically with multi-component models, leveraging spatial information in a data cube for enhanced performance. The currently available models are:
+
+    - **NH₃ (1,1)** (2-components; ``fittype='nh3_multi_v'``)
+    - **N₂H⁺ (1-0)** (2-components; ``fittype='n2hp_multi_v'``)
+
 - **Data Visualization**:
-  Generate plots and 3D visualizations to interpret the spectral model effectively.
-- **Custom Modules**:
-  Modules can be used to build custom pipelines to handle specific fitting needs.
+  Generate spectral plots and 3D visualizations to interpret fitted models.
 
-To learn more about MUFASA, check out the :doc:`Guides <guides>` section.
+- **Custom Modules**:
+  Provide modules for custom building pipelines tailored towards unique fitting needs.
+
+To learn more, check out the :doc:`Guides <guides>` section or use the navigation bar at the top.
 
 Citation
 ~~~~~~~~
-Please cite the following paper when publishing with MUFASA-generated data products:
+When publishing with MUFASA-generated data products, please cite the following paper:
 
-- Chen, M. C.-Y. et al. "Velocity-Coherent Filaments in NGC 1333: Evidence for Accretion Flow?" ApJ (`2020 <https://ui.adsabs.harvard.edu/abs/2020ApJ...891...84C/abstract>`_).
+    - Chen, M. C.-Y. et al. "Velocity-Coherent Filaments in NGC 1333: Evidence for Accretion Flow?" ApJ (`2020 <https://ui.adsabs.harvard.edu/abs/2020ApJ...891...84C/abstract>`_).
 
 Quick Install
 ~~~~~~~~~~~~~
-To quickly install the latest version of **MUFASA**, clone its GitHub `repository <https://github.com/mcyc/mufasa>`_ and run the following command in your local repository directory:
+To quickly clone and install the latest version of **MUFASA** locally from the GitHub `source <https://github.com/mcyc/mufasa>`_:
 
 .. code-block:: bash
 
+    git clone https://github.com/mcyc/mufasa.git
+    cd mufasa
     pip install -e .
 
-See the :doc:`Installation <installation>` page for details.
+For more details, see the :doc:`Installation <installation>` page.
 
-Quick Links
------------
-- **Installation**: :doc:`installation`
-- **Getting Started**: :doc:`quick_start`
-- **Guides**: :doc:`guides`
-- **GitHub Repository**: `MUFASA GitHub <https://github.com/mcyc/mufasa>`_
-- **Tutorials**: :doc:`tutorials/index`
-- **API Reference**: :doc:`api/modules`
-- **GitHub Repository**: `MUFASA GitHub <https://github.com/mcyc/mufasa>`_
+Quick Start
+~~~~~~~~~~~
+To get started with **MUFASA** quickly, check out the :doc:`Quick Start <quick_start>` guide.
 
+Contents
+---------
+
+Use the navigation bar at the top to explore other sections, including :doc:`Tutorials <tutorials/index>`, :doc:`Guides <guides>`, and :doc:`API Reference <api/modules>`.
 
 .. toctree::
    :hidden:
