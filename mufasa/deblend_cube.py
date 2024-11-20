@@ -17,39 +17,41 @@ from .utils.multicore import validate_n_cores
 
 #=======================================================================================================================
 
-def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp = None, tau_wgt = 0.1, n_cpu=None, linetype='nh3'):
-    '''
-    Deblend hyperfine structures in a cube based on fitted models, i.e., reconstruct the fitted model with Gaussian
-    lines with optical depths accounted for (e.g., similar to CO (J = 0-1))
+def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp=None, tau_wgt=0.1, n_cpu=None, linetype='nh3'):
+    """
+    Deblend hyperfine structures in a cube based on fitted models.
 
-    :param para: <ndarray>
-        The fitted parameters in the order of vel, width, tex, and tau for each velocity slab.
-        (Note: the size of the z axis for para must thus be in the multiple of 4)
+    This function reconstructs the fitted model with Gaussian lines accounting
+    for optical depths (e.g., similar to CO (J = 0-1)).
 
-    :param specCubeRef: <SpectralCube.Cube>
-        The reference cube from which the deblended cube is constructed from
+    Parameters
+    ----------
+    para : numpy.ndarray
+        The fitted parameters in the order of velocity, width, Tex, and tau for
+        each velocity slab. The size of the z-axis for `para` must be a multiple of 4.
+    specCubeRef : spectral_cube.SpectralCube
+        The reference cube from which the deblended cube is constructed.
+    vmin : float, optional
+        The lower velocity limit on the deblended cube in km/s. Default is 4.0.
+    vmax : float, optional
+        The upper velocity limit on the deblended cube in km/s. Default is 11.0.
+    f_spcsamp : int, optional
+        The scaling factor for spectral sampling relative to the reference cube.
+        For example, `f_spcsamp=2` doubles the spectral resolution.
+    tau_wgt : float, optional
+        A scaling factor for the input tau. For example, `tau_wgt=0.1` better
+        represents the true optical depth of an NH3 (1,1) hyperfine group than
+        the "fitted tau". Default is 0.1.
+    n_cpu : int, optional
+        The number of CPUs to use. If None, defaults to all CPUs available minus one.
+    linetype : str, optional
+        The line type to use for deblending. Options are 'nh3' or 'n2hp'. Default is 'nh3'.
 
-    :param vmin: <float>
-        The lower veloicty limit on the deblended cube in the unit of km/s
-
-    :param vmax: <float>
-        The upper veloicty limit on the deblended cube in the unit of km/s
-
-    :param f_spcsamp: <int>
-        The scaling factor for the spectral sampling relative the reference cube
-        (e.g., f_spcsamp = 2 give you twice the spectral resolution)
-
-    :param tau_wgt:
-        The scaling factor for the input tau
-        (e.g., tau_wgt = 0.1 better represents the true optical depth of a NH3 (1,1) hyperfine group than the
-         "fitted tau")
-
-    :param n_cpu: <int>
-        The number of cpus to use. If None, defaults to all the cpus available minus one.
-
-    :return mcube: <SpectralCube.Cube>
-        The deblended cube
-    '''
+    Returns
+    -------
+    mcube : spectral_cube.SpectralCube
+        The deblended cube.
+    """
 
     # get different types of deblending models
     if linetype == 'nh3':

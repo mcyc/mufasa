@@ -24,7 +24,6 @@ Submodules
    mufasa.deblend_cube
    mufasa.exceptions
    mufasa.guess_refine
-   mufasa.holder
    mufasa.master_fitter
    mufasa.moment_guess
    mufasa.multi_v_fit

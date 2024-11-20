@@ -412,12 +412,19 @@ def get_moments(cube, window_hwidth=5, linewidth_sigma=True, trim=3, return_rms=
 
 def estimate_mode(data, bins=25):
     """
-    Estimate the mode of the data using a histogram
-    :param data:
-        the data to evaluate
-    :param bins:
-        number of bins
-    :return:
+    Estimate the mode of the data using a histogram.
+
+    Parameters
+    ----------
+    data : ndarray
+        The data for which to estimate the mode. Non-finite values will be ignored.
+    bins : int, optional
+        Number of bins to use for the histogram. Default is 25.
+
+    Returns
+    -------
+    float
+        The estimated mode of the data.
     """
     data=data[np.isfinite(data)]
     counts, bins = np.histogram(data, bins=bins)

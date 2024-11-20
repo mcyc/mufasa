@@ -1,3 +1,11 @@
+"""
+UltraCube module.
+
+Provides utilities for processing spectral cubes, including fitting, masking,
+and moment calculations.
+"""
+
+
 from __future__ import print_function
 from __future__ import absolute_import
 __author__ = 'mcychen'
@@ -105,7 +113,6 @@ class UltraCube(object):
         ValueError
             If both `cubefile` and `cube` are None.
         """
-
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
@@ -145,6 +152,21 @@ class UltraCube(object):
 
 
     def make_header2D(self):
+        """
+        Create a 2D header by removing the specified axis.
+
+        Parameters
+        ----------
+        header : astropy.io.fits.Header
+            FITS header to modify.
+        axis : int
+            Axis to remove from the header.
+
+        Returns
+        -------
+        astropy.io.fits.Header
+            Modified 2D header.
+        """
         return mvf.make_header(ndim=2, ref_header=self.cube.header)
 
     def load_pcube(self, pcube_ref=None):
@@ -203,7 +225,6 @@ class UltraCube(object):
         pcube : pyspeckit.SpectralCube
             The pyspeckit.SpectralCube object needed work with the fitting
         """
-
         # read the cube first as a SpectralCube object to performe unit conversion
         # Note: dask is set to False to ensure it's compitable with some of pyspeckit's functions
         # this loading mehod is not memory efficient, but needed workaround at the moment
@@ -315,8 +336,6 @@ class UltraCube(object):
         TypeError
             If `ncomp` is not an integer or a list of integers.
         """
-
-
         if not 'multicore' in kwargs:
             kwargs['multicore'] = self.n_cores
 
@@ -672,14 +691,8 @@ class UCubePlus(UltraCube):
         Directory where parameter maps are stored. Created if it does not exist.
     paraPaths : dict
         Dictionary mapping component numbers to file paths for saved parameter maps.
-
-    Methods
-    -------
-    read_model_fit(ncomps, read_conv=False, **kwargs)
-        Load model fits from disk or perform fitting if files do not exist.
-    get_model_fit(ncomp, update=True, **kwargs)
-        Load or perform model fitting for the specified number of components.
     """
+    __module__ = "mufasa.UltraCube"  # Explicitly set the module
 
     def __init__(self, cubefile, cube=None, fittype=None, paraNameRoot=None, paraDir=None, **kwargs):
         """
@@ -704,7 +717,6 @@ class UCubePlus(UltraCube):
         -------
         None
         """
-
         super().__init__(cubefile, cube, fittype=fittype, **kwargs)
 
         self.cubeDir = os.path.dirname(cubefile)
@@ -729,6 +741,8 @@ class UCubePlus(UltraCube):
         """
         Load model fits if they exist; otherwise, perform the fitting.
 
+        .. :noindex:
+
         Parameters
         ----------
         ncomps : list of int
@@ -752,7 +766,6 @@ class UCubePlus(UltraCube):
         FileNotFoundError
             If the specified fit files are not found and fitting cannot proceed.
         """
-
         for nc in ncomps:
             if str(nc) not in self.paraPaths:
                 self.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(self.paraDir, self.paraNameRoot, nc)
@@ -766,6 +779,7 @@ class UCubePlus(UltraCube):
     def get_model_fit(self, ncomp, update=True, **kwargs):
         """
         Load the model fits if they exist, or perform fitting if they don't.
+
         Parameters
         ----------
         ncomp : int or list of int
@@ -779,7 +793,6 @@ class UCubePlus(UltraCube):
         -------
         None
         """
-
         for nc in ncomp:
             if not str(nc) in self.paraPaths:
                 self.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(self.paraDir, self.paraNameRoot, nc)
@@ -882,7 +895,6 @@ def load_model_fit(cube, filename, ncomp, fittype):
     pyspeckit.Cube
         The fitted pyspeckit cube with the loaded model.
     """
-
     #pcube = pyspeckit.Cube(cube=cube)
     pcube = pyspeckit.Cube(cube)
 
@@ -1076,21 +1088,38 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False,
-            include_nosamp=True, planemask=None):
-    '''
-    Calculate residual sum of squares (RSS)
+def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False, include_nosamp=True, planemask=None):
+    """
+    Calculate the residual sum of squares (RSS) for a spectral cube model fit.
 
+    Parameters
+    ----------
     cube : SpectralCube
-    model: numpy array
-    expand : int
-        Expands the region where the residual is evaluated by this many channels in the spectral dimension
-    reduced : boolean
-        Whether or not to return the reduced chi-squared value or not
-    mask: boolean array
-        A mask stating which array elements the chi-squared values are calculated from
-    '''
+        The spectral data cube to analyze.
+    model : numpy.ndarray
+        The model array to compare against the data cube.
+    expand : int, optional
+        Number of channels to expand the region where the RSS is calculated along the spectral dimension. Default is 20.
+    usemask : bool, optional
+        Whether to apply a mask during RSS calculation. Default is True.
+    mask : numpy.ndarray, optional
+        A boolean array specifying which elements to include in the calculation. If None, a default mask based on the model is used.
+    return_size : bool, optional
+        If True, return the size of the valid sample region used in the RSS calculation. Default is True.
+    return_mask : bool, optional
+        If True, return the final mask used during RSS computation. Default is False.
+    include_nosamp : bool, optional
+        Whether to include spectral regions with no sample data by filling gaps with a default mask. Default is True.
+    planemask : numpy.ndarray, optional
+        A 2D mask specifying where to calculate RSS for optimized computation. Default is None.
 
+    Returns
+    -------
+    tuple
+        The calculated RSS values. If `return_size` or `return_mask` is True, additional elements include:
+        - Sample size per pixel (if `return_size` is True).
+        - Final mask used (if `return_mask` is True).
+    """
     if usemask:
         if mask is None:
             # may want to change this for future models that includes absorptions
@@ -1153,21 +1182,59 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
     return returns
 
 
-def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = None):
-    '''
-    cube : SpectralCube
-    model: numpy array
-    expand : int
-        Expands the region where the residual is evaluated by this many channels in the spectral dimension
-    reduced : boolean
-        Whether or not to return the reduced chi-squared value or not
-    usemask: boolean
-        Whether or not to mask out some parts of the data.
-        If no mask is provided, it masks out samples with model values of zero.
-    mask: boolean array
-        A mask stating which array elements the chi-squared values are calculated from
-    '''
+def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
+    """
+    Calculate the chi-squared or reduced chi-squared value for a spectral cube.
 
+    This function computes the chi-squared goodness-of-fit statistic by comparing
+    the observed data in the cube with a provided model. Optionally, the calculation
+    can be restricted to masked regions and expanded spectral regions.
+
+    Parameters
+    ----------
+    cube : SpectralCube
+        The observed spectral cube containing the data to compare against the model.
+    model : numpy.ndarray
+        A 3D array representing the model cube, which must have the same shape as the input cube.
+    expand : int, optional
+        Number of spectral channels to expand the mask region. Default is 20.
+    reduced : bool, optional
+        If True, compute the reduced chi-squared value by normalizing with the degrees of freedom.
+        If False, compute the standard chi-squared value. Default is True.
+    usemask : bool, optional
+        If True, apply a mask to exclude invalid regions from the calculation. If no mask is provided,
+        regions where the model is zero are excluded. Default is True.
+    mask : numpy.ndarray, optional
+        A 3D boolean array specifying regions to include in the calculation. If None,
+        a mask is automatically derived from the model.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 2D array representing the chi-squared (or reduced chi-squared) value
+        at each spatial pixel in the cube.
+
+    Notes
+    -----
+    - The `expand` parameter allows users to extend the region of interest by a
+      specified number of spectral channels around the model.
+    - The reduced chi-squared value is normalized by the number of degrees of freedom.
+    - The residuals between the cube and model are weighted using the mask.
+
+    Raises
+    ------
+    ValueError
+        If the cube and model dimensions do not match.
+
+    Examples
+    --------
+    >>> from spectral_cube import SpectralCube
+    >>> import numpy as np
+    >>> cube = SpectralCube.read("example_cube.fits")
+    >>> model = np.random.random(cube.shape)
+    >>> chisq = get_chisq(cube, model, expand=10, reduced=True)
+    >>> print(chisq)
+    """
     if usemask:
         if mask is None:
             mask = model > 0
@@ -1206,18 +1273,61 @@ def get_chisq(cube, model, expand=20, reduced = True, usemask = True, mask = Non
 
 
 def get_masked_moment(cube, model, order=0, expand=10, mask=None):
-    '''
-    create masked moment using either the model
-    :param cube: SpectralCube
-    :param model: numpy array
-    :param order:
-    :param expand : int
-        Expands the region where the residual is evaluated by this many channels in the spectral dimension
-    :param boolean array
-        A mask stating which array elements the chi-squared values are calculated from
-    :return:
-    '''
+    """
+    Calculate a masked moment of a spectral cube.
 
+    This function generates a moment map (e.g., integrated intensity, centroid)
+    for the input spectral cube, applying a mask derived from the provided model
+    and optionally expanding the mask region.
+
+    Parameters
+    ----------
+    cube : SpectralCube
+        The spectral cube containing the observed data, from which the moment
+        is calculated.
+    model : numpy.ndarray
+        A 3D array representing the model cube, used to derive the mask. The
+        dimensions must match the cube.
+    order : int, optional
+        The order of the moment to compute:
+        - `0` for integrated intensity (default),
+        - `1` for centroid,
+        - `2` for line width.
+    expand : int, optional
+        Number of spectral channels to expand the mask around the model.
+        Default is 10.
+    mask : numpy.ndarray, optional
+        A 3D boolean array specifying which elements to include in the moment
+        calculation. If provided, it is combined with the mask derived from
+        the model. Default is None.
+
+    Returns
+    -------
+    astropy.units.Quantity
+        The computed moment map, with the unit determined by the input cube
+        and the moment order.
+
+    Notes
+    -----
+    - The mask is generated by identifying non-zero elements in the model and
+      optionally expanding this region by the `expand` parameter.
+    - Pixels with low signal-to-noise ratios are excluded from the moment map
+      based on the mask.
+    - The function uses the spectral axis of the cube for moment calculations.
+
+    Raises
+    ------
+    ValueError
+        If the cube and model dimensions do not match.
+
+    Examples
+    --------
+    >>> from spectral_cube import SpectralCube
+    >>> cube = SpectralCube.read("example_cube.fits")
+    >>> model = np.random.random(cube.shape)
+    >>> moment_map = get_masked_moment(cube, model, order=0, expand=5)
+    >>> moment_map.write("masked_moment.fits")
+    """
     if mask is None:
         mask = model > 0
     else:
@@ -1269,13 +1379,40 @@ def get_rms(residual):
 
 
 def get_residual(cube, model, planemask=None):
-    '''
-    Calculate the residual of the fit to the cube.
-    :param cube: a SpectralCube object, potentially with dask enabled
-    :param model: ndarray, a model of the cube
-    :param planemask: a 2D boolean mask specifying where to calculate. Using this can save computing time
-    :return: residual, either as a dask array (if dask is enabled) or a numpy array
-    '''
+    """
+    Calculate the residual between the data cube and the model cube.
+
+    The residual is calculated as the difference between the spectral data
+    in the cube and the corresponding model values. Optionally, a 2D
+    spatial mask (`planemask`) can be applied to restrict the calculation
+    to specific spatial regions.
+
+    Parameters
+    ----------
+    cube : SpectralCube
+        A spectral cube object containing the observed data. It can be a
+        dask-enabled cube or a standard numpy-based cube.
+    model : numpy.ndarray
+        A 3D array representing the model cube, where the dimensions match
+        those of the data cube (spectral axis as the first dimension).
+    planemask : numpy.ndarray, optional
+        A 2D boolean array specifying the spatial pixels for which residuals
+        should be calculated. If provided, only these regions will be used
+        in the calculation. Default is None.
+
+    Returns
+    -------
+    numpy.ndarray or dask.array.Array
+        The residual array, calculated as the difference between the cube's
+        data and the model values. The returned type matches the cube's data
+        type (e.g., dask array if the cube uses dask, or numpy array otherwise).
+
+    Notes
+    -----
+    - If `planemask` is provided, the residuals are calculated only for the
+      specified spatial pixels, which can reduce computation time.
+    - Handles memory-efficient computation when dask is enabled.
+    """
     # Get the cube data as a dask array or numpy array
     data = cube.filled_data[:].value  # dask array if dask is enabled, numpy array otherwise
 
@@ -1302,11 +1439,21 @@ def get_residual(cube, model, planemask=None):
 
 
 def get_Tpeak(model):
-    '''
-    Return the peak value of a model cube at each spatial pixel (i.e. along the spectral axis)
-    :param model:
-    :return:
-    '''
+    """
+    Calculate the peak value of a model cube at each spatial pixel.
+
+    Parameters
+    ----------
+    model : numpy.ndarray
+        The input model cube with spectral data. The first dimension is assumed
+        to represent the spectral axis, and subsequent dimensions represent spatial pixels.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 2D array where each element corresponds to the peak value of the model
+        cube along the spectral axis for each spatial pixel.
+    """
     return np.nanmax(model, axis=0)
 
 
@@ -1335,7 +1482,6 @@ def is_K(data_unit):
     >>> is_K(u.Jy)
     False
     """
-
     return data_unit == 'K' or data_unit == u.K
 
 
@@ -1376,7 +1522,6 @@ def to_K(cube):
     >>> cube = SpectralCube.read('example_cube.fits')
     >>> cube_in_K = to_K(cube)
     """
-
     # Decorator to handle UnitConversionError
     def handle_unit_conversion_error(func):
         @wraps(func)

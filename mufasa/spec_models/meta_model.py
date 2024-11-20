@@ -8,7 +8,6 @@ from concurrent.futures import ThreadPoolExecutor
 from ..exceptions import FitTypeError
 from .. import moment_guess as momgue
 
-
 class MetaModel(object):
     """
     A class to store spectral model-specific information relevant to spectral modeling tasks, such as fitting.
@@ -62,7 +61,6 @@ class MetaModel(object):
     model_func : function
         The specific spectral model function used for fitting. Set based on `fittype`.
     """
-
     def __init__(self, fittype, ncomp):
         """
         Initialize a MetaModel object.
@@ -155,7 +153,6 @@ class MetaModel(object):
         else:
             raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
 
-
     def model_function(self, xarr, parameters, planemask=None, multithreaded=False):
         """
         Compute the spectral model for a given spectral axis and model parameters.
@@ -166,28 +163,36 @@ class MetaModel(object):
             The spectral axis along which to evaluate the model function.
         parameters : array-like
             The model parameters for evaluation. Can be:
-            - A 1D array with shape (l,), representing a single set of parameters.
-            - A 2D array with shape (l, n), where `l` is the number of parameters, and `n` is the number of spatial positions.
-            - A 3D array with shape (l, m, n), where `l` is the number of parameters per pixel, and `m` and `n` represent
-              the spatial dimensions. In this case, the function will evaluate the model at each (m, n) pixel specified by `planemask`.
+
+            - A 1D array with shape `(l,)`, representing a single set of parameters.
+            - A 2D array with shape `(l, n)`, where `l` is the number of parameters,
+              and `n` is the number of spatial positions.
+            - A 3D array with shape `(l, m, n)`, where `l` is the number of parameters
+              per pixel, and `m` and `n` represent the spatial dimensions. In this
+              case, the function will evaluate the model at each `(m, n)` pixel
+              specified by `planemask`.
         planemask : array-like, optional
-            A 2D mask array with shape (m, n) indicating the pixels to evaluate when `parameters` is 3D.
-            Pixels with `True` in the mask will be evaluated. If None, a default mask is generated where
-            all non-zero, finite values in `parameters` are considered valid.
+            A 2D mask array with shape `(m, n)` indicating the pixels to evaluate when
+            `parameters` is 3D. Pixels with `True` in the mask will be evaluated. If
+            None, a default mask is generated where all non-zero, finite values in
+            `parameters` are considered valid.
         multithreaded : bool, optional
-            Whether to enable multithreading to evaluate pixels in parallel when `parameters` is 2D or 3D.
-            Default is False.
+            Whether to enable multithreading to evaluate pixels in parallel when
+            `parameters` is 2D or 3D. Default is False.
 
         Returns
         -------
         np.ndarray
-            The evaluated spectral model values. The output shape matches the input shape of `parameters`:
-            - If `parameters` is 1D, returns a 1D array of computed values.
-            - If `parameters` is 2D, returns a 1D array with length `n`, containing computed values for each position.
-            - If `parameters` is 3D, returns a 2D array with shape (m, n), containing computed values for each
-              evaluated pixel in the masked region. Masked pixels are filled with NaN.
-        """
+            The evaluated spectral model values. The output shape matches the input
+            shape of `parameters`:
 
+            - If `parameters` is 1D, returns a 1D array of computed values.
+            - If `parameters` is 2D, returns a 1D array with length `n`, containing
+              computed values for each position.
+            - If `parameters` is 3D, returns a 2D array with shape `(m, n)`, containing
+              computed values for each evaluated pixel in the masked region. Masked
+              pixels are filled with NaN.
+        """
         if parameters.ndim == 1:
             # Direct evaluation for 1D input
             return self.model_func(xarr, *parameters)
@@ -240,44 +245,53 @@ class MetaModel(object):
 
             return results
 
-
     def peakT(self, parameters, index_v=0, planemask=None, multithreaded=False):
         """
-        Estimate the peak brightness temperature of the spectral model by evaluating the model at the spectral location
-        (i.e., the velocity) of the brightest hyperfine line. Note: this method only works for a single-component model,
-        where the peak brightness is expected to be located near the brightest hyperfine line.
+        Estimate the peak brightness temperature of the spectral model by evaluating
+        the model at the spectral location (i.e., the velocity) of the brightest
+        hyperfine line.
+
+        Note
+        ----
+        This method only works for a single-component model, where the peak
+        brightness is expected to be located near the brightest hyperfine line.
 
         Parameters
         ----------
         parameters : array-like
-            The model parameters to evaluate, where each element corresponds to a parameter used in the spectral model.
-            Can be:
-            - A 1D array with shape (l,), representing a single set of parameters.
-            - A 2D array with shape (l, n), where `l` is the number of parameters and `n` is the number of spatial positions.
-            - A 3D array with shape (l, m, n), where `l` is the number of parameters per pixel, and `m` and `n` represent
-              the spatial dimensions.
+            The model parameters to evaluate, where each element corresponds to a
+            parameter used in the spectral model. Can be:
+
+            - A 1D array with shape `(l,)`, representing a single set of parameters.
+            - A 2D array with shape `(l, n)`, where `l` is the number of parameters and
+              `n` is the number of spatial positions.
+            - A 3D array with shape `(l, m, n)`, where `l` is the number of parameters
+              per pixel, and `m` and `n` represent the spatial dimensions.
         index_v : int, optional
-            Index of the parameter corresponding to the velocity centroid, which is 0 for all spectral models
-            implemented in MUFASA. Default is 0.
+            Index of the parameter corresponding to the velocity centroid, which is 0
+            for all spectral models implemented in MUFASA. Default is 0.
         planemask : array-like, optional
-            A 2D mask array with shape (m, n) indicating the pixels to evaluate when `parameters` is 3D.
-            Pixels with `True` in the mask will be evaluated. If None, a mask is generated based on finite, non-zero values
-            in `parameters`.
+            A 2D mask array with shape `(m, n)` indicating the pixels to evaluate when
+            `parameters` is 3D. Pixels with `True` in the mask will be evaluated. If
+            None, a mask is generated based on finite, non-zero values in
+            `parameters`.
         multithreaded : bool, optional
-            Whether to enable multithreading to evaluate pixels in parallel when `parameters` is 2D or 3D.
-            Default is False.
+            Whether to enable multithreading to evaluate pixels in parallel when
+            `parameters` is 2D or 3D. Default is False.
 
         Returns
         -------
         np.ndarray
             An array with the peak brightness temperature for each evaluated pixel:
-            - If `parameters` is 1D, returns a scalar representing the peak brightness temperature.
-            - If `parameters` is 2D, returns a 1D array with length `n`, containing the peak brightness temperature for each
-              position.
-            - If `parameters` is 3D, returns a 2D array with shape (m, n) containing the peak brightness temperature for each
-              evaluated pixel in the masked region. Masked pixels are filled with NaN.
-        """
 
+            - If `parameters` is 1D, returns a scalar representing the peak
+              brightness temperature.
+            - If `parameters` is 2D, returns a 1D array with length `n`, containing
+              the peak brightness temperature for each position.
+            - If `parameters` is 3D, returns a 2D array with shape `(m, n)`, containing
+              the peak brightness temperature for each evaluated pixel in the masked
+              region. Masked pixels are filled with NaN.
+        """
         # Function implementation
 
         # Get the velocity at the brightest hyperfine line

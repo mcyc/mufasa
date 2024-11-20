@@ -41,9 +41,6 @@ class LineSetup(object):
                 self.tau_min = 0.3
 
         elif linetype == 'n2hp':
-            '''
-            For Julian to fill in for the N2H+ model
-            '''
             from .spec_models.n2hp_constants import voff_lines_dict
 
             voff = voff_lines_dict['onezero']
@@ -143,19 +140,60 @@ def vmask_cube(cube, vmap, window_hwidth=3.0):
 
 
 def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
-    '''
-    :param spec:
-        A spectrum or cube. Can be either pyspeckit objects or spectral_cube objects
-    :param window_hwidth:
-        <float>
-        the half-width of the spectral window to calculate moments from (useful to isolate hyperfine lines)
-    :param v_atpeak:
-        <float or ndarraay>
-        the velocity or velocity map to center the moment calculation on
-    :param signal_mask:
-    :return:
-    '''
+    """
+    Calculate the zeroth, first, and second moments of a spectrum or cube
+    within a specified velocity window.
 
+    Parameters
+    ----------
+    spec : pyspeckit.Cube, pyspeckit.spectrum.classes.Spectrum, or SpectralCube
+        The spectrum or cube for which moments are calculated.
+        Can be a `pyspeckit.Cube`, `pyspeckit.spectrum.classes.Spectrum`,
+        or `SpectralCube` object.
+    window_hwidth : float, optional
+        The half-width of the spectral window in km/s used to calculate moments.
+        This is useful for isolating hyperfine lines. Default is 4.0.
+    v_atpeak : float, numpy.ndarray, or None, optional
+        The velocity or velocity map (in km/s) around which to center the moment
+        calculation. If None, it will be estimated from the spectrum or cube.
+        Default is None.
+    signal_mask : numpy.ndarray or None, optional
+        An optional mask to apply when estimating the velocity peak (`v_atpeak`).
+        Useful for suppressing noise when determining the peak. Default is None.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        A tuple containing:
+        - Zeroth moment (`m0`) as a numpy array.
+        - First moment (`m1`) as a numpy array in km/s.
+        - Second moment (`m2`) as a numpy array in km/s.
+
+    Raises
+    ------
+    Exception
+        If the input `spec` is not a supported type.
+
+    Notes
+    -----
+    - This function acts as a wrapper to calculate moments for different types
+      of inputs (`SpectralCube`, `pyspeckit.Cube`, or `pyspeckit.spectrum`).
+    - For `SpectralCube`, `v_atpeak` as a map is not currently supported.
+
+    Examples
+    --------
+    For a `SpectralCube` object:
+
+    >>> from spectral_cube import SpectralCube
+    >>> cube = SpectralCube.read("example_cube.fits")
+    >>> m0, m1, m2 = window_moments(cube, window_hwidth=3.0, v_atpeak=5.0)
+
+    For a `pyspeckit.spectrum.classes.Spectrum`:
+
+    >>> import pyspeckit
+    >>> spec = pyspeckit.Spectrum("example_spectrum.fits")
+    >>> m0, m1, m2 = window_moments(spec, window_hwidth=2.0)
+    """
     def moments_pys_spectrum(spectrum, window_hwidth=4.0, v_atpeak=None, iter_refine=False):
         '''
         find moments within a given window (e.g., around the main hyperfine lines)
@@ -196,23 +234,60 @@ def window_moments(spec, window_hwidth=4.0, v_atpeak=None, signal_mask=None):
 
         return moments[1], moments[2], moments[3]
 
-
     def moments_pys_cube(pcube, window_hwidth=4.0, v_atpeak=None, iter_refine=False, multicore=None):
-        '''
-        find moments within a given window (e.g., around the main hyperfine lines)
-        # note: iter_refine has not proven to be very effective in our tests
+        """
+        Calculate moments of a pyspeckit spectral cube within a specified velocity window.
 
-        :param pcube:
-            <pyspeckit.cubes.SpectralCube.Cube>
-            the cube to take the moments of
+        Parameters
+        ----------
+        pcube : pyspeckit.cubes.SpectralCube.Cube
+            The spectral cube for which moments are calculated.
+        window_hwidth : float, optional
+            The half-width of the velocity window (in km/s) used to isolate spectral lines.
+            Default is 4.0 km/s.
+        v_atpeak : float, numpy.ndarray, or None, optional
+            The velocity or velocity map (in km/s) around which to center the moment
+            calculations. If None, moments are calculated over the entire cube and
+            refined iteratively. Default is None.
+        iter_refine : bool, optional
+            If True, refines the velocity window iteratively based on the first moment.
+            This is useful for low signal-to-noise spectra. Default is False.
+        multicore : int or None, optional
+            The number of CPU cores to use for parallel processing. If None, it will use
+            all available cores. Default is None.
 
-        :param window_hwidth: float
-            half-width of the window (in km/s) to be used to isolate the main hyperfine lines from the rest of the spectrum
+        Returns
+        -------
+        tuple of numpy.ndarray
+            A tuple containing:
+            - Zeroth moment (`m0`) as a numpy array.
+            - First moment (`m1`) as a numpy array in km/s.
+            - Second moment (`m2`) as a numpy array in km/s.
 
-        :param v_atpeak: float or ndarray
-            the velociy or a map of velocities to center the spectral window on
-        '''
+        Notes
+        -----
+        - This function uses pyspeckit's `momenteach` method for calculating moments.
+        - If `v_atpeak` is provided, the function will restrict calculations to the
+          specified velocity window. Otherwise, an initial pass over the cube will
+          estimate the velocity map, which is used to define the window.
+        - Iterative refinement of moments can be computationally expensive and
+          is not recommended for large datasets unless necessary.
 
+        Examples
+        --------
+        >>> from pyspeckit import Cube
+        >>> pcube = Cube("example_cube.fits")
+        >>> m0, m1, m2 = moments_pys_cube(pcube, window_hwidth=3.0)
+
+        >>> vmap = pcube.moment1(unit='km/s').value
+        >>> m0, m1, m2 = moments_pys_cube(pcube, window_hwidth=2.0, v_atpeak=vmap, iter_refine=True)
+
+        Raises
+        ------
+        AttributeError
+            If parallel processing with `momenteach` fails, the function will fall back
+            to single-core execution.
+        """
         multicore = validate_n_cores(multicore)
 
         def get_win_moms(pcube, v_atpeak):
@@ -313,18 +388,67 @@ def noisemask_moment(sp, m1, m2, mask_sigma=4, noise_rms = None, **kwargs):
 
 
 def moment_guesses(moment1, moment2, ncomp, sigmin=0.07, tex_guess=3.2, tau_guess=0.5, moment0=None, linetype='nh3', mom0_floor=None):
-    '''
-    Make reasonable guesses for the multiple component fits
-    :param moment1:
-    :param moment2:
-    :param ncomp:
-    :param sigmin:
-        <float> default at 0.07 km/s, the spectral resolution of the GAS channels
-    :param tex_guess:
-    :param tau_guess:
-    :return:
-    '''
+    """
+    Generate reasonable initial guesses for multiple component fits based on moment maps.
 
+    Parameters
+    ----------
+    moment1 : numpy.ndarray
+        The first moment (velocity centroid) map.
+    moment2 : numpy.ndarray
+        The second moment (velocity dispersion) map.
+    ncomp : int
+        Number of components for the fit.
+    sigmin : float, optional
+        Minimum velocity dispersion (in km/s). Default is 0.07 km/s, the spectral resolution of the GAS channels.
+    tex_guess : float, optional
+        Initial guess for the excitation temperature (T_ex). Default is 3.2 K.
+    tau_guess : float, optional
+        Initial guess for the optical depth (tau). Default is 0.5.
+    moment0 : numpy.ndarray, optional
+        Zeroth moment (integrated intensity) map. If provided, this will be used to
+        modify the guesses for T_ex and tau. Default is None.
+    linetype : str, optional
+        Line type, either 'nh3' or 'n2hp'. Determines parameter limits. Default is 'nh3'.
+    mom0_floor : float, optional
+        Minimum floor value for moment0 when normalizing. If not provided, a default
+        normalization is applied. Default is None.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 2D array of shape `(ncomp * 4, moment1.shape)` containing the guesses for each parameter:
+        - Component velocity centroids.
+        - Velocity dispersions.
+        - Excitation temperatures.
+        - Optical depths.
+
+    Notes
+    -----
+    - For `ncomp == 1`, the method uses a single-component guess based on the provided moments.
+    - For `ncomp == 2`, the method applies a recipe for a bright and faint component with
+      offsets in velocity and reduced T_ex and tau for the faint component.
+    - For `ncomp > 2`, components are evenly spaced in velocity, and parameter guesses
+      are scaled accordingly.
+    - If `moment0` is provided, the guesses for T_ex and tau are scaled based on the
+      normalized moment0 values.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> moment1 = np.array([[1.0, 2.0], [3.0, 4.0]])
+    >>> moment2 = np.array([[0.1, 0.2], [0.3, 0.4]])
+    >>> ncomp = 2
+    >>> guesses = moment_guesses(moment1, moment2, ncomp, tex_guess=4.0, tau_guess=0.8)
+
+    >>> moment0 = np.array([[1.5, 2.5], [3.5, 4.5]])
+    >>> guesses_with_mom0 = moment_guesses(moment1, moment2, ncomp, moment0=moment0, mom0_floor=0.1)
+
+    Raises
+    ------
+    ValueError
+        If `ncomp` is less than 1 or other parameters are invalid.
+    """
     # setup different limits based on the line specie
     line_setup = LineSetup(linetype)
     tex_max = line_setup.tex_max
