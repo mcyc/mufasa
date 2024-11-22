@@ -56,4 +56,4 @@ Use the navigation bar at the top to explore other sections, including :doc:`Tut
    quick_start
    guides
    tutorials/index
-   api/modules
+   api/generated/index

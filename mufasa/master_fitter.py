@@ -65,7 +65,7 @@ logger = get_logger(__name__)
 
 # =======================================================================================================================
 
-class Region:
+class Region(object):
     """
     A class to represent the observed spectral cube to perform the model fits.
 

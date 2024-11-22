@@ -1,0 +1,34 @@
+:html_theme.sidebar_secondary.remove:
+
+.. _api_ref:
+
+=============
+API Reference
+=============
+
+This is the API reference for Mufasa.
+
+.. toctree::
+   :maxdepth: 2
+   :glob:
+   :hidden:
+
+   *
+
+.. list-table::
+   :header-rows: 1
+
+   * - Module
+     - Summary
+{% for package in api_structure.subpackages %}
+   * - :mod:`{{ package }}`
+     - Summary for {{ package }} package.
+{% endfor %}
+{% for module in api_structure.modules %}
+   * - :mod:`{{ module }}`
+     - Summary for {{ module }} module.
+{% endfor %}
+{% if not api_structure.subpackages and not api_structure.modules %}
+   * - No modules found
+     -
+{% endif %}
