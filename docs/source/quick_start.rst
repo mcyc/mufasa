@@ -78,4 +78,4 @@ To plot the fitted parameters in 3D, such as in position-position-velocity (PPV)
 Exploring More
 --------------
 - For more examples and detailed guides, see :doc:`Tutorials <tutorials/index>`.
-- For a full reference of available modules, visit the :doc:`API Reference <api/modules>`.
+- For a full reference of available modules, visit the :doc:`API Reference <api/generated/index>`.

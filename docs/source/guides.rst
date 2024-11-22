@@ -27,7 +27,7 @@ Reference Materials
 -------------------
 For detailed information on all available modules, classes, and methods, refer to:
 
-- :doc:`API Reference <api/modules>`: A complete reference for the **MUFASA** API.
+- :doc:`API Reference <api/generated/index>`: A complete reference for the **MUFASA** API.
 
 Contributing to MUFASA
 ----------------------

@@ -47,7 +47,7 @@ To get started with **MUFASA** quickly, check out the :doc:`Quick Start <quick_s
 Contents
 ---------
 
-Use the navigation bar at the top to explore other sections, including :doc:`Tutorials <tutorials/index>`, :doc:`Guides <guides>`, and :doc:`API Reference <api/modules>`.
+Use the navigation bar at the top to explore other sections, including :doc:`Tutorials <tutorials/index>`, :doc:`Guides <guides>`, and :doc:`API Reference <api/index>`.
 
 .. toctree::
    :hidden:
@@ -56,4 +56,4 @@ Use the navigation bar at the top to explore other sections, including :doc:`Tut
    quick_start
    guides
    tutorials/index
-   api/generated/index
+   api/index

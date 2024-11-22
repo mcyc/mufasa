@@ -1,0 +1,15 @@
+=============
+Modules
+=============
+
+Below is the full list of modules and submodules in MUFASA, with links to their detailed API documentation.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Module
+     - Description
+{% for module_name, module_details in API_REFERENCE.items() %}
+   * - :mod:`{{ module_name }}`
+     - {{ module_details.short_summary or "No description available." }}
+{% endfor %}

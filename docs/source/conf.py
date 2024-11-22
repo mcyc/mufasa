@@ -32,9 +32,11 @@ extensions = [
     #'sphinx_search.extension',  # Add search extension
 ]
 
+
 autosummary_generate = True
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
+autosummary_imported_members = True
 
 autodoc_default_options = {
     'members': True,
@@ -61,6 +63,7 @@ intersphinx_mapping = {
     'scipy': ('https://docs.scipy.org/doc/scipy/', None),
     'matplotlib': ('https://matplotlib.org/stable/', None),
     'joblib': ('https://joblib.readthedocs.io/en/latest/', None),
+    'spectral_cube': ('https://spectral-cube.readthedocs.io/en/latest/', None),
 }
 
 templates_path = ['_templates']
@@ -73,6 +76,11 @@ html_sidebars = {
     "quick_start": [],
     "installation": [],
 }
+
+nitpick_ignore = [
+    ('class', 'SpectralCube'),
+]
+
 
 # Remove unused gallery config if not in use
 # sphinx_gallery_conf = {

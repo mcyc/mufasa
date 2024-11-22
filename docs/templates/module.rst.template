@@ -1,0 +1,19 @@
+{{ MODULE_NAME }}
+{{ "=" * MODULE_NAME|length }}
+
+.. automodule:: {{ MODULE_NAME }}
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+{% for section in DETAILS.sections %}
+{{ section.title }}
+{{ "-" * section.title|length }}
+
+.. autosummary::
+    :toctree: ../generated/{{ MODULE_NAME | replace('.', '/') }}/
+
+{% for item in section.autosummary %}
+    {{ item }}
+{% endfor %}
+{% endfor %}

@@ -1,0 +1,18 @@
+:html_theme.sidebar_secondary.remove:
+
+.. _api_deprecated_ref:
+
+Recently Deprecated
+===================
+
+{% for version, objects in DEPRECATED_API_REFERENCE.items() %}
+.. rubric:: To be removed in {{ version }}
+
+.. autosummary::
+   :nosignatures:
+   :toctree: ../modules/generated
+
+{% for obj in objects %}
+   {{ obj }}
+{% endfor %}
+{% endfor %}

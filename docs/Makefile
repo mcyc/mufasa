@@ -6,7 +6,7 @@ SPHINXAPIDOC  ?= sphinx-apidoc
 # Simplified directory paths
 SOURCEDIR     = source
 BUILDDIR      = build
-APIDESTDIR    = source/api
+APIDESTDIR    = source/api/generated
 TEMPLATEDIR   = templates
 PACKAGEDIR    = ../mufasa
 
@@ -33,8 +33,10 @@ clean:
 	$(SILENT)rm -rf "$(BUILDDIR)"
 
 apidocs:
-	@echo "Generating API documentation templates..."
+	@echo "Generating API documentation..."
+	sphinx-apidoc -o source/api/generated ../mufasa --force --separate
 	python scripts/render_templates.py
+	@echo "Custom templates have been rendered."
 
 distclean: clean
 	$(SILENT)echo "WARNING: Performing deep clean..."
