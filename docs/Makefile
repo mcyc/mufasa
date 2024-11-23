@@ -32,11 +32,17 @@ clean:
 	$(SILENT)echo "Cleaning build directory..."
 	$(SILENT)rm -rf "$(BUILDDIR)"
 
-apidocs:
+apidocs_1:
 	@echo "Generating API documentation..."
 	sphinx-apidoc -o source/api/generated ../mufasa --force --separate --no-toc
 	python scripts/make_api_rst.py
 	@echo "Customized API index.rst generated."
+
+apidocs:
+	@echo "Generating API documentation..."
+	sphinx-apidoc -o source/api/generated ../mufasa --force --separate
+	python scripts/make_api_index.py
+
 
 distclean: clean
 	$(SILENT)echo "WARNING: Performing deep clean..."

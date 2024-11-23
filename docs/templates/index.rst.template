@@ -1,16 +1,29 @@
-=============
+.. _api_reference:
+
+===============
 API Reference
-=============
+===============
 
-Below is a hierarchical overview of all modules and submodules.
+This is the API reference for Mufasa.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Module
+     - Description
+   {% for module, description in MODULES if '._' not in module -%}
+   * - :mod:`{{ module }}`
+     - {{ description }}
+   {% endfor %}
 
 .. toctree::
    :maxdepth: 2
-   :titlesonly:
+   :hidden:
 
-   generated/mufasa
+   {% for module, description in MODULES if module.count('.') <= 1 and '._' not in module -%}
+   generated/{{ module }}
+   {% endfor %}
 
-.. toctree::
-   :maxdepth: 2
 
-   modules
+
+
