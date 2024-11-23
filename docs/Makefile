@@ -34,9 +34,9 @@ clean:
 
 apidocs:
 	@echo "Generating API documentation..."
-	sphinx-apidoc -o source/api/generated ../mufasa --force --separate
-	python scripts/render_templates.py
-	@echo "Custom templates have been rendered."
+	sphinx-apidoc -o source/api/generated ../mufasa --force --separate --no-toc
+	python scripts/make_api_rst.py
+	@echo "Customized API index.rst generated."
 
 distclean: clean
 	$(SILENT)echo "WARNING: Performing deep clean..."

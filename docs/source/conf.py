@@ -54,6 +54,7 @@ html_theme_options = {
     "show_toc_level": 2,
     "navbar_align": "left",
     "collapse_navigation": True,  # Enable collapsible sidebar
+    "navigation_depth": 4,  # Ensure the sidebar reflects submodules
     #"navbar_end": ["version-switcher"],
 }
 
