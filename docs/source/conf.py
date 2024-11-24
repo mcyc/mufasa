@@ -39,11 +39,12 @@ napoleon_numpy_docstring = True
 autosummary_imported_members = True
 
 autodoc_default_options = {
-    'members': True,
-    'undoc-members': True,
-    'show-inheritance': True,
-    'exclude-members': '__weakref__',
-    'typehints': 'description',
+    'members': True,                # Document all members
+    'undoc-members': False,         # Skip undocumented members
+    'show-inheritance': True,       # Show class inheritance diagrams
+    'inherited-members': False,     # Skip inherited members
+    'special-members': False,       # Skip special methods (e.g., __init__)
+    'exclude-members': '__weakref__'  # Exclude undesired members
 }
 
 # -- HTML output options ------------------------------------------------------

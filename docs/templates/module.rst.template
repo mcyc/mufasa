@@ -3,38 +3,39 @@
 {{ short_name }}
 {{ '=' * short_name|length }}
 
-{{ docstring }}
-.. currentmodule:: {{ full_name }}
+.. automodule:: {{ full_name }}
+   :noindex:
+   :exclude-members: {% for member in classes + functions -%}{{ member }}, {% endfor %}
 
-{% if submodules %}
-Submodules
-----------
+{% if submodules -%}
+.. rubric:: Submodules
+
 .. autosummary::
-   :toctree:
+   :toctree: generated/
 
    {% for submodule in submodules -%}
    {{ submodule }}
-   {% endfor %}
-{% endif %}
+   {% endfor -%}
+{% endif -%}
 
-{% if classes %}
-Classes
--------
+{% if classes -%}
+.. rubric:: Classes
+
 .. autosummary::
    :toctree: generated/
 
    {% for cls in classes -%}
-   {{ full_name }}.{{ cls }}
-   {% endfor %}
-{% endif %}
+   {{ cls }}
+   {% endfor -%}
+{% endif -%}
 
 {% if functions %}
-Functions
----------
+.. rubric:: Functions
+
 .. autosummary::
-   :toctree:
+   :toctree: generated/
 
    {% for func in functions -%}
-   {{ full_name }}.{{ func }}
-   {% endfor %}
-{% endif %}
+   {{ func }}
+   {% endfor -%}
+{% endif -%}

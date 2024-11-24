@@ -1,62 +1,50 @@
-# Sphinx configuration variables
+# Variables
 SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
-SPHINXAPIDOC  ?= sphinx-apidoc
-
-# Simplified directory paths
 SOURCEDIR     = source
 BUILDDIR      = build
-APIDESTDIR    = source/api/generated
-TEMPLATEDIR   = templates
-PACKAGEDIR    = ../mufasa
+SCRIPTSDIR    = scripts
 
-# Verbosity control
-VERBOSE ?= 0
-ifeq ($(VERBOSE), 1)
-    SILENT =
-else
-    SILENT = @
-endif
+.DEFAULT_GOAL := html
 
-.DEFAULT_GOAL := all
+# Targets
 
-.PHONY: all clean distclean html apidocs check_env help
+all: apidocs html
 
-all: check_env clean apidocs html
-
-html:
-	$(SILENT)echo "Building HTML documentation..."
-	$(SILENT)$(SPHINXBUILD) -j auto -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-
-clean:
-	$(SILENT)echo "Cleaning build directory..."
-	$(SILENT)rm -rf "$(BUILDDIR)"
-
-apidocs_1:
-	@echo "Generating API documentation..."
-	sphinx-apidoc -o source/api/generated ../mufasa --force --separate --no-toc
-	python scripts/make_api_rst.py
-	@echo "Customized API index.rst generated."
+generate-api-reference:
+	@echo "Generating API_REFERENCE..."
+	python $(SCRIPTSDIR)/generate_api_reference.py
 
 apidocs:
-	@echo "Generating API documentation..."
-	sphinx-apidoc -o source/api/generated ../mufasa --force --separate
-	python scripts/make_api_index.py
+	@echo "Generating .rst files for API documentation..."
+	python $(SCRIPTSDIR)/generate_rst_files.py
 
+html:
+	@echo "Building HTML documentation..."
+	$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 
-distclean: clean
-	$(SILENT)echo "WARNING: Performing deep clean..."
-	$(SILENT)rm -rf "$(APIDESTDIR)"/*.rst
+clean:
+	@echo "Cleaning build and generated files..."
+	rm -rf "$(BUILDDIR)"
+	rm -rf "$(SOURCEDIR)/api/generated"
 
-check_env:
-	$(SILENT)command -v $(SPHINXBUILD) > /dev/null || { echo "$(SPHINXBUILD) not found! Install Sphinx."; exit 1; }
-	$(SILENT)command -v $(SPHINXAPIDOC) > /dev/null || { echo "$(SPHINXAPIDOC) not found! Install Sphinx."; exit 1; }
+distclean: confirm-distclean clean
+	@echo "WARNING: Removing all auto-generated .rst files..."
+	rm -f "$(SOURCEDIR)/api/generated/*.rst"
+	rm -f "$(SCRIPTSDIR)/api_reference.py"
+
+confirm-distclean:
+	@read -p "Are you sure you want to perform a distclean? This will remove all generated files (y/n): " confirm; \
+	if [ "$$confirm" != "y" ]; then \
+		echo "Distclean aborted."; \
+		exit 1; \
+	fi
 
 help:
-	@echo "Usage:"
-	@echo "  make           Build all (clean, apidocs, html)"
-	@echo "  make html      Build HTML documentation"
-	@echo "  make apidocs   Generate API documentation from mufasa source"
-	@echo "  make clean     Remove build directory"
-	@echo "  make distclean Deep clean, including API documentation"
-	@echo "  make help      Show this help message"
+	@echo "Makefile targets:"
+	@echo "  make generate-api-reference  Generate or overwrite API_REFERENCE dynamically."
+	@echo "  make apidocs                 Generate .rst files for API documentation."
+	@echo "  make html                    Build the HTML documentation."
+	@echo "  make clean                   Clean up build and generated files."
+	@echo "  make distclean               Clean everything, including auto-generated files (requires confirmation)."
+	@echo "  make help                    Show this help message."
