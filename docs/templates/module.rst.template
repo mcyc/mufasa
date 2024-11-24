@@ -1,19 +1,40 @@
-{{ MODULE_NAME }}
-{{ "=" * MODULE_NAME|length }}
+.. _{{ full_name }}:
 
-.. automodule:: {{ MODULE_NAME }}
-    :members:
-    :undoc-members:
-    :show-inheritance:
+{{ short_name }}
+{{ '=' * short_name|length }}
 
-{% for section in DETAILS.sections %}
-{{ section.title }}
-{{ "-" * section.title|length }}
+{{ docstring }}
+.. currentmodule:: {{ full_name }}
 
+{% if submodules %}
+Submodules
+----------
 .. autosummary::
-    :toctree: ../generated/{{ MODULE_NAME | replace('.', '/') }}/
+   :toctree:
 
-{% for item in section.autosummary %}
-    {{ item }}
-{% endfor %}
-{% endfor %}
+   {% for submodule in submodules -%}
+   {{ submodule }}
+   {% endfor %}
+{% endif %}
+
+{% if classes %}
+Classes
+-------
+.. autosummary::
+   :toctree: generated/
+
+   {% for cls in classes -%}
+   {{ full_name }}.{{ cls }}
+   {% endfor %}
+{% endif %}
+
+{% if functions %}
+Functions
+---------
+.. autosummary::
+   :toctree:
+
+   {% for func in functions -%}
+   {{ full_name }}.{{ func }}
+   {% endfor %}
+{% endif %}

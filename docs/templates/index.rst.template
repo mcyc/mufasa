@@ -4,14 +4,14 @@
 API Reference
 ===============
 
-This is the API reference for Mufasa.
+This is the API reference for {{ package_name }}.
 
 .. list-table::
    :header-rows: 1
 
    * - Module
      - Description
-   {% for module, description in MODULES if '._' not in module -%}
+   {% for module, description in modules -%}
    * - :mod:`{{ module }}`
      - {{ description }}
    {% endfor %}
@@ -20,10 +20,7 @@ This is the API reference for Mufasa.
    :maxdepth: 2
    :hidden:
 
-   {% for module, description in MODULES if module.count('.') <= 1 and '._' not in module -%}
+   {% for module, _ in modules -%}
    generated/{{ module }}
    {% endfor %}
-
-
-
 
