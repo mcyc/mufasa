@@ -34,9 +34,11 @@ extensions = [
 
 
 autosummary_generate = True
+autosummary_imported_members = True
+numpydoc_show_class_members = False  # Suppresses showing members for classes
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
-autosummary_imported_members = True
+
 
 autodoc_default_options = {
     'members': True,                # Document all members

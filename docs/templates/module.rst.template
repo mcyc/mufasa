@@ -23,6 +23,7 @@
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
 
    {% for cls in classes -%}
    {{ cls }}
@@ -34,6 +35,7 @@
 
 .. autosummary::
    :toctree: generated/
+   :nosignatures:
 
    {% for func in functions -%}
    {{ func }}
