@@ -1,0 +1,13 @@
+.. _{{ full_name }}:
+
+{{ short_name }}
+{{ '=' * short_name|length }}
+
+{{ full_name }}{{ signature }}
+
+{{ docstring }}
+
+.. autoclass:: {{ full_name }}
+   :members:
+   :undoc-members:
+   :inherited-members:

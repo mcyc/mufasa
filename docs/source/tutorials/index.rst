@@ -32,6 +32,6 @@ Descriptions
 
 Next Steps
 ----------
-- After exploring the tutorials, check out the :doc:`API Reference <../api/generated/index>` for a full overview of available modules and classes.
+- After exploring the tutorials, check out the :doc:`API Reference <../api/index>` for a full overview of available modules and classes.
 - Visit the :doc:`Guides <../guides>` for advanced workflows and tips.
 - Find additional resources on the `MUFASA GitHub repository <https://github.com/mcyc/mufasa>`_.

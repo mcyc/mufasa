@@ -1,26 +1,37 @@
-.. _api_reference:
+:html_theme.sidebar_secondary.remove:
 
-===============
+.. _api_ref:
+
+=============
 API Reference
-===============
+=============
 
-This is the API reference for {{ package_name }}.
-
-.. list-table::
-   :header-rows: 1
-
-   * - Module
-     - Description
-   {% for module, description in modules -%}
-   * - :mod:`{{ module }}`
-     - {{ description }}
-   {% endfor %}
+This is the class and function reference of **MUFASA**.
 
 .. toctree::
    :maxdepth: 2
    :hidden:
 
-   {% for module, _ in modules -%}
-   generated/{{ module }}
+   {% for module in API_REFERENCE -%}
+   {% if module.startswith('mufasa.')
+         and module.count('.') == 1
+         and '._' not in module -%}
+   {{ module }}
+   {% endif -%}
    {% endfor %}
+
+.. list-table::
+   :header-rows: 1
+   :class: apisearch-table
+
+   * - Object
+     - Description
+   {% for module, module_info in API_REFERENCE.items() -%}
+   {% for obj in module_info["sections"][0]["autosummary"] -%}
+   {% if module_info["type"].get(obj) in ["class", "function"] -%}
+   * - :obj:`~{{ module }}.{{ obj }}`
+     - {{ module_info["short_summary"] }}
+   {% endif -%}
+   {% endfor -%}
+   {% endfor -%}
 

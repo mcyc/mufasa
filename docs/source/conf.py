@@ -85,6 +85,7 @@ nitpick_ignore = [
     ('class', 'SpectralCube'),
 ]
 
+#exclude_patterns = ['api/generated/generated*']
 
 # Remove unused gallery config if not in use
 # sphinx_gallery_conf = {

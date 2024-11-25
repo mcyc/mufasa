@@ -14,6 +14,11 @@ def discover_package(package_name):
 
     # Walk through the package directory to find modules and submodules
     for _, module_name, is_pkg in pkgutil.walk_packages([package_dir], prefix=f"{package_name}."):
+        # Skip modules starting with "._"
+        if '._' in module_name:
+            print(f"Skipping hidden module: {module_name}")
+            continue
+
         try:
             module = importlib.import_module(module_name)
         except ImportError as e:
@@ -36,6 +41,7 @@ def discover_package(package_name):
                 submodule_name for _, submodule_name, sub_is_pkg in pkgutil.iter_modules(
                     [os.path.dirname(module.__file__)], prefix=f"{module_name}."
                 )
+                if '._' not in submodule_name  # Skip hidden submodules
             ]
             members = [{"name": submodule, "type": "module"} for submodule in submodules]
         else:
@@ -53,8 +59,6 @@ def discover_package(package_name):
         }
 
     return api_reference
-
-
 
 
 def write_api_reference(api_reference, output_file):

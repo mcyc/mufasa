@@ -28,13 +28,6 @@ API_REFERENCE = {
             {'name': 'to_K', 'type': 'function'}
         ]
     },
-    'mufasa._version': {
-        'module': 'mufasa._version',
-        'description': 'No description available.',
-        'members': [
-
-        ]
-    },
     'mufasa.aic': {
         'module': 'mufasa.aic',
         'description': 'No description available.',

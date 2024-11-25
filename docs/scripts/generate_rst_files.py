@@ -7,7 +7,9 @@ TEMPLATE_DIR = "templates"
 MODULE_TEMPLATE = "module.rst.template"
 CLASS_TEMPLATE = "class.rst.template"
 FUNCTION_TEMPLATE = "function.rst.template"
-OUTPUT_DIR = "source/api/generated"
+INDEX_TEMPLATE = "index.rst.template"  # Template for api/index.rst
+OUTPUT_DIR = "source/api" #"source/api/generated"
+INDEX_OUTPUT = "source/api/index.rst"
 
 env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
 
@@ -25,39 +27,63 @@ def write_file(output_path, content):
         f.write(content)
 
 
+def transform_api_reference(api_reference):
+    """Transform API_REFERENCE to Scikit-learn-style format with type mapping."""
+    transformed_reference = {}
+    for module_name, module_details in api_reference.items():
+        # Extract autosummary and type mapping
+        members = module_details.get("members", [])
+        autosummary = [member["name"] for member in members]
+        types = {member["name"]: member["type"] for member in members}
+
+        # Build transformed entry
+        transformed_reference[module_name] = {
+            "short_summary": module_details.get("description", "No description available."),
+            "description": None,  # Add detailed descriptions if available
+            "sections": [
+                {
+                    "title": None,  # Titles can be added if needed
+                    "autosummary": autosummary,
+                }
+            ],
+            "type": types,  # Include type mapping
+        }
+    return transformed_reference
+
+
+def generate_api_index():
+    """Generate the api/index.rst file."""
+    transformed_reference = transform_api_reference(API_REFERENCE)
+    context = {
+        "API_REFERENCE": transformed_reference,
+        "DEPRECATED_API_REFERENCE": [],  # Add deprecated items if applicable
+    }
+    content = render_template(INDEX_TEMPLATE, context)
+    write_file(INDEX_OUTPUT, content)
+    print(f"Generated index .rst: {INDEX_OUTPUT}")
+
+
 def generate_module_rst(module_name, module_details):
     """Generate .rst file for a module."""
-    # Separate out classes, functions, and submodules
-    classes = [
-        member["name"] for member in module_details["members"] if member["type"] == "class"
-    ]
-    functions = [
-        member["name"] for member in module_details["members"] if member["type"] == "function"
-    ]
-    submodules = [
-        member["name"] for member in module_details["members"] if member["type"] == "module"
-    ]
+    members = module_details["members"]
 
-    # Prepare the context for rendering
     context = {
-        "full_name": module_details["module"],  # Full module name
-        "short_name": module_details["module"].split('.')[-1],  # Short name (last part)
+        "full_name": module_details["module"],
+        "short_name": module_details["module"].split('.')[-1],
         "docstring": module_details.get("description", "No description available."),
-        "classes": classes,
-        "functions": functions,
-        "submodules": submodules,  # Pass full names; template handles short names
+        "submodules": [m["name"] for m in members if m["type"] == "module"],
+        "classes": [f"{module_details['module']}.{m['name']}" for m in members if m["type"] == "class"],
+        "functions": [f"{module_details['module']}.{m['name']}" for m in members if m["type"] == "function"],
     }
 
-    # Render and write the .rst file
     output_path = os.path.join(OUTPUT_DIR, f"{module_name}.rst")
     content = render_template(MODULE_TEMPLATE, context)
     write_file(output_path, content)
     print(f"Generated module .rst: {output_path}")
 
 
-
 def generate_member_rst(module_name, member):
-    """Generate .rst file for a class or function."""
+    """Generate .rst file for a class, function, or submodule."""
     if member["type"] == "class":
         template_name = CLASS_TEMPLATE
     elif member["type"] == "function":
@@ -79,15 +105,19 @@ def generate_member_rst(module_name, member):
     print(f"Generated member .rst: {output_path}")
 
 
+def generate_rst_files(generate_member = False):
+    """Generate all .rst files for modules, classes, and functions."""
 
-
-def generate_rst_files():
-    """Generate .rst files for all modules and members defined in API_REFERENCE."""
+    # Step 1: Generate module and member .rst files
     for module_name, module_details in API_REFERENCE.items():
-        generate_module_rst(module_details["module"], module_details)
-        for member in module_details["members"]:
-            if member["type"] != "module":  # Skip submodules for member-level files
-                generate_member_rst(module_details["module"], member)
+        generate_module_rst(module_name, module_details)
+        if generate_member:
+            for member in module_details["members"]:
+                if member["type"] != "module":  # Skip submodules for member-level files
+                    generate_member_rst(module_name, member)
+
+    # Step 2: Generate the index.rst
+    generate_api_index()
 
 
 if __name__ == "__main__":

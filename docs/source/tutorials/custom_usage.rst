@@ -11,7 +11,7 @@ We are actively working on detailed content for this section. It will include:
 - Advanced data manipulation techniques.
 - Extending and integrating **MUFASA** with your existing pipelines.
 
-For a complete reference to all available modules and classes, see the :doc:`API Reference <../api/generated/index>`.
+For a complete reference to all available modules and classes, see the :doc:`API Reference <../api/index>`.
 
 Contribute
 ----------

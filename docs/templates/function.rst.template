@@ -1,0 +1,10 @@
+.. _{{ full_name }}:
+
+{{ short_name }}
+{{ '=' * short_name|length }}
+
+{{ full_name }}{{ signature }}
+
+{{ docstring }}
+
+.. autofunction:: {{ full_name }}

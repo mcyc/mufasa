@@ -13,4 +13,9 @@ html[data-theme="dark"] .navbar {
     width: auto;
 }
 
+.sk-apisearch-desc {
+    font-style: italic;
+    color: gray;
+}
+
 

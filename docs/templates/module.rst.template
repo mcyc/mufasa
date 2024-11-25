@@ -1,24 +1,26 @@
 .. _{{ full_name }}:
 
-{{ short_name }}
-{{ '=' * short_name|length }}
+{{ full_name }}
+{{ '=' * full_name|length }}
 
 .. automodule:: {{ full_name }}
    :noindex:
-   :exclude-members: {% for member in classes + functions -%}{{ member }}, {% endfor %}
+   {% if classes + functions -%}
+   :exclude-members: {% for member in classes + functions %}{{ member.split('.')[-1] }}{% if not loop.last %}, {% endif %}{% endfor %}
+   {% endif -%}
 
-{% if submodules -%}
+{% if submodules %}
 .. rubric:: Submodules
 
 .. autosummary::
-   :toctree: generated/
+   :toctree:
 
    {% for submodule in submodules -%}
-   {{ submodule }}
+   ~{{ submodule }}
    {% endfor -%}
 {% endif -%}
 
-{% if classes -%}
+{% if classes %}
 .. rubric:: Classes
 
 .. autosummary::
@@ -26,7 +28,7 @@
    :nosignatures:
 
    {% for cls in classes -%}
-   {{ cls }}
+   ~{{ cls }}
    {% endfor -%}
 {% endif -%}
 
@@ -38,6 +40,6 @@
    :nosignatures:
 
    {% for func in functions -%}
-   {{ func }}
+   ~{{ func }}
    {% endfor -%}
 {% endif -%}
