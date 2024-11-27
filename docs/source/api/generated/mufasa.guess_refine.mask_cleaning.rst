@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.mask_cleaning:
+.. _mufasa.guess_refine.mask_cleaning:
 
 mask_cleaning
 =================================

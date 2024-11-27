@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.expand_fits:
+.. _mufasa.master_fitter.expand_fits:
 
 expand_fits
 ================================

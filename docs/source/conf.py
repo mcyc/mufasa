@@ -79,6 +79,7 @@ html_logo = "_static/logo.png"
 html_sidebars = {
     "quick_start": [],
     "installation": [],
+    "guides": [],
 }
 
 nitpick_ignore = [

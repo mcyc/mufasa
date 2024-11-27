@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.save_map:
+.. _mufasa.master_fitter.save_map:
 
 save_map
 =============================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.vmask_cube:
+.. _mufasa.moment_guess.vmask_cube:
 
 vmask_cube
 ==============================

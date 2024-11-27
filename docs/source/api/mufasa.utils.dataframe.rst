@@ -1,10 +1,10 @@
 ﻿.. _mufasa.utils.dataframe:
 
-dataframe
+mufasa.utils.dataframe
 ======================
 
 .. automodule:: mufasa.utils.dataframe
-   :exclude-members: assign_to_dataframe, make_dataframe, read
+   :exclude-members: _hidden_member, assign_to_dataframe, make_dataframe, read
    
 .. rubric:: Functions
 

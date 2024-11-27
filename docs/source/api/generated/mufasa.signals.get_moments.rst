@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.get_moments:
+.. _mufasa.signals.get_moments:
 
 get_moments
 ==========================

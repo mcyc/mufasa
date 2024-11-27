@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.peakT:
+.. _mufasa.moment_guess.peakT:
 
 peakT
 =========================

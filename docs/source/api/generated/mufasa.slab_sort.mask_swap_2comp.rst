@@ -1,4 +1,4 @@
-﻿.. _mufasa.slab_sort.mask_swap_2comp:
+.. _mufasa.slab_sort.mask_swap_2comp:
 
 mask_swap_2comp
 ================================

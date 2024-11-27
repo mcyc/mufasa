@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.get_rms_robust:
+.. _mufasa.signals.get_rms_robust:
 
 get_rms_robust
 =============================

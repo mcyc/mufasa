@@ -66,6 +66,5 @@ def generate_api_index():
     print(f"Generated index .rst: {INDEX_OUTPUT}")
 
 
-
 if __name__ == "__main__":
     generate_api_index()

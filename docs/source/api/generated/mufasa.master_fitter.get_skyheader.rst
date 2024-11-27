@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_skyheader:
+.. _mufasa.master_fitter.get_skyheader:
 
 get_skyheader
 ==================================

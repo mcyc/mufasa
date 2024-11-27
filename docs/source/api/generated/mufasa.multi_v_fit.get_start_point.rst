@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.get_start_point:
+.. _mufasa.multi_v_fit.get_start_point:
 
 get_start_point
 ==================================

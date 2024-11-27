@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.handle_snr:
+.. _mufasa.multi_v_fit.handle_snr:
 
 handle_snr
 =============================

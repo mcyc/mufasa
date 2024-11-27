@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.master_mask:
+.. _mufasa.guess_refine.master_mask:
 
 master_mask
 ===============================

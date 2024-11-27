@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.calc_AICc:
+.. _mufasa.UltraCube.calc_AICc:
 
 calc_AICc
 ==========================

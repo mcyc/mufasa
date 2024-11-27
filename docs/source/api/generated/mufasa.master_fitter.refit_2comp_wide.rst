@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.refit_2comp_wide:
+.. _mufasa.master_fitter.refit_2comp_wide:
 
 refit_2comp_wide
 =====================================

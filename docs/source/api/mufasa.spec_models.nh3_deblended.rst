@@ -1,10 +1,10 @@
 ﻿.. _mufasa.spec_models.nh3_deblended:
 
-nh3_deblended
+mufasa.spec_models.nh3_deblended
 ================================
 
 .. automodule:: mufasa.spec_models.nh3_deblended
-   :exclude-members: nh3_vtau_singlemodel_deblended
+   :exclude-members: _hidden_member, nh3_vtau_singlemodel_deblended
    
 .. rubric:: Functions
 

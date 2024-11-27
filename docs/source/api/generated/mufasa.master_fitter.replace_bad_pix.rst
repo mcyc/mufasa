@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.replace_bad_pix:
+.. _mufasa.master_fitter.replace_bad_pix:
 
 replace_bad_pix
 ====================================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.mask_swap_2comp:
+.. _mufasa.guess_refine.mask_swap_2comp:
 
 mask_swap_2comp
 ===================================

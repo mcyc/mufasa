@@ -1,10 +1,10 @@
 ﻿.. _mufasa.spec_models.meta_model:
 
-meta_model
+mufasa.spec_models.meta_model
 =============================
 
 .. automodule:: mufasa.spec_models.meta_model
-   :exclude-members: MetaModel, ThreadPoolExecutor
+   :exclude-members: _hidden_member, MetaModel
    
 .. rubric:: Classes
 
@@ -13,5 +13,4 @@ meta_model
    :nosignatures:
 
    MetaModel
-   ThreadPoolExecutor
    

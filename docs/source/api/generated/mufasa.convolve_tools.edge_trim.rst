@@ -1,4 +1,4 @@
-﻿.. _mufasa.convolve_tools.edge_trim:
+.. _mufasa.convolve_tools.edge_trim:
 
 edge_trim
 ===============================

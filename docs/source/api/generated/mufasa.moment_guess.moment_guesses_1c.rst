@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.moment_guesses_1c:
+.. _mufasa.moment_guess.moment_guesses_1c:
 
 moment_guesses_1c
 =====================================

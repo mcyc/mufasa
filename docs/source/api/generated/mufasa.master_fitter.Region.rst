@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.Region:
+.. _mufasa.master_fitter.Region:
 
 Region
 ===========================
@@ -11,3 +11,6 @@ Region
    :show-inheritance:
    :special-members: __init__, __call__
    :exclude-members: _hidden_member
+
+   .. autosummary::
+      :toctree: _autosummary

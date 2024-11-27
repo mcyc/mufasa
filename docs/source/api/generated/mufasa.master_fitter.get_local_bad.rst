@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_local_bad:
+.. _mufasa.master_fitter.get_local_bad:
 
 get_local_bad
 ==================================

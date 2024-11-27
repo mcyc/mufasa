@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.snr_estimate:
+.. _mufasa.multi_v_fit.snr_estimate:
 
 snr_estimate
 ===============================

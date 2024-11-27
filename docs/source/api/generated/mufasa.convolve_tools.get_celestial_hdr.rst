@@ -1,4 +1,4 @@
-﻿.. _mufasa.convolve_tools.get_celestial_hdr:
+.. _mufasa.convolve_tools.get_celestial_hdr:
 
 get_celestial_hdr
 =======================================

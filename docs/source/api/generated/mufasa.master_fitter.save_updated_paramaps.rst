@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.save_updated_paramaps:
+.. _mufasa.master_fitter.save_updated_paramaps:
 
 save_updated_paramaps
 ==========================================

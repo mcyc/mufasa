@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.trim_edge:
+.. _mufasa.signals.trim_edge:
 
 trim_edge
 ========================

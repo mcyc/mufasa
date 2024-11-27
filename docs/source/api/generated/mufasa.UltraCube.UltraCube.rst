@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.UltraCube:
+.. _mufasa.UltraCube.UltraCube:
 
 UltraCube
 ==========================
@@ -11,3 +11,6 @@ UltraCube
    :show-inheritance:
    :special-members: __init__, __call__
    :exclude-members: _hidden_member
+
+   .. autosummary::
+      :toctree: _autosummary

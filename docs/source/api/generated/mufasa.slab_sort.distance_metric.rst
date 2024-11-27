@@ -1,4 +1,4 @@
-﻿.. _mufasa.slab_sort.distance_metric:
+.. _mufasa.slab_sort.distance_metric:
 
 distance_metric
 ================================

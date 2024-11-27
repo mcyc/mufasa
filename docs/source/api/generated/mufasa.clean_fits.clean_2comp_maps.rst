@@ -1,4 +1,4 @@
-﻿.. _mufasa.clean_fits.clean_2comp_maps:
+.. _mufasa.clean_fits.clean_2comp_maps:
 
 clean_2comp_maps
 ==================================

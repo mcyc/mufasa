@@ -1,4 +1,4 @@
-﻿.. _mufasa.clean_fits.extremeV_mask:
+.. _mufasa.clean_fits.extremeV_mask:
 
 extremeV_mask
 ===============================

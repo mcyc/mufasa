@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_masked_moment:
+.. _mufasa.UltraCube.get_masked_moment:
 
 get_masked_moment
 ==================================

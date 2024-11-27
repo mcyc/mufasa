@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.refit_swap_2comp:
+.. _mufasa.master_fitter.refit_swap_2comp:
 
 refit_swap_2comp
 =====================================

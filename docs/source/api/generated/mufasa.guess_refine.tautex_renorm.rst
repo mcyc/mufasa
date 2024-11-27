@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.tautex_renorm:
+.. _mufasa.guess_refine.tautex_renorm:
 
 tautex_renorm
 =================================

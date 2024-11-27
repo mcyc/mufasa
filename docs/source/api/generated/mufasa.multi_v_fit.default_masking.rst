@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.default_masking:
+.. _mufasa.multi_v_fit.default_masking:
 
 default_masking
 ==================================

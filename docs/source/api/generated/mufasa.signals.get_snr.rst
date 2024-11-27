@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.get_snr:
+.. _mufasa.signals.get_snr:
 
 get_snr
 ======================

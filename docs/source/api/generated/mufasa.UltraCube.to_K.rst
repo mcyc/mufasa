@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.to_K:
+.. _mufasa.UltraCube.to_K:
 
 to_K
 =====================

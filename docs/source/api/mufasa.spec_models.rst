@@ -3,18 +3,25 @@
 mufasa.spec_models
 ==================
 
+.. currentmodule:: mufasa.spec_models
+
+No description available.
+
 .. automodule:: mufasa.spec_models
    :noindex:
-   
+
 .. rubric:: Submodules
 
 .. autosummary::
    :toctree:
 
-   ~mufasa.spec_models.ammonia_multiv
-   ~mufasa.spec_models.meta_model
-   ~mufasa.spec_models.n2hp_constants
-   ~mufasa.spec_models.n2hp_deblended
-   ~mufasa.spec_models.n2hp_multiv
-   ~mufasa.spec_models.nh3_deblended
+   ammonia_multiv
+   meta_model
+   n2hp_constants
+   n2hp_deblended
+   n2hp_multiv
+   nh3_deblended
    
+
+
+

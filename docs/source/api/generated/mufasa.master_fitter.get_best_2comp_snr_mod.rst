@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_best_2comp_snr_mod:
+.. _mufasa.master_fitter.get_best_2comp_snr_mod:
 
 get_best_2comp_snr_mod
 ===========================================

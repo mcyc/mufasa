@@ -1,4 +1,4 @@
-﻿.. _mufasa.convolve_tools.regrid:
+.. _mufasa.convolve_tools.regrid:
 
 regrid
 ============================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.convolve_sky_byfactor:
+.. _mufasa.UltraCube.convolve_sky_byfactor:
 
 convolve_sky_byfactor
 ======================================

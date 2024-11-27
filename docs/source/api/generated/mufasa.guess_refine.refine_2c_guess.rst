@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.refine_2c_guess:
+.. _mufasa.guess_refine.refine_2c_guess:
 
 refine_2c_guess
 ===================================

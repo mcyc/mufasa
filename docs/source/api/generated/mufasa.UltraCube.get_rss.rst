@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_rss:
+.. _mufasa.UltraCube.get_rss:
 
 get_rss
 ========================

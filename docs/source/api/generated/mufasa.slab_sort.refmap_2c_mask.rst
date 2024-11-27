@@ -1,4 +1,4 @@
-﻿.. _mufasa.slab_sort.refmap_2c_mask:
+.. _mufasa.slab_sort.refmap_2c_mask:
 
 refmap_2c_mask
 ===============================

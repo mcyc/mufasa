@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_convolved_cube:
+.. _mufasa.master_fitter.get_convolved_cube:
 
 get_convolved_cube
 =======================================

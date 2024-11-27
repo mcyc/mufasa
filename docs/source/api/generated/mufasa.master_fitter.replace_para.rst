@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.replace_para:
+.. _mufasa.master_fitter.replace_para:
 
 replace_para
 =================================

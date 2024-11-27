@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.fit_surroundings:
+.. _mufasa.master_fitter.fit_surroundings:
 
 fit_surroundings
 =====================================

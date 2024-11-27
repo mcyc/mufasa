@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_rms:
+.. _mufasa.UltraCube.get_rms:
 
 get_rms
 ========================

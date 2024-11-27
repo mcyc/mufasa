@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.get_tex:
+.. _mufasa.moment_guess.get_tex:
 
 get_tex
 ===========================

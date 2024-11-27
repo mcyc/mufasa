@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.master_2comp_fit:
+.. _mufasa.master_fitter.master_2comp_fit:
 
 master_2comp_fit
 =====================================

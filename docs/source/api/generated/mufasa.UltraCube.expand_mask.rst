@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.expand_mask:
+.. _mufasa.UltraCube.expand_mask:
 
 expand_mask
 ============================

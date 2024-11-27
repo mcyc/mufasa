@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.get_rms_prefit:
+.. _mufasa.moment_guess.get_rms_prefit:
 
 get_rms_prefit
 ==================================

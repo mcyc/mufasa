@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.refine_rms:
+.. _mufasa.signals.refine_rms:
 
 refine_rms
 =========================

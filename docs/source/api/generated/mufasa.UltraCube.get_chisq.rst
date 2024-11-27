@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_chisq:
+.. _mufasa.UltraCube.get_chisq:
 
 get_chisq
 ==========================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.save_fit:
+.. _mufasa.UltraCube.save_fit:
 
 save_fit
 =========================

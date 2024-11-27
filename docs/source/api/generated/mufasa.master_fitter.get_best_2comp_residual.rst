@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_best_2comp_residual:
+.. _mufasa.master_fitter.get_best_2comp_residual:
 
 get_best_2comp_residual
 ============================================

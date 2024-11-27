@@ -1,4 +1,4 @@
-﻿.. _mufasa.clean_fits.remove_zeros:
+.. _mufasa.clean_fits.remove_zeros:
 
 remove_zeros
 ==============================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.retry_fit:
+.. _mufasa.multi_v_fit.retry_fit:
 
 retry_fit
 ============================

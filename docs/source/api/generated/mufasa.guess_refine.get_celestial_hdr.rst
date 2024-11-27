@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.get_celestial_hdr:
+.. _mufasa.guess_refine.get_celestial_hdr:
 
 get_celestial_hdr
 =====================================

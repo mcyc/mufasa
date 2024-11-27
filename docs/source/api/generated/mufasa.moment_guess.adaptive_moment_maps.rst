@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.adaptive_moment_maps:
+.. _mufasa.moment_guess.adaptive_moment_maps:
 
 adaptive_moment_maps
 ========================================

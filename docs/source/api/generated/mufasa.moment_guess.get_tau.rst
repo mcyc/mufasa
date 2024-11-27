@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.get_tau:
+.. _mufasa.moment_guess.get_tau:
 
 get_tau
 ===========================

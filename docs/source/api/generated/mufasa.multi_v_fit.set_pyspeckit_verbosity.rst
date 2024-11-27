@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.set_pyspeckit_verbosity:
+.. _mufasa.multi_v_fit.set_pyspeckit_verbosity:
 
 set_pyspeckit_verbosity
 ==========================================

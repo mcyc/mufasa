@@ -1,4 +1,4 @@
-﻿.. _mufasa.convolve_tools.convolve_sky_byfactor:
+.. _mufasa.convolve_tools.convolve_sky_byfactor:
 
 convolve_sky_byfactor
 ===========================================

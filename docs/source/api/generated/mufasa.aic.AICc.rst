@@ -1,4 +1,4 @@
-﻿.. _mufasa.aic.AICc:
+.. _mufasa.aic.AICc:
 
 AICc
 ===============

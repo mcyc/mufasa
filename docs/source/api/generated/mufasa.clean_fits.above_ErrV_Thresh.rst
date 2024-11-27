@@ -1,4 +1,4 @@
-﻿.. _mufasa.clean_fits.above_ErrV_Thresh:
+.. _mufasa.clean_fits.above_ErrV_Thresh:
 
 above_ErrV_Thresh
 ===================================

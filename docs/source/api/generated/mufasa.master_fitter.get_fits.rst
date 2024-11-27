@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_fits:
+.. _mufasa.master_fitter.get_fits:
 
 get_fits
 =============================

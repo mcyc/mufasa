@@ -1,4 +1,4 @@
-﻿.. _mufasa.aic.fits_comp_chisq:
+.. _mufasa.aic.fits_comp_chisq:
 
 fits_comp_chisq
 ==========================

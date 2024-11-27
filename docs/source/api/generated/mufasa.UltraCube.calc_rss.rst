@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.calc_rss:
+.. _mufasa.UltraCube.calc_rss:
 
 calc_rss
 =========================

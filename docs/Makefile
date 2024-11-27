@@ -24,7 +24,7 @@ check-deps:
 apidocs: check-deps
 	@echo "Generating .rst files for API documentation..."
 	sphinx-apidoc -o "$(APIDIR)" ../mufasa --separate --templatedir="$(SOURCEDIR)/_templates"
-	python $(SCRIPTSDIR)/generate_rst_files.py
+	python $(SCRIPTSDIR)/generate_api_index.py
 
 # Build HTML documentation
 html: check-deps

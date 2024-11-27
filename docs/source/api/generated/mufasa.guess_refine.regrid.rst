@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.regrid:
+.. _mufasa.guess_refine.regrid:
 
 regrid
 ==========================

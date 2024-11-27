@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_best_2comp_residual_cnv:
+.. _mufasa.master_fitter.get_best_2comp_residual_cnv:
 
 get_best_2comp_residual_cnv
 ================================================

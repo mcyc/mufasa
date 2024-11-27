@@ -1,10 +1,10 @@
 ﻿.. _mufasa.visualization.scatter_3D:
 
-scatter_3D
+mufasa.visualization.scatter_3D
 ===============================
 
 .. automodule:: mufasa.visualization.scatter_3D
-   :exclude-members: ScatterPPV, get_logger, make_subplots, quickPeakT, scatter_3D, scatter_3D_df
+   :exclude-members: _hidden_member, ScatterPPV, scatter_3D, scatter_3D_df
    
 .. rubric:: Classes
 
@@ -20,9 +20,6 @@ scatter_3D
    :toctree: generated/
    :nosignatures:
 
-   get_logger
-   make_subplots
-   quickPeakT
    scatter_3D
    scatter_3D_df
    

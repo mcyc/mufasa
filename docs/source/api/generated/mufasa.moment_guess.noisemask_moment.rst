@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.noisemask_moment:
+.. _mufasa.moment_guess.noisemask_moment:
 
 noisemask_moment
 ====================================

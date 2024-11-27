@@ -1,10 +1,10 @@
 ﻿.. _mufasa.utils.multicore:
 
-multicore
+mufasa.utils.multicore
 ======================
 
 .. automodule:: mufasa.utils.multicore
-   :exclude-members: cpu_count, get_logger, validate_n_cores
+   :exclude-members: _hidden_member, validate_n_cores
    
 .. rubric:: Functions
 
@@ -12,7 +12,5 @@ multicore
    :toctree: generated/
    :nosignatures:
 
-   cpu_count
-   get_logger
    validate_n_cores
    

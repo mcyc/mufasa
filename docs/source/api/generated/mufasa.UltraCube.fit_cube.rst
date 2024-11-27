@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.fit_cube:
+.. _mufasa.UltraCube.fit_cube:
 
 fit_cube
 =========================

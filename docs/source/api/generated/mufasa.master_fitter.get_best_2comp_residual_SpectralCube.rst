@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_best_2comp_residual_SpectralCube:
+.. _mufasa.master_fitter.get_best_2comp_residual_SpectralCube:
 
 get_best_2comp_residual_SpectralCube
 =========================================================

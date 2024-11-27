@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_residual:
+.. _mufasa.UltraCube.get_residual:
 
 get_residual
 =============================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.load_model_fit:
+.. _mufasa.UltraCube.load_model_fit:
 
 load_model_fit
 ===============================

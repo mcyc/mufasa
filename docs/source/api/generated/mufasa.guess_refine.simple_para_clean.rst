@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.simple_para_clean:
+.. _mufasa.guess_refine.simple_para_clean:
 
 simple_para_clean
 =====================================

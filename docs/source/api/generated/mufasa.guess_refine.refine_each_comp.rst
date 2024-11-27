@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.refine_each_comp:
+.. _mufasa.guess_refine.refine_each_comp:
 
 refine_each_comp
 ====================================

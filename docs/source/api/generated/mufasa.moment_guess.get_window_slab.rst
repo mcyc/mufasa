@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.get_window_slab:
+.. _mufasa.moment_guess.get_window_slab:
 
 get_window_slab
 ===================================

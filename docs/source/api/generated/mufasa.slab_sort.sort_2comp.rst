@@ -1,4 +1,4 @@
-﻿.. _mufasa.slab_sort.sort_2comp:
+.. _mufasa.slab_sort.sort_2comp:
 
 sort_2comp
 ===========================

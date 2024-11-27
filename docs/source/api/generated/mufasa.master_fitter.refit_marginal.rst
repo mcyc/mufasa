@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.refit_marginal:
+.. _mufasa.master_fitter.refit_marginal:
 
 refit_marginal
 ===================================

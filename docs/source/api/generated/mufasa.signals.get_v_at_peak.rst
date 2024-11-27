@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.get_v_at_peak:
+.. _mufasa.signals.get_v_at_peak:
 
 get_v_at_peak
 ============================

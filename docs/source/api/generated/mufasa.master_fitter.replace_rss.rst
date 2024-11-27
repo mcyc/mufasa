@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.replace_rss:
+.. _mufasa.master_fitter.replace_rss:
 
 replace_rss
 ================================

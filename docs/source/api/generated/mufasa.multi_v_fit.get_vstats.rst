@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.get_vstats:
+.. _mufasa.multi_v_fit.get_vstats:
 
 get_vstats
 =============================

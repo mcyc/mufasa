@@ -1,10 +1,10 @@
 ﻿.. _mufasa.utils.neighbours:
 
-neighbours
+mufasa.utils.neighbours
 =======================
 
 .. automodule:: mufasa.utils.neighbours
-   :exclude-members: disk, disk_neighbour, get_neighbor_coord, get_valid_neighbors, maxref_neighbor_coords, square, square_neighbour
+   :exclude-members: _hidden_member, disk_neighbour, get_neighbor_coord, get_valid_neighbors, maxref_neighbor_coords, square_neighbour
    
 .. rubric:: Functions
 
@@ -12,11 +12,9 @@ neighbours
    :toctree: generated/
    :nosignatures:
 
-   disk
    disk_neighbour
    get_neighbor_coord
    get_valid_neighbors
    maxref_neighbor_coords
-   square
    square_neighbour
    

@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.save_pcube:
+.. _mufasa.multi_v_fit.save_pcube:
 
 save_pcube
 =============================

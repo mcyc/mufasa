@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_best_2comp_model:
+.. _mufasa.master_fitter.get_best_2comp_model:
 
 get_best_2comp_model
 =========================================

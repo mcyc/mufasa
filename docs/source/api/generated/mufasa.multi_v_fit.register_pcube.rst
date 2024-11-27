@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.register_pcube:
+.. _mufasa.multi_v_fit.register_pcube:
 
 register_pcube
 =================================

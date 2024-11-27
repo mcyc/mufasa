@@ -1,4 +1,4 @@
-﻿.. _mufasa.aic.likelihood:
+.. _mufasa.aic.likelihood:
 
 likelihood
 =====================

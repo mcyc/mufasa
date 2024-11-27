@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.mom_guess_wide_sep:
+.. _mufasa.moment_guess.mom_guess_wide_sep:
 
 mom_guess_wide_sep
 ======================================

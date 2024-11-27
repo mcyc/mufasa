@@ -1,11 +1,10 @@
-.. _mufasa.deblend_cube:
+﻿.. _mufasa.deblend_cube:
 
 mufasa.deblend_cube
 ===================
 
 .. automodule:: mufasa.deblend_cube
-   :noindex:
-   :exclude-members: deblend
+   :exclude-members: _hidden_member, deblend
    
 .. rubric:: Functions
 
@@ -13,5 +12,5 @@ mufasa.deblend_cube
    :toctree: generated/
    :nosignatures:
 
-   ~mufasa.deblend_cube.deblend
+   deblend
    

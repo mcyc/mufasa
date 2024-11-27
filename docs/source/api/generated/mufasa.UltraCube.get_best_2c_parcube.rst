@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_best_2c_parcube:
+.. _mufasa.UltraCube.get_best_2c_parcube:
 
 get_best_2c_parcube
 ====================================

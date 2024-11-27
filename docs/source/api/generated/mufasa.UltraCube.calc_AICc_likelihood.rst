@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.calc_AICc_likelihood:
+.. _mufasa.UltraCube.calc_AICc_likelihood:
 
 calc_AICc_likelihood
 =====================================

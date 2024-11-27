@@ -1,4 +1,4 @@
-﻿.. _mufasa.aic.get_comp_AICc:
+.. _mufasa.aic.get_comp_AICc:
 
 get_comp_AICc
 ========================

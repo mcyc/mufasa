@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.save_guesses:
+.. _mufasa.guess_refine.save_guesses:
 
 save_guesses
 ================================

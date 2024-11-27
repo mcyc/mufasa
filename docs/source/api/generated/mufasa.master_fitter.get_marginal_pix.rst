@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_marginal_pix:
+.. _mufasa.master_fitter.get_marginal_pix:
 
 get_marginal_pix
 =====================================

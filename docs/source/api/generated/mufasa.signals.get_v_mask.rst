@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.get_v_mask:
+.. _mufasa.signals.get_v_mask:
 
 get_v_mask
 =========================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.LineSetup:
+.. _mufasa.moment_guess.LineSetup:
 
 LineSetup
 =============================
@@ -11,3 +11,6 @@ LineSetup
    :show-inheritance:
    :special-members: __init__, __call__
    :exclude-members: _hidden_member
+
+   .. autosummary::
+      :toctree: _autosummary

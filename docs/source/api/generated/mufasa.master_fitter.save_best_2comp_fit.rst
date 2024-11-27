@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.save_best_2comp_fit:
+.. _mufasa.master_fitter.save_best_2comp_fit:
 
 save_best_2comp_fit
 ========================================

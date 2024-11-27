@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.window_mask_pcube:
+.. _mufasa.moment_guess.window_mask_pcube:
 
 window_mask_pcube
 =====================================

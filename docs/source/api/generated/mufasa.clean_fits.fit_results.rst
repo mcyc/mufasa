@@ -1,4 +1,4 @@
-﻿.. _mufasa.clean_fits.fit_results:
+.. _mufasa.clean_fits.fit_results:
 
 fit_results
 =============================
@@ -11,3 +11,6 @@ fit_results
    :show-inheritance:
    :special-members: __init__, __call__
    :exclude-members: _hidden_member
+
+   .. autosummary::
+      :toctree: _autosummary

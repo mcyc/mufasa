@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.quick_2comp_sort:
+.. _mufasa.guess_refine.quick_2comp_sort:
 
 quick_2comp_sort
 ====================================

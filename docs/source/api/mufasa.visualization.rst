@@ -3,14 +3,21 @@
 mufasa.visualization
 ====================
 
+.. currentmodule:: mufasa.visualization
+
+No description available.
+
 .. automodule:: mufasa.visualization
    :noindex:
-   
+
 .. rubric:: Submodules
 
 .. autosummary::
    :toctree:
 
-   ~mufasa.visualization.scatter_3D
-   ~mufasa.visualization.spec_viz
+   scatter_3D
+   spec_viz
    
+
+
+

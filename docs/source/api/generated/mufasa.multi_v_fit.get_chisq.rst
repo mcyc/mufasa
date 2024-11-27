@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.get_chisq:
+.. _mufasa.multi_v_fit.get_chisq:
 
 get_chisq
 ============================

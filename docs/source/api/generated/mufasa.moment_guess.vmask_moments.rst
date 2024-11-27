@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.vmask_moments:
+.. _mufasa.moment_guess.vmask_moments:
 
 vmask_moments
 =================================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_Tpeak:
+.. _mufasa.UltraCube.get_Tpeak:
 
 get_Tpeak
 ==========================

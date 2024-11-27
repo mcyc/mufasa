@@ -1,4 +1,4 @@
-﻿.. _mufasa.convolve_tools.snr_mask:
+.. _mufasa.convolve_tools.snr_mask:
 
 snr_mask
 ==============================

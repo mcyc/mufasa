@@ -1,4 +1,4 @@
-﻿.. _mufasa.convolve_tools.regrid_mask:
+.. _mufasa.convolve_tools.regrid_mask:
 
 regrid_mask
 =================================

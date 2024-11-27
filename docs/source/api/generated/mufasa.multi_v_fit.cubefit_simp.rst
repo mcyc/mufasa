@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.cubefit_simp:
+.. _mufasa.multi_v_fit.cubefit_simp:
 
 cubefit_simp
 ===============================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.refine_signal_mask:
+.. _mufasa.signals.refine_signal_mask:
 
 refine_signal_mask
 =================================

@@ -1,4 +1,4 @@
-﻿.. _mufasa.aic.fits_comp_AICc:
+.. _mufasa.aic.fits_comp_AICc:
 
 fits_comp_AICc
 =========================

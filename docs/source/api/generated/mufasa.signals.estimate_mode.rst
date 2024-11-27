@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.estimate_mode:
+.. _mufasa.signals.estimate_mode:
 
 estimate_mode
 ============================

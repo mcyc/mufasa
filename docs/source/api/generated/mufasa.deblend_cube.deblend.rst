@@ -1,4 +1,4 @@
-﻿.. _mufasa.deblend_cube.deblend:
+.. _mufasa.deblend_cube.deblend:
 
 deblend
 ===========================

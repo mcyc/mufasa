@@ -1,4 +1,4 @@
-﻿.. _mufasa.signals.v_estimate:
+.. _mufasa.signals.v_estimate:
 
 v_estimate
 =========================

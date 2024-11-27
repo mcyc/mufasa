@@ -1,4 +1,4 @@
-﻿.. _mufasa.guess_refine.guess_from_cnvpara:
+.. _mufasa.guess_refine.guess_from_cnvpara:
 
 guess_from_cnvpara
 ======================================

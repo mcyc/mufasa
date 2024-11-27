@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.is_K:
+.. _mufasa.UltraCube.is_K:
 
 is_K
 =====================

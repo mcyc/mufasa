@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.cubefit_gen:
+.. _mufasa.multi_v_fit.cubefit_gen:
 
 cubefit_gen
 ==============================

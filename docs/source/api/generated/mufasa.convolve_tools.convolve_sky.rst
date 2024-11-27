@@ -1,4 +1,4 @@
-﻿.. _mufasa.convolve_tools.convolve_sky:
+.. _mufasa.convolve_tools.convolve_sky:
 
 convolve_sky
 ==================================

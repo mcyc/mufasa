@@ -1,4 +1,4 @@
-﻿.. _mufasa.UltraCube.get_all_lnk_maps:
+.. _mufasa.UltraCube.get_all_lnk_maps:
 
 get_all_lnk_maps
 =================================

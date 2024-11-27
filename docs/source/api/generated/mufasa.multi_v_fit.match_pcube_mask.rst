@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.match_pcube_mask:
+.. _mufasa.multi_v_fit.match_pcube_mask:
 
 match_pcube_mask
 ===================================

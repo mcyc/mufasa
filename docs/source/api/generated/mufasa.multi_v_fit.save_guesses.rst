@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.save_guesses:
+.. _mufasa.multi_v_fit.save_guesses:
 
 save_guesses
 ===============================

@@ -1,18 +1,10 @@
 ﻿.. _mufasa.utils.interpolate:
 
-interpolate
+mufasa.utils.interpolate
 ========================
 
 .. automodule:: mufasa.utils.interpolate
-   :exclude-members: Gaussian2DKernel, convolve, expand_interpolate, iter_expand
-   
-.. rubric:: Classes
-
-.. autosummary::
-   :toctree: generated/
-   :nosignatures:
-
-   Gaussian2DKernel
+   :exclude-members: _hidden_member, expand_interpolate, iter_expand
    
 .. rubric:: Functions
 
@@ -20,7 +12,6 @@ interpolate
    :toctree: generated/
    :nosignatures:
 
-   convolve
    expand_interpolate
    iter_expand
    

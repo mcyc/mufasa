@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.refit_bad_2comp:
+.. _mufasa.master_fitter.refit_bad_2comp:
 
 refit_bad_2comp
 ====================================

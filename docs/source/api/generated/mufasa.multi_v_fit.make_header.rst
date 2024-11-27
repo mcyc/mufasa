@@ -1,4 +1,4 @@
-﻿.. _mufasa.multi_v_fit.make_header:
+.. _mufasa.multi_v_fit.make_header:
 
 make_header
 ==============================

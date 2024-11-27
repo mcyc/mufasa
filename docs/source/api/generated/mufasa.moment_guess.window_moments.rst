@@ -1,4 +1,4 @@
-﻿.. _mufasa.moment_guess.window_moments:
+.. _mufasa.moment_guess.window_moments:
 
 window_moments
 ==================================

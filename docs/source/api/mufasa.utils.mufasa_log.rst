@@ -1,10 +1,10 @@
 ﻿.. _mufasa.utils.mufasa_log:
 
-mufasa_log
+mufasa.utils.mufasa_log
 =======================
 
 .. automodule:: mufasa.utils.mufasa_log
-   :exclude-members: OriginContextFilter, WarningContextFilter, get_logger, init_logging, reset_logger
+   :exclude-members: _hidden_member, OriginContextFilter, WarningContextFilter, get_logger, init_logging, reset_logger
    
 .. rubric:: Classes
 

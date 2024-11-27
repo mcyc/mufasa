@@ -1,17 +1,8 @@
 """
-master_fitter.py.
+master_fitter
+=================
 
-This module provides functionality for fitting spectral data using a variety of models.
-It includes tools for preparing data, applying models, and handling results.
-
-Functions
----------
-- <function1>: Description of function 1
-- <function2>: Description of function 2
-
-Classes
--------
-- Region: A class to represent and manipulate observed spectral cubes.
+This module provides functionality for handle spectral fitting and visualization automatically.
 
 Examples
 --------
@@ -68,19 +59,6 @@ logger = get_logger(__name__)
 class Region(object):
     """
     A class to represent the observed spectral cube to perform the model fits.
-
-    Attributes
-    ----------
-    cubePath : str
-        Path to the spectral cube FITS file.
-    paraNameRoot : str
-        Root string used for naming output files.
-    paraDir : str, optional
-        Directory to store output files. Defaults to the same directory as the input cube.
-    fittype : str
-        Type of spectral model used for fitting (e.g., 'nh3_multi_v').
-    ucube : UltraCube
-        UltraCube object for handling spectral cube operations.
 
     Examples
     --------

@@ -44,47 +44,6 @@ logger = get_logger(__name__)
 class UltraCube(object):
     """
     A framework to manage and fit multi-component spectral models for spectral cubes.
-
-    This class provides tools to handle:
-    - Loading and managing spectral cubes,
-    - Fitting spectral models with multiple components,
-    - Generating diagnostic and visualization tools for fits,
-    - Calculating residuals, chi-squared, and AICc metrics.
-
-    Attributes
-    ----------
-    pcubes : dict
-        Holds pyspeckit cubes for each model fit.
-    residual_cubes : dict
-        Stores residual cubes for each component fitted.
-    rms_maps : dict
-        Root-mean-square (RMS) maps of residuals.
-    Tpeak_maps : dict
-        Peak temperature maps from fitted models.
-    chisq_maps : dict
-        Chi-squared maps for fitted models.
-    rchisq_maps : dict
-        Reduced chi-squared maps.
-    rss_maps : dict
-        Residual sum of squares maps.
-    NSamp_maps : dict
-        Number of samples per pixel.
-    AICc_maps : dict
-        Corrected Akaike Information Criterion maps for model evaluation.
-    master_model_mask : np.ndarray, optional
-        Boolean mask indicating regions with fitted models.
-    snr_min : float
-        Minimum signal-to-noise ratio for attempting fits.
-    cnv_factor : int
-        Convolution factor for spatial resolution adjustments.
-    n_cores : int
-        Number of CPU cores used for parallel processing.
-    fittype : str
-        Spectral model type used for fitting.
-    plotter : Plotter
-        Visualization tool for fits.
-    meta_model : MetaModel
-        Metadata handler for spectral models.
     """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
@@ -682,15 +641,6 @@ class UltraCube(object):
 class UCubePlus(UltraCube):
     """
     A subclass of UltraCube that includes directory management for parameter maps and model fits.
-
-    Attributes
-    ----------
-    paraNameRoot : str
-        Root name for parameter map files. Derived from the cube filename if not provided.
-    paraDir : str
-        Directory where parameter maps are stored. Created if it does not exist.
-    paraPaths : dict
-        Dictionary mapping component numbers to file paths for saved parameter maps.
     """
     __module__ = "mufasa.UltraCube"  # Explicitly set the module
 

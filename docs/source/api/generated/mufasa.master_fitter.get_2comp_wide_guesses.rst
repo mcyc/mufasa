@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_2comp_wide_guesses:
+.. _mufasa.master_fitter.get_2comp_wide_guesses:
 
 get_2comp_wide_guesses
 ===========================================

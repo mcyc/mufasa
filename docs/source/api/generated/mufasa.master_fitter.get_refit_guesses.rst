@@ -1,4 +1,4 @@
-﻿.. _mufasa.master_fitter.get_refit_guesses:
+.. _mufasa.master_fitter.get_refit_guesses:
 
 get_refit_guesses
 ======================================
