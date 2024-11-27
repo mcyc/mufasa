@@ -1,11 +1,11 @@
 .. _{{ fullname }}:
 
-{{ name }}
+{{ fullname }}
 {{ underline }}
 
 .. automodule:: {{ fullname }}
    {% if classes + functions -%}
-   :exclude-members: {% for member in classes + functions %}{{ member }}{% if not loop.last %}, {% endif %}{% endfor %}
+   :exclude-members: _hidden_member, {% for member in classes + functions %}{{ member }}{% if not loop.last %}, {% endif %}{% endfor %}
    {% endif -%}
 
 

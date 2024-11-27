@@ -35,6 +35,7 @@ def transform_api_reference(api_reference):
         members = module_details.get("members", [])
         autosummary = [member["name"] for member in members]
         types = {member["name"]: member["type"] for member in members}
+        descriptions = {member["name"]: member["description"] for member in members}
 
         # Build transformed entry
         transformed_reference[module_name] = {
@@ -44,8 +45,10 @@ def transform_api_reference(api_reference):
                 {
                     "title": None,  # Titles can be added if needed
                     "autosummary": autosummary,
+                    "descriptions": descriptions,  # Include descriptions mapping
                 }
             ],
+
             "type": types,  # Include type mapping
         }
     return transformed_reference
@@ -63,62 +66,6 @@ def generate_api_index():
     print(f"Generated index .rst: {INDEX_OUTPUT}")
 
 
-def generate_module_rst(module_name, module_details):
-    """Generate .rst file for a module."""
-    members = module_details["members"]
-
-    context = {
-        "full_name": module_details["module"],
-        "short_name": module_details["module"].split('.')[-1],
-        "docstring": module_details.get("description", "No description available."),
-        "submodules": [m["name"] for m in members if m["type"] == "module"],
-        "classes": [f"{module_details['module']}.{m['name']}" for m in members if m["type"] == "class"],
-        "functions": [f"{module_details['module']}.{m['name']}" for m in members if m["type"] == "function"],
-    }
-
-    output_path = os.path.join(OUTPUT_DIR, f"{module_name}.rst")
-    content = render_template(MODULE_TEMPLATE, context)
-    write_file(output_path, content)
-    print(f"Generated module .rst: {output_path}")
-
-
-def generate_member_rst(module_name, member):
-    """Generate .rst file for a class, function, or submodule."""
-    if member["type"] == "class":
-        template_name = CLASS_TEMPLATE
-    elif member["type"] == "function":
-        template_name = FUNCTION_TEMPLATE
-    else:
-        raise ValueError(f"Unknown member type: {member['type']}")
-
-    # Prepare the context for rendering
-    context = {
-        "full_name": f"{module_name}.{member['name']}",
-        "short_name": member["name"],
-        "docstring": f"Documentation for {member['name']}.",  # Replace with actual docstring if available
-    }
-
-    # Output .rst file in the `generated/` directory
-    output_path = os.path.join(OUTPUT_DIR, f"{module_name}.{member['name']}.rst")
-    content = render_template(template_name, context)
-    write_file(output_path, content)
-    print(f"Generated member .rst: {output_path}")
-
-
-def generate_rst_files(generate_member = False):
-    """Generate all .rst files for modules, classes, and functions."""
-
-    # Step 1: Generate module and member .rst files
-    for module_name, module_details in API_REFERENCE.items():
-        generate_module_rst(module_name, module_details)
-        if generate_member:
-            for member in module_details["members"]:
-                if member["type"] != "module":  # Skip submodules for member-level files
-                    generate_member_rst(module_name, member)
-
-    # Step 2: Generate the index.rst
-    generate_api_index()
-
 
 if __name__ == "__main__":
-    generate_rst_files()
+    generate_api_index()

@@ -6,7 +6,8 @@
 API Reference
 =============
 
-This is the class and function reference of **MUFASA**.
+This is the class and function reference of **MUFASA**. In addition to the table below,
+you can also use the search bar on the top right side of the webpage.
 
 .. toctree::
    :maxdepth: 2
@@ -30,8 +31,13 @@ This is the class and function reference of **MUFASA**.
    {% for obj in module_info["sections"][0]["autosummary"] -%}
    {% if module_info["type"].get(obj) in ["class", "function"] -%}
    * - :obj:`~{{ module }}.{{ obj }}`
-     - {{ module_info["short_summary"] }}
-   {% endif -%}
-   {% endfor -%}
-   {% endfor -%}
+     - .. container:: sk-apisearch-desc
 
+          {{ module_info["sections"][0]["descriptions"].get(obj, "No description available.") }}
+
+          .. container:: caption
+
+             :mod:`{{ module }}`
+   {% endif -%}
+   {% endfor %}
+   {% endfor %}
