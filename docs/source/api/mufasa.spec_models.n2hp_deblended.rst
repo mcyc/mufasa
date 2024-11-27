@@ -1,7 +1,16 @@
-mufasa.spec\_models.n2hp\_deblended module
-==========================================
+﻿.. _mufasa.spec_models.n2hp_deblended:
+
+mufasa.spec_models.n2hp_deblended
+=================================
 
 .. automodule:: mufasa.spec_models.n2hp_deblended
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :exclude-members: _hidden_member, n2hp_vtau_singlemodel_deblended
+   
+.. rubric:: Functions
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+
+   n2hp_vtau_singlemodel_deblended
+   

@@ -1,16 +1,21 @@
 Quick Start
 ===========
+        Let's get started quickly with **MUFASA**! If needed, use the navigation bar on the right to skip ahead to a specific topic.
 
-Let's help you get started quickly with **MUFASA**. Use the navigation bar on the right to quickly locate specific topics.
+Run Spectral Fits
+------------------
 
-Installation
-------------
-If you haven't installed **MUFASA** yet, please follow the instructions in :doc:`Instal <installation>`.
+.. note::
 
-Setting Up Fits
----------------
-To set up for spectral fits, initialize a :class:`~mufasa.master_fitter.Region` object,
-which manages the input data, model parameters, and output files.
+   **Install:** If you haven't installed MUFASA already, see :doc:`Install <installation>`.
+
+
+Setting Up
+~~~~~~~~~~~
+
+To set up spectral fits, initialize a :class:`~mufasa.master_fitter.Region`
+object to manage the input data, model parameters, and output files in
+specified directories:
 
 .. code-block:: python
 
@@ -27,27 +32,33 @@ which manages the input data, model parameters, and output files.
     # Initialize the Region object
     region = mf.Region(cubePath, paraNameRoot, paraDir, fittype)
 
+MUFASA currently supports the following spectral models to be specified with `fittype`:
 
-Fitting Spectra
----------------
+- **NH₃ (1,1)** (2-components; ``'nh3_multi_v'``)
+- **N₂H⁺ (1-0)** (2-components; ``'n2hp_multi_v'``)
+
+Fitting
+~~~~~~~~~
 .. _fitting-spectra:
 
-To perform automated spectral fitting, use the following example:
+To perform automated spectral fitting:
 
 .. code-block:: python
 
     # Perform an automated two-components fit
     region.master_2comp_fit(snr_min=3)
 
-The currently available spectral models are:
+.. note::
 
-- **NH₃ (1,1)** (2-components; ``fittype='nh3_multi_v'``)
-- **N₂H⁺ (1-0)** (2-components; ``fittype='n2hp_multi_v'``)
+   **SNR cutoff:** The default `snr_min=3` is recommended,
+   which typically goes deeper than SNR=3 fairly efficiently.
+   MUFASA supports snr_min=0, but the effort is much more exhaustive.
 
-Visualizing Results
+
+View Results
 -------------------
 
-Reading the Saved Results
+Reading Saved Results
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 If you have exited the fitting session already, you can quickly load the saved results by
 reinitializing ``region`` (see the :ref:`Fitting Spectra <fitting-spectra>` section) and running:
@@ -75,7 +86,7 @@ To plot the fitted parameters in 3D, such as in position-position-velocity (PPV)
     # Plot fitted results as an interactive 3D HTML file, saved to `savepath`
     region.plot_ppv_scatter(savepath, vel_scale=0.5, showfig=True, auto_open_html=False)
 
-Exploring More
+Explore More
 --------------
 - For more examples and detailed guides, see :doc:`Tutorials <tutorials/index>`.
-- For a full reference of available modules, visit the :doc:`API Reference <api/modules>`.
+- For a full reference of available modules, visit the :doc:`API Reference <api/index>`.

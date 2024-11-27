@@ -1,7 +1,16 @@
-mufasa.spec\_models.nh3\_deblended module
-=========================================
+﻿.. _mufasa.spec_models.nh3_deblended:
+
+mufasa.spec_models.nh3_deblended
+================================
 
 .. automodule:: mufasa.spec_models.nh3_deblended
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :exclude-members: _hidden_member, nh3_vtau_singlemodel_deblended
+   
+.. rubric:: Functions
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+
+   nh3_vtau_singlemodel_deblended
+   

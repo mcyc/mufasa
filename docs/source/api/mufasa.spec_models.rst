@@ -1,23 +1,27 @@
-mufasa.spec\_models package
-===========================
+.. _mufasa.spec_models:
 
-Submodules
-----------
+mufasa.spec_models
+==================
 
-.. toctree::
-   :maxdepth: 4
+.. currentmodule:: mufasa.spec_models
 
-   mufasa.spec_models.ammonia_multiv
-   mufasa.spec_models.meta_model
-   mufasa.spec_models.n2hp_constants
-   mufasa.spec_models.n2hp_deblended
-   mufasa.spec_models.n2hp_multiv
-   mufasa.spec_models.nh3_deblended
-
-Module contents
----------------
+No description available.
 
 .. automodule:: mufasa.spec_models
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :noindex:
+
+.. rubric:: Submodules
+
+.. autosummary::
+   :toctree:
+
+   ammonia_multiv
+   meta_model
+   n2hp_constants
+   n2hp_deblended
+   n2hp_multiv
+   nh3_deblended
+   
+
+
+

@@ -1,7 +1,18 @@
-mufasa.spec\_models.n2hp\_multiv module
-=======================================
+﻿.. _mufasa.spec_models.n2hp_multiv:
+
+mufasa.spec_models.n2hp_multiv
+==============================
 
 .. automodule:: mufasa.spec_models.n2hp_multiv
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :exclude-members: _hidden_member, T_antenna, n2hp_multi_v, n2hp_multi_v_model_generator
+   
+.. rubric:: Functions
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+
+   T_antenna
+   n2hp_multi_v
+   n2hp_multi_v_model_generator
+   

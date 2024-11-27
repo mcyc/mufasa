@@ -1,7 +1,16 @@
-mufasa.utils.multicore module
-=============================
+﻿.. _mufasa.utils.multicore:
+
+mufasa.utils.multicore
+======================
 
 .. automodule:: mufasa.utils.multicore
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :exclude-members: _hidden_member, validate_n_cores
+   
+.. rubric:: Functions
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+
+   validate_n_cores
+   

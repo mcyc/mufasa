@@ -1,7 +1,7 @@
-mufasa.spec\_models.n2hp\_constants module
-==========================================
+﻿.. _mufasa.spec_models.n2hp_constants:
+
+mufasa.spec_models.n2hp_constants
+=================================
 
 .. automodule:: mufasa.spec_models.n2hp_constants
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   

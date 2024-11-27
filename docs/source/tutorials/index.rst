@@ -1,7 +1,7 @@
 Tutorials
 =========
 
-Welcome to the tutorials section for **MUFASA**! These guides will help you get hands-on experience with the core features of **MUFASA**.
+        Welcome to tutorials! Let's help you get some hands-on experience with the core features of **MUFASA**.
 
 .. toctree::
    :hidden:
@@ -13,8 +13,11 @@ Welcome to the tutorials section for **MUFASA**! These guides will help you get 
    visualization
    custom_usage
 
-Descriptions
+Overview
 ------------
+
+MUFASA's tutorials contain the following sections
+
 - :doc:`Loading Data and Results <load_data_n_results>`:
   Learn how to load your input data, initialize a :class:`~mufasa.master_fitter.Region` object, and access saved fits. This tutorial is ideal for users starting their spectral analysis workflows.
 
@@ -32,6 +35,6 @@ Descriptions
 
 Next Steps
 ----------
-- After exploring the tutorials, check out the :doc:`API Reference <../api/modules>` for a full overview of available modules and classes.
+- After exploring the tutorials, check out the :doc:`API Reference <../api/index>` for a full overview of available modules and classes.
 - Visit the :doc:`Guides <../guides>` for advanced workflows and tips.
 - Find additional resources on the `MUFASA GitHub repository <https://github.com/mcyc/mufasa>`_.

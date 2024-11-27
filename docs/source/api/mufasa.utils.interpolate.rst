@@ -1,7 +1,17 @@
-mufasa.utils.interpolate module
-===============================
+﻿.. _mufasa.utils.interpolate:
+
+mufasa.utils.interpolate
+========================
 
 .. automodule:: mufasa.utils.interpolate
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :exclude-members: _hidden_member, expand_interpolate, iter_expand
+   
+.. rubric:: Functions
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+
+   expand_interpolate
+   iter_expand
+   

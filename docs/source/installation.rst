@@ -1,14 +1,21 @@
-Install
+Installation
 =================
+
+.. note::
+
+   **Recommended Install**
+    MUFASA is undergoing rapid developments at the moment,
+    install form the source (see Option 2) to stay up-to-date with the latest version.
+
 
 System Requirements
 --------------------
 MUFASA is compatible with the following environments:
 - Python 3.8 or later.
-- Dependencies include NumPy, Astropy, Spectral-Cube, and pyspeckit.
+- Dependencies include `NumPy`, `Astropy`, `Spectral-Cube`, and `pyspeckit`.
 
-Installation Instructions
--------------------------
+Instructions
+-------------
 
 1. **Installing from PyPI**
    The easiest way to install MUFASA is through PyPI. Run the following command in your terminal:
@@ -33,8 +40,8 @@ Installation Instructions
 
        pip install numpy astropy spectral-cube pyspeckit
 
-Testing the Installation
-------------------------
+Verification
+~~~~~~~~~~~~~
 To verify the installation, open a Python interpreter and import MUFASA:
 
 .. code-block:: python

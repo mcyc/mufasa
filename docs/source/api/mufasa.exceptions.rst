@@ -1,7 +1,7 @@
-mufasa.exceptions module
-========================
+﻿.. _mufasa.exceptions:
+
+mufasa.exceptions
+=================
 
 .. automodule:: mufasa.exceptions
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   

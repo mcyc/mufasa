@@ -1,7 +1,16 @@
-mufasa.spec\_models.meta\_model module
-======================================
+﻿.. _mufasa.spec_models.meta_model:
+
+mufasa.spec_models.meta_model
+=============================
 
 .. automodule:: mufasa.spec_models.meta_model
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :exclude-members: _hidden_member, MetaModel
+   
+.. rubric:: Classes
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+
+   MetaModel
+   

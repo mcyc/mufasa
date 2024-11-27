@@ -1,19 +1,23 @@
-mufasa.visualization package
-============================
+.. _mufasa.visualization:
 
-Submodules
-----------
+mufasa.visualization
+====================
 
-.. toctree::
-   :maxdepth: 4
+.. currentmodule:: mufasa.visualization
 
-   mufasa.visualization.scatter_3D
-   mufasa.visualization.spec_viz
-
-Module contents
----------------
+No description available.
 
 .. automodule:: mufasa.visualization
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :noindex:
+
+.. rubric:: Submodules
+
+.. autosummary::
+   :toctree:
+
+   scatter_3D
+   spec_viz
+   
+
+
+

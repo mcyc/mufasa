@@ -1,7 +1,20 @@
-mufasa.utils.neighbours module
-==============================
+﻿.. _mufasa.utils.neighbours:
+
+mufasa.utils.neighbours
+=======================
 
 .. automodule:: mufasa.utils.neighbours
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   :exclude-members: _hidden_member, disk_neighbour, get_neighbor_coord, get_valid_neighbors, maxref_neighbor_coords, square_neighbour
+   
+.. rubric:: Functions
+
+.. autosummary::
+   :toctree: generated/
+   :nosignatures:
+
+   disk_neighbour
+   get_neighbor_coord
+   get_valid_neighbors
+   maxref_neighbor_coords
+   square_neighbour
+   
