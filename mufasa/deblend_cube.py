@@ -1,3 +1,9 @@
+"""
+The `mufasa.deblend_cube` module provides functionality for deblending hyperfine structures in spectral cubes,
+allowing for the reconstruction of fitted models with Gaussian lines accounting for
+optical depths.
+"""
+
 from __future__ import print_function
 from __future__ import absolute_import
 __author__ = 'mcychen'

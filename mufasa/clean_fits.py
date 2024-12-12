@@ -1,3 +1,8 @@
+"""
+The `mufasa.clean_fits` module provides functionality for handling multi-component fitting
+results, cleaning parameter maps, and generating exclusive single- and
+two-component maps.
+"""
 from __future__ import print_function
 __author__ = 'mcychen'
 

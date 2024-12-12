@@ -1,3 +1,8 @@
+"""
+The `mufasa.convolve_tools` module provides tools for processing spectral cubes with spatial
+convolution, signal-to-noise masking, and edge trimming.
+"""
+
 from __future__ import print_function
 __author__ = 'mcychen'
 

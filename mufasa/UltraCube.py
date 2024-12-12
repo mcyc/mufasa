@@ -1,10 +1,7 @@
 """
-UltraCube module.
-
-Provides utilities for processing spectral cubes, including fitting, masking,
-and moment calculations.
+The `mufasa.UltraCube` module provides tools for processing, analyzing, and visualizing spectral
+cubes, particularly for fitting multi-component spectral models.
 """
-
 
 from __future__ import print_function
 from __future__ import absolute_import
@@ -43,35 +40,50 @@ logger = get_logger(__name__)
 
 class UltraCube(object):
     """
-    A framework to manage and fit multi-component spectral models for spectral cubes.
+    A framework for multi-component spectral cube analysis and model fitting.
+
+    The `UltraCube` class manages spectral cubes, supports multi-component model
+    fitting, and provides tools for statistical evaluation, visualization, and
+    residual analysis. It is designed to handle large-scale spectral datasets
+    efficiently.
+
+    Parameters
+    ----------
+    cubefile : str, optional
+        Path to the FITS cube file. If not provided, a `SpectralCube` instance must be
+        supplied via the `cube` parameter.
+    cube : SpectralCube, optional
+        A `SpectralCube` instance representing the input spectral data. This parameter
+        is used only if `cubefile` is not provided.
+    fittype : str, optional
+        Type of spectral model to fit. Must be compatible with the `MetaModel` framework.
+    snr_min : float, optional
+        Minimum signal-to-noise ratio for considering a voxel during fitting.
+    rmsfile : str, optional
+        Path to the file containing RMS values for the cube.
+    cnv_factor : int, optional, default=2
+        Factor by which to spatially convolve the cube for pre-processing.
+    n_cores : int or bool, optional, default=True
+        Number of CPU cores to use for parallel processing. If `True`, uses all available
+        cores minus one.
+
+    Notes
+    -----
+    - The `UltraCube` class is designed to handle cubes with varying spatial
+      and spectral resolutions. It uses the `pyspeckit` library for fitting
+      and the `MetaModel` framework for defining custom spectral models.
+    - Convolution, masking, and statistical evaluation tools are provided for
+      pre- and post-processing of data.
+    - If a file path is provided via `cubefile`, the cube is loaded using
+      `SpectralCube.read`.
+    - The convolution factor (`cnv_factor`) is applied to the spatial axes to
+      reduce resolution before processing.
+    - The number of CPU cores (`n_cores`) defaults to all but one available core
+      for parallel computations, but can be explicitly set.
+
     """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
-        """
-        Initialize the UltraCube object.
-
-        Parameters
-        ----------
-        cubefile : str, optional
-            Path to the .fits cube file. If None, the cube parameter is used.
-        cube : SpectralCube, optional
-            A spectral cube object to initialize the UltraCube.
-        fittype : str, optional
-            Type of spectral model to be fitted.
-        snr_min : float, optional
-            Minimum peak signal-to-noise ratio for attempting fits.
-        rmsfile : str, optional
-            Path to the file containing RMS values for the cube.
-        cnv_factor : int, optional
-            Factor by which to spatially convolve the cube. Default is 2.
-        n_cores : int, optional
-            Number of CPU cores to use for computation. Default is all available cores minus one.
-
-        Raises
-        ------
-        ValueError
-            If both `cubefile` and `cube` are None.
-        """
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
@@ -868,14 +880,112 @@ def load_model_fit(cube, filename, ncomp, fittype):
 
 
 def convolve_sky_byfactor(cube, factor, savename=None, **kwargs):
+    """
+    Convolve the spatial dimensions of a spectral cube by a specified factor.
+
+    This function reduces the spatial resolution of the input cube by convolving
+    it with a Gaussian kernel scaled by the given factor. The resulting cube can
+    optionally be saved to disk.
+
+    Parameters
+    ----------
+    cube : SpectralCube
+        The input spectral cube to be convolved. Must be an instance of
+        `spectral_cube.SpectralCube`.
+    factor : int
+        The factor by which to reduce the spatial resolution. A factor of 2
+        doubles the beam size, effectively halving the spatial resolution.
+    savename : str, optional
+        The file path to save the convolved cube. If None, the convolved cube
+        is not saved. Default is None.
+    **kwargs : dict, optional
+        Additional keyword arguments passed to the convolution function
+        (e.g., to customize the kernel or handle edge cases).
+
+    Returns
+    -------
+    convolved_cube : SpectralCube
+        The convolved spectral cube with reduced spatial resolution.
+
+    Notes
+    -----
+    - Convolution is performed only on the spatial dimensions of the cube.
+    - The kernel size is determined automatically based on the specified `factor`.
+    - This function can be computationally intensive for large cubes. Consider
+      using memory-efficient techniques if applicable.
+
+    Raises
+    ------
+    ValueError
+        If the input `cube` is not compatible with the convolution operation
+        or if the specified `factor` is invalid.
+    IOError
+        If an error occurs while saving the convolved cube to the specified path.
+
+    """
     return cnvtool.convolve_sky_byfactor(cube, factor, savename, **kwargs)
 
 #======================================================================================================================#
 # UltraCube based methods
 
 def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cube=False, planemask=None, expand=20):
-    # calculate residual sum of squares
+    """
+    Calculate the residual sum of squares (RSS) for a spectral cube model fit.
 
+    The RSS is computed as the sum of squared differences between the observed data
+    and the model values for each voxel in the spectral cube. The calculation can be
+    restricted using masks and expanded spectral regions.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        An instance of the `UltraCube` class containing the spectral data and fitted models.
+    compID : int or str
+        The component ID or number of components in the model to evaluate. If `compID` is 0,
+        the model is assumed to be a flat baseline (`y = 0`).
+    usemask : bool, optional
+        Whether to apply a mask during the RSS calculation. If True, regions where the
+        model is zero or invalid are excluded. Default is True.
+    mask : numpy.ndarray, optional
+        A 3D boolean array specifying which voxels to include in the calculation.
+        If None and `usemask` is True, a default mask derived from the model is used.
+    return_size : bool, optional
+        Whether to return the effective sample size (number of valid voxels) for each spatial pixel.
+        Default is True.
+    update_cube : bool, optional
+        Whether to update the `UltraCube` instance with the calculated RSS values. Default is False.
+    planemask : numpy.ndarray, optional
+        A 2D spatial boolean array specifying which spatial pixels to calculate RSS for.
+        If None, all spatial pixels are considered. Default is None.
+    expand : int, optional
+        Number of spectral channels to expand the mask region for RSS calculation. Default is 20.
+
+    Returns
+    -------
+    rss : numpy.ndarray
+        A 2D array containing the RSS values for each spatial pixel.
+    nsamp : numpy.ndarray, optional
+        A 2D array containing the effective sample size (number of valid spectral samples)
+        for each spatial pixel. Returned only if `return_size` is True.
+    final_mask : numpy.ndarray, optional
+        The 3D boolean mask used in the RSS calculation. Returned only if explicitly required
+        by the caller.
+
+    Notes
+    -----
+    The RSS is calculated as:
+
+        RSS = Σ (data - model)²
+
+    where the sum is taken over spectral channels for each spatial pixel.
+
+    If `expand > 0`, the mask region is extended by the specified number of spectral channels.
+
+    Raises
+    ------
+    ValueError
+        If the dimensions of the data cube and model cube do not match, or if an invalid mask is provided.
+    """
     if isinstance(compID, int):
         compID = str(compID)
 
@@ -893,7 +1003,53 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
 
 
 def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None, expand=20):
+    """
+    Calculate the chi-squared (χ²) or reduced chi-squared value for a spectral cube model fit.
 
+    This function computes the goodness-of-fit by comparing the data in the spectral cube
+    to the model values. Optionally, the calculation can include masking and spectral
+    region expansion.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        An instance of the `UltraCube` class containing the spectral data and fitted models.
+    compID : int or str
+        The component ID or number of components in the model to evaluate. If `compID` is 0,
+        the model is assumed to be a flat baseline (`y = 0`).
+    reduced : bool, optional
+        Whether to compute the reduced chi-squared value by normalizing with the degrees of freedom.
+        If False, computes the standard chi-squared value. Default is False.
+    usemask : bool, optional
+        Whether to apply a mask to exclude invalid or unwanted regions from the calculation. Default is False.
+    mask : numpy.ndarray, optional
+        A 3D boolean array specifying which voxels to include in the chi-squared calculation.
+        If None and `usemask` is True, a default mask derived from the model is used.
+    expand : int, optional
+        Number of spectral channels to expand the mask region. Default is 20.
+
+    Returns
+    -------
+    chisq : numpy.ndarray
+        A 2D array representing the chi-squared (or reduced chi-squared) values
+        for each spatial pixel in the cube.
+
+    Notes
+    -----
+    The chi-squared statistic is calculated as:
+
+        χ² = Σ [(data - model)² / rms²]
+
+    where the sum is taken over spectral channels for each spatial pixel.
+
+    If `reduced=True`, the reduced chi-squared is computed by dividing χ² by
+    the degrees of freedom, which is the number of samples minus the number of model parameters.
+
+    Raises
+    ------
+    ValueError
+        If the dimensions of the data cube and model cube do not match.
+    """
     if isinstance(compID, int):
         compID = str(compID)
 
@@ -910,8 +1066,54 @@ def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None, expand=20
 
 
 def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20):
-    # calculate AICc value withouth change the internal ucube data
+    """
+    Calculate the corrected Akaike Information Criterion (AICc) for a spectral cube model.
 
+    This function computes the AICc for a given model component by evaluating
+    the residual sum of squares (RSS) and the effective sample size. The AICc
+    values help compare the goodness-of-fit for models with varying complexities.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        An instance of the `UltraCube` class containing the spectral data, fitted models,
+        and associated parameters.
+    compID : int or str
+        The component ID or number of components in the model. If an integer,
+        it is used to calculate the number of parameters as `n_parameters = compID * 4`.
+    mask : numpy.ndarray
+        A 3D boolean array specifying which voxels (volume pixels) to include in the AICc calculation.
+    planemask : numpy.ndarray, optional
+        A 2D spatial boolean array specifying which pixels to calculate AICc for. If provided,
+        calculations are restricted to these pixels. Default is None.
+    return_NSamp : bool, optional
+        If True, return the effective sample size along with the AICc values. Default is True.
+    expand : int, optional
+        Number of spectral channels to expand the region where the RSS is calculated.
+        Default is 20.
+
+    Returns
+    -------
+    AICc_map : numpy.ndarray
+        A 2D array containing the computed AICc values for the specified regions.
+    NSamp_map : numpy.ndarray, optional
+        A 2D array containing the effective sample size for each spatial pixel.
+        Only returned if `return_NSamp` is True.
+
+    Notes
+    -----
+    The corrected Akaike Information Criterion (AICc) is a modification of the AIC
+    that accounts for finite sample sizes. It is given by:
+
+        AICc = AIC + (2k(k + 1)) / (N - k - 1)
+
+    where `k` is the number of parameters and `N` is the sample size.
+
+    Raises
+    ------
+    ValueError
+        If the input `ucube` does not contain valid models or residuals for the specified `compID`.
+    """
     if isinstance(compID, int):
         p = compID * 4
         compID = str(compID)
@@ -936,9 +1138,61 @@ def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20)
 
 
 def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0, planemask=None):
-    # return the log likelihood of the A model relative to the B model
-    # currently, expand is only used if ucube_B is provided
+    """
+    Calculate the relative likelihood of two models based on their AICc values.
 
+    This function computes the logarithmic relative likelihood of model A
+    compared to model B, given their corrected Akaike Information Criterion (AICc)
+    values. It can optionally use a second `UltraCube` instance for comparisons.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        An instance of the `UltraCube` class containing the spectral data,
+        fitted models, and associated parameters for model A.
+    ncomp_A : int
+        Number of components in model A.
+    ncomp_B : int
+        Number of components in model B.
+    ucube_B : UltraCube, optional
+        An optional second `UltraCube` instance for model B. If provided,
+        AICc values for both models are calculated independently, and a
+        common mask is used. Default is None.
+    multicore : bool, optional
+        Whether to enable parallel processing. Default is True.
+    expand : int, optional
+        Number of spectral channels to expand the region where AICc values
+        are calculated. Default is 0.
+    planemask : numpy.ndarray, optional
+        A 2D spatial boolean array specifying which pixels to calculate the
+        relative likelihood for. If None, all pixels are considered. Default is None.
+
+    Returns
+    -------
+    lnk : numpy.ndarray
+        A 2D array containing the logarithmic relative likelihood of model A
+        compared to model B.
+
+    Notes
+    -----
+    - The likelihood is derived from the difference in AICc values:
+
+        .. math::
+
+            \ln(\mathcal{L}_A / \mathcal{L}_B) = (AICc_B - AICc_A) / 2
+
+      where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of models A and B.
+    - If `ucube_B` is provided, the models are compared over their common mask, and the AICc values
+      are recalculated fresh.
+    - This function handles mismatches in sample size (`NSamp`) by resetting and updating model masks.
+    - Currently, the expand argument is only used if ucube_B is provided
+
+    Raises
+    ------
+    ValueError
+        If the required AICc values for the models cannot be calculated due to missing data or invalid masks.
+
+    """
     if not ucube_B is None:
         # if a second UCube is provide for model comparison, use their common mask and calculate AICc values
         # without storing/updating them in the UCubes
@@ -982,6 +1236,53 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
     return lnk
 
 def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
+    """
+    Compute log-likelihood ratio maps for model comparisons up to a specified number of components.
+
+    This function calculates log-likelihood ratio (lnk) maps for comparing spectral
+    models with different numbers of components, based on the Akaike Information
+    Criterion corrected for finite sample sizes (AICc).
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        An instance of the `UltraCube` class containing the spectral data and fitted models.
+    ncomp_max : int, optional
+        The maximum number of components to include in the model comparison.
+        Default is 2.
+    rest_model_mask : bool, optional
+        If True, resets and updates the master model mask in `ucube` for components
+        being compared. Default is True.
+    multicore : bool, optional
+        Whether to enable parallel processing for calculations. Default is True.
+
+    Returns
+    -------
+    lnk_maps : tuple of numpy.ndarray
+        Log-likelihood ratio maps for the model comparisons. The returned maps include:
+        - `lnk10`: Comparison between 1-component and 0-component models.
+        - `lnk20` (if `ncomp_max >= 2`): Comparison between 2-component and 0-component models.
+        - `lnk21` (if `ncomp_max >= 2`): Comparison between 2-component and 1-component models.
+
+    Notes
+    -----
+    - Log-likelihood ratios are calculated using AICc values for each model as:
+
+        .. math::
+
+            \ln(\mathcal{L}_A / \mathcal{L}_B) = (AICc_B - AICc_A) / 2
+
+      where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of
+      models A and B, respectively.
+    - If `ncomp_max` is greater than 2, the function does not compute higher-order
+      comparisons and simply returns the log-likelihood maps for up to 2 components.
+
+    Raises
+    ------
+    ValueError
+        If `ncomp_max` is less than 1 or if model data for the required number of
+        components is missing in `ucube`.
+    """
     if rest_model_mask:
         ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
 
@@ -1000,8 +1301,70 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
 
 
 def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True, include_1c=True):
-    # get the best 2c model justified by AICc lnk
+    """
+    Select the best 2-component parameter cube based on AICc likelihood thresholds.
 
+    This function identifies regions in the parameter cube where the 2-component model
+    is justified over simpler models (0- or 1-component) based on log-likelihood ratio
+    thresholds calculated from the AICc. It can also combine results with a 1-component
+    model for regions where 2-component fits are not justified.
+
+    Parameters
+    ----------
+    ucube : UltraCube
+        An instance of the `UltraCube` class containing spectral data and model fits.
+    multicore : bool, optional
+        Whether to enable parallel processing for calculations. Default is True.
+    lnk21_thres : float, optional
+        Threshold for the log-likelihood ratio between 2-component and 1-component models.
+        Default is 5.
+    lnk20_thres : float, optional
+        Threshold for the log-likelihood ratio between 2-component and 0-component models.
+        Default is 5.
+    lnk10_thres : float, optional
+        Threshold for the log-likelihood ratio between 1-component and 0-component models.
+        Default is 5.
+    return_lnks : bool, optional
+        If True, return the log-likelihood ratio maps (lnk10, lnk20, lnk21) along with
+        the parameter and error cubes. Default is True.
+    include_1c : bool, optional
+        If True, include 1-component model results in regions where the 2-component model
+        is not justified. Default is True.
+
+    Returns
+    -------
+    tuple
+        If `return_lnks` is True:
+            - parcube : numpy.ndarray
+                A 3D array representing the best-fit parameter cube for the justified
+                model in each spatial region.
+            - errcube : numpy.ndarray
+                A 3D array representing the associated errors for the parameters.
+            - lnk10 : numpy.ndarray
+                Log-likelihood ratio map comparing 1-component and 0-component models.
+            - lnk20 : numpy.ndarray
+                Log-likelihood ratio map comparing 2-component and 0-component models.
+            - lnk21 : numpy.ndarray
+                Log-likelihood ratio map comparing 2-component and 1-component models.
+        If `return_lnks` is False:
+            - parcube : numpy.ndarray
+            - errcube : numpy.ndarray
+
+    Notes
+    -----
+    - The function determines the best model for each spatial region by comparing
+      log-likelihood ratios with the specified thresholds.
+    - Regions where the 2-component model is not justified (based on `lnk21_thres`
+      and `lnk20_thres`) can revert to the 1-component model if `include_1c` is True.
+    - Any region failing to meet the `lnk10_thres` threshold for the 1-component model
+      is set to NaN in the parameter and error cubes.
+
+    Raises
+    ------
+    ValueError
+        If model fits for 1-component or 2-component models are missing in `ucube`.
+
+    """
     lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore)
 
     parcube = copy(ucube.pcubes['2'].parcube)
@@ -1313,7 +1676,42 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
 
 
 def expand_mask(mask, expand):
-    # adds a buffer of size set by the expand keyword to a 2D mask,
+    """
+    Expand a 3D mask along the spectral axis by a specified buffer size.
+
+    This function applies a binary dilation to the input mask, increasing its coverage
+    along the spectral axis by the specified `expand` value. The expansion is applied
+    independently for each spatial pixel.
+
+    Parameters
+    ----------
+    mask : numpy.ndarray
+        A 3D boolean array representing the original mask. The first dimension corresponds
+        to the spectral axis, while the remaining dimensions represent spatial axes.
+    expand : int
+        The number of spectral channels to extend the mask along the spectral axis.
+        Must be a non-negative integer.
+
+    Returns
+    -------
+    expanded_mask : numpy.ndarray
+        A 3D boolean array of the same shape as the input mask, with the spectral
+        regions expanded by the specified buffer size.
+
+    Notes
+    -----
+    The binary dilation process enlarges the `True` regions in the mask along the
+    spectral axis. The dilation does not affect spatial axes, but it creates a buffer
+    around the original mask in the spectral dimension.
+
+    Raises
+    ------
+    ValueError
+        If `expand` is not a non-negative integer.
+    TypeError
+        If the input `mask` is not a boolean numpy array.
+
+    """
     selem = np.ones(expand,dtype=bool)
     selem.shape += (1,1,)
     mask = nd.binary_dilation(mask, selem)
@@ -1321,7 +1719,41 @@ def expand_mask(mask, expand):
 
 
 def get_rms(residual):
-    # get robust estimate of the rms from the fit residual
+    """
+    Compute a robust estimate of the root mean square (RMS) from the fit residuals.
+
+    This function calculates the RMS of the residuals using a robust method based on the
+    median absolute deviation (MAD). It is less sensitive to outliers compared to a
+    standard RMS calculation.
+
+    Parameters
+    ----------
+    residual : numpy.ndarray
+        A 3D array representing the residuals between the observed data and the fitted model.
+        The first dimension corresponds to the spectral axis, while the remaining dimensions
+        represent the spatial axes.
+
+    Returns
+    -------
+    rms : numpy.ndarray
+        A 2D array representing the RMS for each spatial pixel in the residual cube.
+
+    Notes
+    -----
+    The RMS is calculated using the following robust formula:
+
+    RMS = 1.4826 × median(abs(x - median(x))) / sqrt(2)
+
+    Here, `x` represents the residuals for each spectral channel at a spatial pixel. The
+    subtraction and absolute value are applied element-wise along the spectral axis. The robust
+    method reduces sensitivity to noise spikes or outliers in the residuals.
+
+    Raises
+    ------
+    ValueError
+        If the input `residual` is not a 3D array or if it contains invalid (e.g., NaN) values.
+
+    """
     diff = residual - np.roll(residual, 2, axis=0)
     rms = 1.4826 * np.nanmedian(np.abs(diff), axis=0) / 2**0.5
     gc.collect()

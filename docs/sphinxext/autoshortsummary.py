@@ -1,5 +1,5 @@
 from sphinx.util.docstrings import prepare_docstring
-[from docutils.parsers.rst import Directive
+from docutils.parsers.rst import Directive
 from docutils.nodes import paragraph, Text
 from importlib import import_module
 import logging

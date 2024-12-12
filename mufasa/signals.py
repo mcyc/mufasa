@@ -1,22 +1,8 @@
 """
-Module Name: signals
-
-Description:
-This module provides functions to find signals and make robust estimates of the noise level.
-
-Functions:
-- get_snr: Calculate the peak signal-to-noise ratio of the cube.
-- get_rms_robust: Estimate the noise level in the cube using robust methods.
-- refine_rms: Refine the noise estimate by masking out signal regions.
-- get_signal_mask: Create a 3D mask to indicate where signals are located.
-- refine_signal_mask: Refine a signal mask by removing noisy features and expanding the mask.
-- trim_cube_edge: Remove noisy edges from a cube.
-- trim_edge: Trim edges using a 2D mask.
-- v_estimate: Estimate the velocity centroid based on the peak emission.
-- get_v_at_peak: Find the velocity corresponding to the spectral channel with the peak emission.
-- get_v_mask: Return a mask centered on a reference velocity with a specified spectral window.
-- get_moments: Calculate moments of the signals in the cube.
+The `mufasa.signals` module provides robust tools for preprocessing spectral data, including RMS estimation,
+signal masking, spatial trimming, and moment calculations.
 """
+
 __author__ = "Mike Chen"
 
 import gc

@@ -1,3 +1,9 @@
+"""
+The `mufasa.moment_guess` module provides utilities for generating initial guesses, refining moment maps,
+and handling physical parameter calculations such as excitation temperature and
+optical depth.
+"""
+
 from __future__ import print_function
 import numpy as np
 import copy

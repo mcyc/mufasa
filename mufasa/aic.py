@@ -1,3 +1,9 @@
+"""
+The `mufasa.aic` module provides tools for statistical evaluation of spectral
+cube models, including Akaike Information Criterion (AIC) calculations, corrected
+AIC (AICc), and chi-squared metrics.
+
+"""
 from __future__ import absolute_import
 __author__ = 'mcychen'
 
@@ -6,8 +12,6 @@ import astropy.io.fits as fits
 from spectral_cube import SpectralCube
 
 from . import multi_v_fit as mvf
-
-# a place to calculate AIC values
 
 #=======================================================================================================================
 

@@ -1,3 +1,9 @@
+"""
+The `mufasa.multi_v_fit` module provides functionality for preprocessing, masking, and refining
+guesses for spectral line fitting, as well as utility functions for calculating
+moments, signal-to-noise ratios, and handling parameter constraints.
+"""
+
 from __future__ import print_function
 from __future__ import absolute_import
 
