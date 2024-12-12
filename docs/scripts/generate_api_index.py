@@ -4,15 +4,10 @@ from api_reference import API_REFERENCE
 
 # Paths and template setup
 TEMPLATE_DIR = "templates"
-MODULE_TEMPLATE = "module.rst.template"
-CLASS_TEMPLATE = "class.rst.template"
-FUNCTION_TEMPLATE = "function.rst.template"
 INDEX_TEMPLATE = "index.rst.template"  # Template for api/index.rst
-OUTPUT_DIR = "source/api" #"source/api/generated"
 INDEX_OUTPUT = "source/api/index.rst"
 
 env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-
 
 def render_template(template_name, context):
     """Render a Jinja2 template with the given context."""

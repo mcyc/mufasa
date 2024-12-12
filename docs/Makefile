@@ -23,23 +23,23 @@ check-deps:
 # Generate .rst files for API documentation
 apidocs: check-deps
 	@echo "Generating .rst files for API documentation..."
-	sphinx-apidoc -o "$(APIDIR)" ../mufasa --separate --templatedir="$(SOURCEDIR)/_templates"
+	sphinx-apidoc -o $(APIDIR) ../mufasa --separate --templatedir=$(SOURCEDIR)/_templates
 	python $(SCRIPTSDIR)/generate_api_index.py
 
 # Build HTML documentation
 html: check-deps
 	@echo "Building HTML documentation..."
-	$(SPHINXBUILD) -b html -j auto "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	$(SPHINXBUILD) -b html -j auto $(SOURCEDIR) $(BUILDDIR) $(SPHINXOPTS)
 
 # Open the built HTML documentation in a browser
 view-html: html
 	@echo "Opening built HTML documentation..."
-	xdg-open "$(BUILDDIR)/index.html" || open "$(BUILDDIR)/index.html" || echo "Unable to open HTML documentation."
+	xdg-open $(BUILDDIR)/index.html || open $(BUILDDIR)/index.html || echo "Unable to open HTML documentation."
 
 # Clean build and generated files
 clean:
 	@echo "Cleaning build and generated files..."
-	rm -rf "$(BUILDDIR)" "$(APIDIR)"
+	rm -rf $(BUILDDIR) $(APIDIR)
 
 # Confirm before performing a distclean
 confirm-distclean:
@@ -52,8 +52,8 @@ confirm-distclean:
 # Perform a deep clean (all generated files)
 distclean: confirm-distclean clean
 	@echo "Removing all auto-generated .rst files..."
-	rm -f "$(GENERATEDDIR)/*.rst"
-	rm -f "$(SCRIPTSDIR)/api_reference.py"
+	rm -f $(GENERATEDDIR)/*.rst
+	rm -f $(SCRIPTSDIR)/api_reference.py
 
 # Show help message
 help:

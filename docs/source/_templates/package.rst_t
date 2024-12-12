@@ -19,7 +19,7 @@
 
    {% for submodule in submodules -%}
    {{ submodule.rsplit('.', 1)[-1] }}
-   {% endfor -%}
+   {% endfor %}
 {% endif %}
 
 {% if classes -%}
@@ -31,7 +31,7 @@
 
    {% for cls in classes %}
    ~{{ cls }}
-   {% endfor -%}
+   {% endfor %}
 {% endif %}
 
 {% if functions -%}
@@ -43,5 +43,5 @@
 
    {% for func in functions %}
    ~{{ func }}
-   {% endfor -%}
+   {% endfor %}
 {% endif %}

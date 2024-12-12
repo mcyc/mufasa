@@ -5,6 +5,7 @@ import sys
 # -- Path setup ---------------------------------------------------------------
 sys.path.insert(0, os.path.abspath('../mufasa'))
 sys.path.insert(0, os.path.abspath('../../mufasa'))
+sys.path.insert(0, os.path.abspath('../sphinxext'))
 
 # -- Project information ------------------------------------------------------
 project = 'MUFASA'
@@ -29,6 +30,7 @@ extensions = [
     'numpydoc',
     'sphinxext.opengraph',
     'nbsphinx',
+    'autoshortsummary',
     #'sphinx_search.extension',  # Add search extension
 ]
 
@@ -54,10 +56,11 @@ html_theme = "pydata_sphinx_theme"
 html_theme_options = {
     "logo": {"text": "MUFASA"},
     "github_url": "https://github.com/mcyc/mufasa",
-    "show_toc_level": 2,
+    "show_toc_level": 4,
     "navbar_align": "left",
     "collapse_navigation": True,  # Enable collapsible sidebar
     "navigation_depth": 4,  # Ensure the sidebar reflects submodules
+    "show_nav_level": 4,
     #"navbar_end": ["version-switcher"],
 }
 
