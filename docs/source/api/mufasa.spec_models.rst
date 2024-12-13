@@ -5,8 +5,6 @@ mufasa.spec_models
 
 .. currentmodule:: mufasa.spec_models
 
-No description available.
-
 .. automodule:: mufasa.spec_models
    :noindex:
 

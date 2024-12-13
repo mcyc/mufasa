@@ -6,8 +6,6 @@
 
 .. currentmodule:: {{ fullname }}
 
-{{ description|default("No description available.") }}
-
 .. automodule:: {{ fullname }}
    :noindex:
 

@@ -5,8 +5,6 @@ mufasa.visualization
 
 .. currentmodule:: mufasa.visualization
 
-No description available.
-
 .. automodule:: mufasa.visualization
    :noindex:
 
