@@ -140,33 +140,22 @@ class UltraCube(object):
         """
         return mvf.make_header(ndim=2, ref_header=self.cube.header)
 
-    def load_pcube(self, pcube_ref=None):
+    def load_cube(self, fitsfile):
         """
-        Load a SpectralCube as a pyspeckit.SpectralCube object.
+        Load a spectral cube from a FITS file and convert its units to K and km/s.
+
+        The function ensures the cube has intensity units in Kelvin and a spectral axis
+        in velocity units (km/s). If the cube lacks a rest frequency, it assigns one
+        based on the spectral model.
 
         Parameters
         ----------
-        pcube_ref : pyspeckit.SpectralCube, optional
-            An existing pyspeckit cube object. If provided, the loaded cube's
-            data pointer will be linked to this reference cube to conserve memory.
+        fitsfile : str
+            Path to the FITS cube file.
 
         Returns
         -------
-        pyspeckit.SpectralCube
-            The loaded pyspeckit cube for spectral model fitting.
-
-        Notes
-        -----
-        - The cube is first loaded as a SpectralCube to ensure proper unit
-          conversions.
-        - Memory is conserved when `pcube_ref` is provided by linking data pointers.
-        - The method handles rest frequency assignment and velocity convention
-          updates.
-
-        Raises
-        ------
-        ValueError
-            If the cube file cannot be loaded or its units are incompatible.
+        None
         """
         cube = SpectralCube.read(fitsfile, use_dask=True)
         cube = to_K(cube)
