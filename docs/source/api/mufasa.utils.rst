@@ -5,10 +5,7 @@ mufasa.utils
 
 .. currentmodule:: mufasa.utils
 
-No description available.
-
 .. automodule:: mufasa.utils
-   :noindex:
 
 .. rubric:: Submodules
 
@@ -22,6 +19,9 @@ No description available.
    multicore
    neighbours
    
+
+
+
 
 
 

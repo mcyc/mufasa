@@ -1,3 +1,9 @@
+"""
+The `mufasa.multi_v_fit` module provides functionality for preprocessing, masking, and refining
+guesses for spectral line fitting, as well as utility functions for calculating
+moments, signal-to-noise ratios, and handling parameter constraints.
+"""
+
 from __future__ import print_function
 from __future__ import absolute_import
 
@@ -47,24 +53,6 @@ logger = get_logger(__name__)
 # =======================================================================================================================
 
 def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None, rest_value=None):
-    '''
-    cube : SpectralCube
-
-    model: numpy array
-
-    expand : int
-        Expands the region where the residual is evaluated by this many channels in the spectral dimension
-
-    reduced : boolean
-        Whether or not to return the reduced chi-squared value or not
-
-    usemask: boolean
-        Whether or not to mask out some parts of the data.
-        If no mask is provided, it masks out samples with model values of zero.
-
-    mask: boolean array
-        A mask stating which array elements the chi-squared values are calculated from
-    '''
 
     if rest_value is not None:
         cube = cube.with_spectral_unit(u.Hz, rest_value=rest_value)
@@ -300,24 +288,7 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
 def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=None, guesses=None, errmap11name=None,
                 multicore=None, mask_function=None, snr_min=0.0, momedgetrim=True, saveguess=False,
                 fittype='nh3_multi_v', **kwargs):
-    '''
-    Perform n velocity component fit on the GAS ammonia 1-1 data.
-    (This should be the function to call for all future codes if it has been proven to be reliable)
-    # note: the method can probably be renamed to cubefit()
 
-    Parameters
-    ----------
-    cube : str
-        The file name of the ammonia 1-1 cube or a SpectralCube object
-    ncomp : int
-        The number of components one wish to fit. Default is 2
-    paraname: str
-        The output file name of the
-    Returns
-    -------
-    pcube : 'pyspeckit.cubes.SpectralCube.Cube'
-        Pyspeckit cube object containing both the fit and the original data cube
-    '''
     logger.debug('Using cubefit_gen')
 
     # get information on the spectral model
@@ -583,13 +554,6 @@ def retry_fit(pcube, kwargs, old_start_point, peaksnr=None):
 
 
 def make_header(ndim, ref_header):
-    '''
-    Create a new header while retaining
-
-    :param ndim:
-    :param ref_header:
-    :return:
-    '''
 
     # initilizing a new, empthy header
     hdr_new = fits.Header()

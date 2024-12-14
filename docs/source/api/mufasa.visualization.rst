@@ -5,10 +5,7 @@ mufasa.visualization
 
 .. currentmodule:: mufasa.visualization
 
-No description available.
-
 .. automodule:: mufasa.visualization
-   :noindex:
 
 .. rubric:: Submodules
 
@@ -18,6 +15,9 @@ No description available.
    scatter_3D
    spec_viz
    
+
+
+
 
 
 

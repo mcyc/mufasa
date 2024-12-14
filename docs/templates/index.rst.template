@@ -10,7 +10,7 @@ This is **MUFASA**'s class and function reference. In addition to the table belo
 you can also search with the search bar located on the top right corner of the webpage.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    {% for module in API_REFERENCE -%}
@@ -33,7 +33,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~{{ module }}.{{ obj }}`
      - .. container:: sk-apisearch-desc
 
-          {{ module_info["sections"][0]["descriptions"].get(obj, "No description available.") }}
+          .. currentmodule:: {{ module }}
+
+          .. autoshortsummary:: {{ module }}.{{ obj }}
 
           .. container:: caption
 

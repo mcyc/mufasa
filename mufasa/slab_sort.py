@@ -1,3 +1,10 @@
+"""
+The `mufasa.slab_sort` module provides utilities for sorting and refining two-component spectral data, including
+functions for swapping components based on linewidth or distance metrics relative
+to reference maps. These tools are intended to facilitate multi-component spectral
+analysis by improving data consistency and organization.
+"""
+
 from __future__ import print_function
 __author__ = 'mcychen'
 

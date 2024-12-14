@@ -1,5 +1,7 @@
-#Exceptions and Warnings (:mod:`numpy.exceptions`)
-#=================================================
+"""
+The `mufasa.exceptions` module provides custom exceptions for handling errors specific to spectral fitting and signal-to-noise
+ratio (SNR) masking.
+"""
 
 class SNRMaskError(Exception):
     """SNR Mask has no valid pixel.

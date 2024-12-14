@@ -38,4 +38,4 @@ Use the navigation bar at the top to explore other pages, including,
    Starting <quick_start>
    guides
    tutorials/index
-   api/index
+   API <api/index>

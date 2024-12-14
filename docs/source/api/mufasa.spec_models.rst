@@ -5,10 +5,7 @@ mufasa.spec_models
 
 .. currentmodule:: mufasa.spec_models
 
-No description available.
-
 .. automodule:: mufasa.spec_models
-   :noindex:
 
 .. rubric:: Submodules
 
@@ -22,6 +19,9 @@ No description available.
    n2hp_multiv
    nh3_deblended
    
+
+
+
 
 
 

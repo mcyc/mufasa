@@ -10,7 +10,7 @@ This is **MUFASA**'s class and function reference. In addition to the table belo
 you can also search with the search bar located on the top right corner of the webpage.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
    :hidden:
 
    mufasa.UltraCube
@@ -39,7 +39,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.UCubePlus`
      - .. container:: sk-apisearch-desc
 
-          A subclass of UltraCube that includes directory management for parameter maps and model fits.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.UCubePlus
 
           .. container:: caption
 
@@ -47,7 +49,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.UltraCube`
      - .. container:: sk-apisearch-desc
 
-          A framework to manage and fit multi-component spectral models for spectral cubes.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.UltraCube
 
           .. container:: caption
 
@@ -55,7 +59,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.calc_AICc`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.calc_AICc
 
           .. container:: caption
 
@@ -63,7 +69,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.calc_AICc_likelihood`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.calc_AICc_likelihood
 
           .. container:: caption
 
@@ -71,7 +79,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.calc_chisq`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.calc_chisq
 
           .. container:: caption
 
@@ -79,7 +89,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.calc_rss`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.calc_rss
 
           .. container:: caption
 
@@ -87,7 +99,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.convolve_sky_byfactor`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.convolve_sky_byfactor
 
           .. container:: caption
 
@@ -95,7 +109,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.expand_mask`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.expand_mask
 
           .. container:: caption
 
@@ -103,7 +119,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.fit_cube`
      - .. container:: sk-apisearch-desc
 
-          Fit the spectral cube using the specified fitting type.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.fit_cube
 
           .. container:: caption
 
@@ -111,7 +129,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_Tpeak`
      - .. container:: sk-apisearch-desc
 
-          Calculate the peak value of a model cube at each spatial pixel.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_Tpeak
 
           .. container:: caption
 
@@ -119,7 +139,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_all_lnk_maps`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_all_lnk_maps
 
           .. container:: caption
 
@@ -127,7 +149,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_best_2c_parcube`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_best_2c_parcube
 
           .. container:: caption
 
@@ -135,7 +159,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_chisq`
      - .. container:: sk-apisearch-desc
 
-          Calculate the chi-squared or reduced chi-squared value for a spectral cube.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_chisq
 
           .. container:: caption
 
@@ -143,7 +169,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_masked_moment`
      - .. container:: sk-apisearch-desc
 
-          Calculate a masked moment of a spectral cube.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_masked_moment
 
           .. container:: caption
 
@@ -151,7 +179,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_residual`
      - .. container:: sk-apisearch-desc
 
-          Calculate the residual between the data cube and the model cube.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_residual
 
           .. container:: caption
 
@@ -159,7 +189,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_rms`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_rms
 
           .. container:: caption
 
@@ -167,7 +199,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.get_rss`
      - .. container:: sk-apisearch-desc
 
-          Calculate the residual sum of squares (RSS) for a spectral cube model fit.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.get_rss
 
           .. container:: caption
 
@@ -175,7 +209,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.is_K`
      - .. container:: sk-apisearch-desc
 
-          Check if a given unit is equivalent to Kelvin (K).
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.is_K
 
           .. container:: caption
 
@@ -183,7 +219,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.load_model_fit`
      - .. container:: sk-apisearch-desc
 
-          Load the spectral fit results from a.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.load_model_fit
 
           .. container:: caption
 
@@ -191,7 +229,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.save_fit`
      - .. container:: sk-apisearch-desc
 
-          Save the fitted parameter cube to a.
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.save_fit
 
           .. container:: caption
 
@@ -199,7 +239,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.UltraCube.to_K`
      - .. container:: sk-apisearch-desc
 
-          Convert the unit of a spectral cube to Kelvin (K).
+          .. currentmodule:: mufasa.UltraCube
+
+          .. autoshortsummary:: mufasa.UltraCube.to_K
 
           .. container:: caption
 
@@ -208,7 +250,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.aic.AIC`
      - .. container:: sk-apisearch-desc
 
-          Calculate the Akaike Information Criterion (AIC).
+          .. currentmodule:: mufasa.aic
+
+          .. autoshortsummary:: mufasa.aic.AIC
 
           .. container:: caption
 
@@ -216,7 +260,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.aic.AICc`
      - .. container:: sk-apisearch-desc
 
-          Calculate the corrected Akaike Information Criterion (AICc).
+          .. currentmodule:: mufasa.aic
+
+          .. autoshortsummary:: mufasa.aic.AICc
 
           .. container:: caption
 
@@ -224,7 +270,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.aic.fits_comp_AICc`
      - .. container:: sk-apisearch-desc
 
-          A wrapper function to calculate corrected Akaike Information Criterion (AICc) values.
+          .. currentmodule:: mufasa.aic
+
+          .. autoshortsummary:: mufasa.aic.fits_comp_AICc
 
           .. container:: caption
 
@@ -232,7 +280,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.aic.fits_comp_chisq`
      - .. container:: sk-apisearch-desc
 
-          Calculate and save chi-squared values for the given cube and model fits.
+          .. currentmodule:: mufasa.aic
+
+          .. autoshortsummary:: mufasa.aic.fits_comp_chisq
 
           .. container:: caption
 
@@ -240,7 +290,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.aic.get_comp_AICc`
      - .. container:: sk-apisearch-desc
 
-          Calculate AICc values for two models over the same samples.
+          .. currentmodule:: mufasa.aic
+
+          .. autoshortsummary:: mufasa.aic.get_comp_AICc
 
           .. container:: caption
 
@@ -248,7 +300,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.aic.likelihood`
      - .. container:: sk-apisearch-desc
 
-          Calculate the log-likelihood of model A relative to model B.
+          .. currentmodule:: mufasa.aic
+
+          .. autoshortsummary:: mufasa.aic.likelihood
 
           .. container:: caption
 
@@ -257,7 +311,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.clean_fits.fit_results`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.clean_fits
+
+          .. autoshortsummary:: mufasa.clean_fits.fit_results
 
           .. container:: caption
 
@@ -265,7 +321,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.clean_fits.above_ErrV_Thresh`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.clean_fits
+
+          .. autoshortsummary:: mufasa.clean_fits.above_ErrV_Thresh
 
           .. container:: caption
 
@@ -273,7 +331,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.clean_fits.clean_2comp_maps`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.clean_fits
+
+          .. autoshortsummary:: mufasa.clean_fits.clean_2comp_maps
 
           .. container:: caption
 
@@ -281,7 +341,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.clean_fits.exclusive_2comp_maps`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.clean_fits
+
+          .. autoshortsummary:: mufasa.clean_fits.exclusive_2comp_maps
 
           .. container:: caption
 
@@ -289,7 +351,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.clean_fits.extremeV_mask`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.clean_fits
+
+          .. autoshortsummary:: mufasa.clean_fits.extremeV_mask
 
           .. container:: caption
 
@@ -297,7 +361,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.clean_fits.remove_zeros`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.clean_fits
+
+          .. autoshortsummary:: mufasa.clean_fits.remove_zeros
 
           .. container:: caption
 
@@ -306,7 +372,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.convolve_tools.convolve_sky`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.convolve_tools
+
+          .. autoshortsummary:: mufasa.convolve_tools.convolve_sky
 
           .. container:: caption
 
@@ -314,7 +382,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.convolve_tools.convolve_sky_byfactor`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.convolve_tools
+
+          .. autoshortsummary:: mufasa.convolve_tools.convolve_sky_byfactor
 
           .. container:: caption
 
@@ -322,7 +392,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.convolve_tools.edge_trim`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.convolve_tools
+
+          .. autoshortsummary:: mufasa.convolve_tools.edge_trim
 
           .. container:: caption
 
@@ -330,7 +402,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.convolve_tools.get_celestial_hdr`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.convolve_tools
+
+          .. autoshortsummary:: mufasa.convolve_tools.get_celestial_hdr
 
           .. container:: caption
 
@@ -338,7 +412,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.convolve_tools.regrid`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.convolve_tools
+
+          .. autoshortsummary:: mufasa.convolve_tools.regrid
 
           .. container:: caption
 
@@ -346,7 +422,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.convolve_tools.regrid_mask`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.convolve_tools
+
+          .. autoshortsummary:: mufasa.convolve_tools.regrid_mask
 
           .. container:: caption
 
@@ -354,7 +432,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.convolve_tools.snr_mask`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.convolve_tools
+
+          .. autoshortsummary:: mufasa.convolve_tools.snr_mask
 
           .. container:: caption
 
@@ -363,7 +443,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.deblend_cube.deblend`
      - .. container:: sk-apisearch-desc
 
-          Deblend hyperfine structures in a cube based on fitted models.
+          .. currentmodule:: mufasa.deblend_cube
+
+          .. autoshortsummary:: mufasa.deblend_cube.deblend
 
           .. container:: caption
 
@@ -372,7 +454,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.exceptions.FitTypeError`
      - .. container:: sk-apisearch-desc
 
-          Fitttype provided is not valid.
+          .. currentmodule:: mufasa.exceptions
+
+          .. autoshortsummary:: mufasa.exceptions.FitTypeError
 
           .. container:: caption
 
@@ -380,7 +464,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.exceptions.SNRMaskError`
      - .. container:: sk-apisearch-desc
 
-          SNR Mask has no valid pixel.
+          .. currentmodule:: mufasa.exceptions
+
+          .. autoshortsummary:: mufasa.exceptions.SNRMaskError
 
           .. container:: caption
 
@@ -388,7 +474,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.exceptions.StartFitError`
      - .. container:: sk-apisearch-desc
 
-          Fitting failed from the beginning.
+          .. currentmodule:: mufasa.exceptions
+
+          .. autoshortsummary:: mufasa.exceptions.StartFitError
 
           .. container:: caption
 
@@ -397,7 +485,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.get_celestial_hdr`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.get_celestial_hdr
 
           .. container:: caption
 
@@ -405,7 +495,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.guess_from_cnvpara`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.guess_from_cnvpara
 
           .. container:: caption
 
@@ -413,7 +505,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.mask_cleaning`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.mask_cleaning
 
           .. container:: caption
 
@@ -421,7 +515,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.mask_swap_2comp`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.mask_swap_2comp
 
           .. container:: caption
 
@@ -429,7 +525,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.master_mask`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.master_mask
 
           .. container:: caption
 
@@ -437,7 +535,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.quick_2comp_sort`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.quick_2comp_sort
 
           .. container:: caption
 
@@ -445,7 +545,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.refine_2c_guess`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.refine_2c_guess
 
           .. container:: caption
 
@@ -453,7 +555,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.refine_each_comp`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.refine_each_comp
 
           .. container:: caption
 
@@ -461,7 +565,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.refine_guess`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.refine_guess
 
           .. container:: caption
 
@@ -469,7 +575,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.regrid`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.regrid
 
           .. container:: caption
 
@@ -477,7 +585,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.save_guesses`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.save_guesses
 
           .. container:: caption
 
@@ -485,7 +595,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.simple_para_clean`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.simple_para_clean
 
           .. container:: caption
 
@@ -493,7 +605,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.guess_refine.tautex_renorm`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.guess_refine
+
+          .. autoshortsummary:: mufasa.guess_refine.tautex_renorm
 
           .. container:: caption
 
@@ -502,7 +616,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.Region`
      - .. container:: sk-apisearch-desc
 
-          A class to represent the observed spectral cube to perform the model fits.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.Region
 
           .. container:: caption
 
@@ -510,7 +626,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.expand_fits`
      - .. container:: sk-apisearch-desc
 
-          Expand fits in a region by incrementally fitting pixels beyond a defined.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.expand_fits
 
           .. container:: caption
 
@@ -518,7 +636,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.fit_best_2comp_residual_cnv`
      - .. container:: sk-apisearch-desc
 
-          Fit the convolved residual of the best-fit two-component spectral model.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.fit_best_2comp_residual_cnv
 
           .. container:: caption
 
@@ -526,7 +646,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.fit_surroundings`
      - .. container:: sk-apisearch-desc
 
-          Expand fits around a region based on model log-likelihood thresholds and.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.fit_surroundings
 
           .. container:: caption
 
@@ -534,7 +656,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_2comp_wide_guesses`
      - .. container:: sk-apisearch-desc
 
-          Generate initial guesses for fitting a two-component spectral model with.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_2comp_wide_guesses
 
           .. container:: caption
 
@@ -542,7 +666,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_best_2comp_model`
      - .. container:: sk-apisearch-desc
 
-          Retrieve the best-fit model cube for the given Region object.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_best_2comp_model
 
           .. container:: caption
 
@@ -550,7 +676,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_best_2comp_residual`
      - .. container:: sk-apisearch-desc
 
-          Calculate the residual cube for the best-fit two-component model.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_best_2comp_residual
 
           .. container:: caption
 
@@ -558,7 +686,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_best_2comp_residual_SpectralCube`
      - .. container:: sk-apisearch-desc
 
-          Generate the residual spectral cube for the best-fit two-component.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_best_2comp_residual_SpectralCube
 
           .. container:: caption
 
@@ -566,7 +696,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_best_2comp_residual_cnv`
      - .. container:: sk-apisearch-desc
 
-          Generate a convolved residual cube for the best-fit two-component.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_best_2comp_residual_cnv
 
           .. container:: caption
 
@@ -574,7 +706,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_best_2comp_snr_mod`
      - .. container:: sk-apisearch-desc
 
-          Calculate the signal-to-noise ratio (SNR) map for the best-fit two-.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_best_2comp_snr_mod
 
           .. container:: caption
 
@@ -582,7 +716,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_convolved_cube`
      - .. container:: sk-apisearch-desc
 
-          Generate and save a convolved version of the spectral cube for a given.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_convolved_cube
 
           .. container:: caption
 
@@ -590,7 +726,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_convolved_fits`
      - .. container:: sk-apisearch-desc
 
-          Fit a model to the convolved cube and save the results.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_convolved_fits
 
           .. container:: caption
 
@@ -598,7 +736,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_fits`
      - .. container:: sk-apisearch-desc
 
-          Fit a model to the original spectral cube and save the results.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_fits
 
           .. container:: caption
 
@@ -606,7 +746,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_local_bad`
      - .. container:: sk-apisearch-desc
 
-          Identify local pixels with significantly lower relative log-likelihood.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_local_bad
 
           .. container:: caption
 
@@ -614,7 +756,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_marginal_pix`
      - .. container:: sk-apisearch-desc
 
-          Return pixels at the edge of structures with values greater than.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_marginal_pix
 
           .. container:: caption
 
@@ -622,7 +766,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_refit_guesses`
      - .. container:: sk-apisearch-desc
 
-          Generate initial guesses for refitting based on neighboring pixels or.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_refit_guesses
 
           .. container:: caption
 
@@ -630,7 +776,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.get_skyheader`
      - .. container:: sk-apisearch-desc
 
-          Generate a 2D sky projection header from a 3D spectral cube header.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.get_skyheader
 
           .. container:: caption
 
@@ -638,7 +786,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.iter_2comp_fit`
      - .. container:: sk-apisearch-desc
 
-          Perform a two-component fit iterantively through two steps.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.iter_2comp_fit
 
           .. container:: caption
 
@@ -646,7 +796,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.master_2comp_fit`
      - .. container:: sk-apisearch-desc
 
-          Perform a two-component fit on the data cube within a Region object.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.master_2comp_fit
 
           .. container:: caption
 
@@ -654,7 +806,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.refit_2comp_wide`
      - .. container:: sk-apisearch-desc
 
-          Refit pixels to recover compoents with wide velocity separation for.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.refit_2comp_wide
 
           .. container:: caption
 
@@ -662,7 +816,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.refit_bad_2comp`
      - .. container:: sk-apisearch-desc
 
-          Refit pixels with poor 2-component fits, as determined by the log-.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.refit_bad_2comp
 
           .. container:: caption
 
@@ -670,7 +826,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.refit_marginal`
      - .. container:: sk-apisearch-desc
 
-          Refit pixels with fits that appears marginally okay, as deterined by the.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.refit_marginal
 
           .. container:: caption
 
@@ -678,7 +836,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.refit_swap_2comp`
      - .. container:: sk-apisearch-desc
 
-          Refit the cube by using the previous fit result as guesses, but with the.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.refit_swap_2comp
 
           .. container:: caption
 
@@ -686,7 +846,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.replace_bad_pix`
      - .. container:: sk-apisearch-desc
 
-          Refit pixels marked by the mask as "bad" and adopt the new model if it.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.replace_bad_pix
 
           .. container:: caption
 
@@ -694,7 +856,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.replace_para`
      - .. container:: sk-apisearch-desc
 
-          Replace parameter values in a parameter cube with those from a reference.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.replace_para
 
           .. container:: caption
 
@@ -702,7 +866,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.replace_rss`
      - .. container:: sk-apisearch-desc
 
-          Replace RSS-related maps in a `UltraCube` object for specific.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.replace_rss
 
           .. container:: caption
 
@@ -710,7 +876,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.save_best_2comp_fit`
      - .. container:: sk-apisearch-desc
 
-          Save the best two-component fit results for the specified region.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.save_best_2comp_fit
 
           .. container:: caption
 
@@ -718,7 +886,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.save_map`
      - .. container:: sk-apisearch-desc
 
-          Save a 2D map as a FITS file.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.save_map
 
           .. container:: caption
 
@@ -726,7 +896,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.save_updated_paramaps`
      - .. container:: sk-apisearch-desc
 
-          Save the updated parameter maps for specified components.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.save_updated_paramaps
 
           .. container:: caption
 
@@ -734,7 +906,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.master_fitter.standard_2comp_fit`
      - .. container:: sk-apisearch-desc
 
-          Perform a two-component fit for the cube using default moment map.
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.standard_2comp_fit
 
           .. container:: caption
 
@@ -743,7 +917,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.LineSetup`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.LineSetup
 
           .. container:: caption
 
@@ -751,7 +927,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.adaptive_moment_maps`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.adaptive_moment_maps
 
           .. container:: caption
 
@@ -759,7 +937,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.get_rms_prefit`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.get_rms_prefit
 
           .. container:: caption
 
@@ -767,7 +947,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.get_tau`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.get_tau
 
           .. container:: caption
 
@@ -775,7 +957,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.get_tex`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.get_tex
 
           .. container:: caption
 
@@ -783,7 +967,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.get_window_slab`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.get_window_slab
 
           .. container:: caption
 
@@ -791,7 +977,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.master_guess`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.master_guess
 
           .. container:: caption
 
@@ -799,7 +987,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.mom_guess_wide_sep`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.mom_guess_wide_sep
 
           .. container:: caption
 
@@ -807,7 +997,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.moment_guesses`
      - .. container:: sk-apisearch-desc
 
-          Generate reasonable initial guesses for multiple component fits based on moment maps.
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.moment_guesses
 
           .. container:: caption
 
@@ -815,7 +1007,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.moment_guesses_1c`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.moment_guesses_1c
 
           .. container:: caption
 
@@ -823,7 +1017,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.noisemask_moment`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.noisemask_moment
 
           .. container:: caption
 
@@ -831,7 +1027,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.peakT`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.peakT
 
           .. container:: caption
 
@@ -839,7 +1037,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.vmask_cube`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.vmask_cube
 
           .. container:: caption
 
@@ -847,7 +1047,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.vmask_moments`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.vmask_moments
 
           .. container:: caption
 
@@ -855,7 +1057,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.window_mask_pcube`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.window_mask_pcube
 
           .. container:: caption
 
@@ -863,7 +1067,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.moment_guess.window_moments`
      - .. container:: sk-apisearch-desc
 
-          Calculate the zeroth, first, and second moments of a spectrum or cube.
+          .. currentmodule:: mufasa.moment_guess
+
+          .. autoshortsummary:: mufasa.moment_guess.window_moments
 
           .. container:: caption
 
@@ -872,7 +1078,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.cubefit_gen`
      - .. container:: sk-apisearch-desc
 
-          Perform n velocity component fit on the GAS ammonia 1-1 data.
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.cubefit_gen
 
           .. container:: caption
 
@@ -880,7 +1088,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.cubefit_simp`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.cubefit_simp
 
           .. container:: caption
 
@@ -888,7 +1098,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.default_masking`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.default_masking
 
           .. container:: caption
 
@@ -896,7 +1108,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.get_chisq`
      - .. container:: sk-apisearch-desc
 
-          cube : SpectralCube.
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.get_chisq
 
           .. container:: caption
 
@@ -904,7 +1118,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.get_start_point`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.get_start_point
 
           .. container:: caption
 
@@ -912,7 +1128,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.get_vstats`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.get_vstats
 
           .. container:: caption
 
@@ -920,7 +1138,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.handle_snr`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.handle_snr
 
           .. container:: caption
 
@@ -928,7 +1148,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.make_header`
      - .. container:: sk-apisearch-desc
 
-          Create a new header while retaining.
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.make_header
 
           .. container:: caption
 
@@ -936,7 +1158,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.match_pcube_mask`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.match_pcube_mask
 
           .. container:: caption
 
@@ -944,7 +1168,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.register_pcube`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.register_pcube
 
           .. container:: caption
 
@@ -952,7 +1178,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.retry_fit`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.retry_fit
 
           .. container:: caption
 
@@ -960,7 +1188,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.save_guesses`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.save_guesses
 
           .. container:: caption
 
@@ -968,7 +1198,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.save_pcube`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.save_pcube
 
           .. container:: caption
 
@@ -976,7 +1208,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.set_pyspeckit_verbosity`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.set_pyspeckit_verbosity
 
           .. container:: caption
 
@@ -984,7 +1218,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.multi_v_fit.snr_estimate`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.multi_v_fit
+
+          .. autoshortsummary:: mufasa.multi_v_fit.snr_estimate
 
           .. container:: caption
 
@@ -993,7 +1229,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.estimate_mode`
      - .. container:: sk-apisearch-desc
 
-          Estimate the mode of the data using a histogram.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.estimate_mode
 
           .. container:: caption
 
@@ -1001,7 +1239,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.get_moments`
      - .. container:: sk-apisearch-desc
 
-          Calculate moments of the signals in a cube.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.get_moments
 
           .. container:: caption
 
@@ -1009,7 +1249,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.get_rms_robust`
      - .. container:: sk-apisearch-desc
 
-          Make a robust RMS estimate.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.get_rms_robust
 
           .. container:: caption
 
@@ -1017,7 +1259,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.get_signal_mask`
      - .. container:: sk-apisearch-desc
 
-          Provide a 3D mask indicating signal regions based on RMS and SNR threshold.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.get_signal_mask
 
           .. container:: caption
 
@@ -1025,7 +1269,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.get_snr`
      - .. container:: sk-apisearch-desc
 
-          Calculate the peak signal-to-noise ratio of the cube.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.get_snr
 
           .. container:: caption
 
@@ -1033,7 +1279,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.get_v_at_peak`
      - .. container:: sk-apisearch-desc
 
-          Find the velocity corresponding to the peak emission.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.get_v_at_peak
 
           .. container:: caption
 
@@ -1041,7 +1289,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.get_v_mask`
      - .. container:: sk-apisearch-desc
 
-          Return a mask centered on a reference velocity with a spectral window.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.get_v_mask
 
           .. container:: caption
 
@@ -1049,7 +1299,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.refine_rms`
      - .. container:: sk-apisearch-desc
 
-          Refine the RMS estimate by masking out signal regions.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.refine_rms
 
           .. container:: caption
 
@@ -1057,7 +1309,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.refine_signal_mask`
      - .. container:: sk-apisearch-desc
 
-          Refine a signal mask by removing noisy features and expanding the mask.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.refine_signal_mask
 
           .. container:: caption
 
@@ -1065,7 +1319,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.trim_cube_edge`
      - .. container:: sk-apisearch-desc
 
-          Remove spatial edges from a cube.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.trim_cube_edge
 
           .. container:: caption
 
@@ -1073,7 +1329,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.trim_edge`
      - .. container:: sk-apisearch-desc
 
-          Trim edges using a 2D mask.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.trim_edge
 
           .. container:: caption
 
@@ -1081,7 +1339,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.signals.v_estimate`
      - .. container:: sk-apisearch-desc
 
-          Estimate the velocity centroid based on peak emission.
+          .. currentmodule:: mufasa.signals
+
+          .. autoshortsummary:: mufasa.signals.v_estimate
 
           .. container:: caption
 
@@ -1090,7 +1350,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.slab_sort.distance_metric`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.slab_sort
+
+          .. autoshortsummary:: mufasa.slab_sort.distance_metric
 
           .. container:: caption
 
@@ -1098,7 +1360,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.slab_sort.mask_swap_2comp`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.slab_sort
+
+          .. autoshortsummary:: mufasa.slab_sort.mask_swap_2comp
 
           .. container:: caption
 
@@ -1106,7 +1370,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.slab_sort.quick_2comp_sort`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.slab_sort
+
+          .. autoshortsummary:: mufasa.slab_sort.quick_2comp_sort
 
           .. container:: caption
 
@@ -1114,7 +1380,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.slab_sort.refmap_2c_mask`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.slab_sort
+
+          .. autoshortsummary:: mufasa.slab_sort.refmap_2c_mask
 
           .. container:: caption
 
@@ -1122,7 +1390,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.slab_sort.sort_2comp`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.slab_sort
+
+          .. autoshortsummary:: mufasa.slab_sort.sort_2comp
 
           .. container:: caption
 
@@ -1132,7 +1402,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.ammonia_multiv.T_antenna`
      - .. container:: sk-apisearch-desc
 
-          Calculate antenna temperatures over nu (in GHz).
+          .. currentmodule:: mufasa.spec_models.ammonia_multiv
+
+          .. autoshortsummary:: mufasa.spec_models.ammonia_multiv.T_antenna
 
           .. container:: caption
 
@@ -1140,7 +1412,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.ammonia_multiv.ammonia_multi_v`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.spec_models.ammonia_multiv
+
+          .. autoshortsummary:: mufasa.spec_models.ammonia_multiv.ammonia_multi_v
 
           .. container:: caption
 
@@ -1148,7 +1422,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.ammonia_multiv.nh3_multi_v_model_generator`
      - .. container:: sk-apisearch-desc
 
-          Works for up to 2 componet fits at the moment.
+          .. currentmodule:: mufasa.spec_models.ammonia_multiv
+
+          .. autoshortsummary:: mufasa.spec_models.ammonia_multiv.nh3_multi_v_model_generator
 
           .. container:: caption
 
@@ -1157,7 +1433,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.meta_model.MetaModel`
      - .. container:: sk-apisearch-desc
 
-          A class to store spectral model-specific information relevant to spectral modeling tasks, such as fitting.
+          .. currentmodule:: mufasa.spec_models.meta_model
+
+          .. autoshortsummary:: mufasa.spec_models.meta_model.MetaModel
 
           .. container:: caption
 
@@ -1167,7 +1445,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.n2hp_deblended.n2hp_vtau_singlemodel_deblended`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.spec_models.n2hp_deblended
+
+          .. autoshortsummary:: mufasa.spec_models.n2hp_deblended.n2hp_vtau_singlemodel_deblended
 
           .. container:: caption
 
@@ -1176,7 +1456,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.n2hp_multiv.T_antenna`
      - .. container:: sk-apisearch-desc
 
-          Calculate antenna temperatures over nu (in GHz).
+          .. currentmodule:: mufasa.spec_models.n2hp_multiv
+
+          .. autoshortsummary:: mufasa.spec_models.n2hp_multiv.T_antenna
 
           .. container:: caption
 
@@ -1184,7 +1466,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.n2hp_multiv.n2hp_multi_v`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.spec_models.n2hp_multiv
+
+          .. autoshortsummary:: mufasa.spec_models.n2hp_multiv.n2hp_multi_v
 
           .. container:: caption
 
@@ -1192,7 +1476,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.n2hp_multiv.n2hp_multi_v_model_generator`
      - .. container:: sk-apisearch-desc
 
-          Works for up to 2 component fits at the moment.
+          .. currentmodule:: mufasa.spec_models.n2hp_multiv
+
+          .. autoshortsummary:: mufasa.spec_models.n2hp_multiv.n2hp_multi_v_model_generator
 
           .. container:: caption
 
@@ -1201,7 +1487,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.spec_models.nh3_deblended.nh3_vtau_singlemodel_deblended`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.spec_models.nh3_deblended
+
+          .. autoshortsummary:: mufasa.spec_models.nh3_deblended.nh3_vtau_singlemodel_deblended
 
           .. container:: caption
 
@@ -1211,7 +1499,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.dataframe.assign_to_dataframe`
      - .. container:: sk-apisearch-desc
 
-          Assign values from a new data array to an existing DataFrame based on spatial coordinates and component index.
+          .. currentmodule:: mufasa.utils.dataframe
+
+          .. autoshortsummary:: mufasa.utils.dataframe.assign_to_dataframe
 
           .. container:: caption
 
@@ -1219,7 +1509,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.dataframe.make_dataframe`
      - .. container:: sk-apisearch-desc
 
-          Create a DataFrame from a 3D parameter array, applying optional velocity and error thresholds.
+          .. currentmodule:: mufasa.utils.dataframe
+
+          .. autoshortsummary:: mufasa.utils.dataframe.make_dataframe
 
           .. container:: caption
 
@@ -1227,7 +1519,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.dataframe.read`
      - .. container:: sk-apisearch-desc
 
-          Read a FITS file and convert the data to a pandas DataFrame, optionally including the header.
+          .. currentmodule:: mufasa.utils.dataframe
+
+          .. autoshortsummary:: mufasa.utils.dataframe.read
 
           .. container:: caption
 
@@ -1236,7 +1530,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.interpolate.expand_interpolate`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.interpolate
+
+          .. autoshortsummary:: mufasa.utils.interpolate.expand_interpolate
 
           .. container:: caption
 
@@ -1244,7 +1540,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.interpolate.iter_expand`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.interpolate
+
+          .. autoshortsummary:: mufasa.utils.interpolate.iter_expand
 
           .. container:: caption
 
@@ -1253,7 +1551,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.map_divide.dist_divide`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.map_divide
+
+          .. autoshortsummary:: mufasa.utils.map_divide.dist_divide
 
           .. container:: caption
 
@@ -1261,7 +1561,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.map_divide.watershed_divide`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.map_divide
+
+          .. autoshortsummary:: mufasa.utils.map_divide.watershed_divide
 
           .. container:: caption
 
@@ -1270,7 +1572,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.mufasa_log.OriginContextFilter`
      - .. container:: sk-apisearch-desc
 
-          Filter instances are used to perform arbitrary filtering of LogRecords.
+          .. currentmodule:: mufasa.utils.mufasa_log
+
+          .. autoshortsummary:: mufasa.utils.mufasa_log.OriginContextFilter
 
           .. container:: caption
 
@@ -1278,7 +1582,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.mufasa_log.WarningContextFilter`
      - .. container:: sk-apisearch-desc
 
-          Filter instances are used to perform arbitrary filtering of LogRecords.
+          .. currentmodule:: mufasa.utils.mufasa_log
+
+          .. autoshortsummary:: mufasa.utils.mufasa_log.WarningContextFilter
 
           .. container:: caption
 
@@ -1286,7 +1592,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.mufasa_log.get_logger`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.mufasa_log
+
+          .. autoshortsummary:: mufasa.utils.mufasa_log.get_logger
 
           .. container:: caption
 
@@ -1294,7 +1602,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.mufasa_log.init_logging`
      - .. container:: sk-apisearch-desc
 
-          :param logfile: file to save to (default mufasa.
+          .. currentmodule:: mufasa.utils.mufasa_log
+
+          .. autoshortsummary:: mufasa.utils.mufasa_log.init_logging
 
           .. container:: caption
 
@@ -1302,7 +1612,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.mufasa_log.reset_logger`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.mufasa_log
+
+          .. autoshortsummary:: mufasa.utils.mufasa_log.reset_logger
 
           .. container:: caption
 
@@ -1311,7 +1623,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.multicore.validate_n_cores`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.multicore
+
+          .. autoshortsummary:: mufasa.utils.multicore.validate_n_cores
 
           .. container:: caption
 
@@ -1320,7 +1634,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.neighbours.disk_neighbour`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.neighbours
+
+          .. autoshortsummary:: mufasa.utils.neighbours.disk_neighbour
 
           .. container:: caption
 
@@ -1328,7 +1644,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.neighbours.get_neighbor_coord`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.neighbours
+
+          .. autoshortsummary:: mufasa.utils.neighbours.get_neighbor_coord
 
           .. container:: caption
 
@@ -1336,7 +1654,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.neighbours.get_valid_neighbors`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.neighbours
+
+          .. autoshortsummary:: mufasa.utils.neighbours.get_valid_neighbors
 
           .. container:: caption
 
@@ -1344,7 +1664,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.neighbours.maxref_neighbor_coords`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.neighbours
+
+          .. autoshortsummary:: mufasa.utils.neighbours.maxref_neighbor_coords
 
           .. container:: caption
 
@@ -1352,7 +1674,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.utils.neighbours.square_neighbour`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.utils.neighbours
+
+          .. autoshortsummary:: mufasa.utils.neighbours.square_neighbour
 
           .. container:: caption
 
@@ -1362,7 +1686,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.scatter_3D.ScatterPPV`
      - .. container:: sk-apisearch-desc
 
-          A class to plot the fitted parameters in 3D scatter plots.
+          .. currentmodule:: mufasa.visualization.scatter_3D
+
+          .. autoshortsummary:: mufasa.visualization.scatter_3D.ScatterPPV
 
           .. container:: caption
 
@@ -1370,7 +1696,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.scatter_3D.scatter_3D`
      - .. container:: sk-apisearch-desc
 
-          Plot a 3D scatter plot with optional opacity scaling for point ranges.
+          .. currentmodule:: mufasa.visualization.scatter_3D
+
+          .. autoshortsummary:: mufasa.visualization.scatter_3D.scatter_3D
 
           .. container:: caption
 
@@ -1378,7 +1706,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.scatter_3D.scatter_3D_df`
      - .. container:: sk-apisearch-desc
 
-          A wrapper for scatter_3D to quickly plot a pandas DataFrame in 3D.
+          .. currentmodule:: mufasa.visualization.scatter_3D
+
+          .. autoshortsummary:: mufasa.visualization.scatter_3D.scatter_3D_df
 
           .. container:: caption
 
@@ -1387,7 +1717,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.Plotter`
      - .. container:: sk-apisearch-desc
 
-          Undocumented
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.Plotter
 
           .. container:: caption
 
@@ -1395,7 +1727,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.ensure_units_compatible`
      - .. container:: sk-apisearch-desc
 
-          Ensure the limits have compatible units with the data, converting if needed.
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.ensure_units_compatible
 
           .. container:: caption
 
@@ -1403,7 +1737,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.get_cube_slab`
      - .. container:: sk-apisearch-desc
 
-          Extract a spectral slab from the cube over the specified velocity range.
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.get_cube_slab
 
           .. container:: caption
 
@@ -1411,7 +1747,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.get_spec_grid`
      - .. container:: sk-apisearch-desc
 
-          Create a grid of subplots for spectra.
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.get_spec_grid
 
           .. container:: caption
 
@@ -1419,7 +1757,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.plot_fits_grid`
      - .. container:: sk-apisearch-desc
 
-          Plot a grid of model fits from the cube centered at (x, y).
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.plot_fits_grid
 
           .. container:: caption
 
@@ -1427,7 +1767,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.plot_model`
      - .. container:: sk-apisearch-desc
 
-          Plot a model fit for a spectrum.
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.plot_model
 
           .. container:: caption
 
@@ -1435,7 +1777,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.plot_spec`
      - .. container:: sk-apisearch-desc
 
-          Plot a spectrum.
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.plot_spec
 
           .. container:: caption
 
@@ -1443,7 +1787,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.plot_spec_grid`
      - .. container:: sk-apisearch-desc
 
-          Plot a grid of spectra from the cube centered at (x, y).
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.plot_spec_grid
 
           .. container:: caption
 
@@ -1451,7 +1797,9 @@ you can also search with the search bar located on the top right corner of the w
    * - :obj:`~mufasa.visualization.spec_viz.strip_units`
      - .. container:: sk-apisearch-desc
 
-          Helper function to strip units from a limit tuple if it contains Quantity.
+          .. currentmodule:: mufasa.visualization.spec_viz
+
+          .. autoshortsummary:: mufasa.visualization.spec_viz.strip_units
 
           .. container:: caption
 

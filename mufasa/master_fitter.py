@@ -1,14 +1,6 @@
 """
-master_fitter
-=================
-
-This module provides functionality for handle spectral fitting and visualization automatically.
-
-Examples
---------
->>> from master_fitter import Region
->>> region = Region("/path/to/cube.fits", "example_name", fittype="nh3_multi_v")
->>> print(region.cubePath)
+The `mufasa.master_fitter` module provides tools for automated spectral fitting,
+refinement, and analysis of multi-component spectral models.
 """
 
 from __future__ import print_function

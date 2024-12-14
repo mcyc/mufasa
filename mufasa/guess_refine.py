@@ -1,3 +1,8 @@
+"""
+The `mufasa.guess_refine` module provides tools for cleaning, normalizing, and
+interpolating fitted parameter maps and generating refined guesses for fitting.
+"""
+
 __author__ = 'mcychen'
 
 #=======================================================================================================================

@@ -6,10 +6,7 @@
 
 .. currentmodule:: {{ fullname }}
 
-{{ description|default("No description available.") }}
-
 .. automodule:: {{ fullname }}
-   :noindex:
 
 {% if submodules -%}
 .. rubric:: Submodules
@@ -29,12 +26,12 @@
    :toctree: generated/
    :nosignatures:
 
-   {% for cls in classes %}
+   {% for cls in classes -%}
    ~{{ cls }}
    {% endfor -%}
 {% endif %}
 
-{% if functions -%}
+{% if functions %}
 .. rubric:: Functions
 
 .. autosummary::
@@ -43,5 +40,30 @@
 
    {% for func in functions %}
    ~{{ func }}
-   {% endfor -%}
+   {% endfor %}
 {% endif %}
+
+
+{% if subpackages -%}
+
+.. toctree::
+   :maxdepth: 4
+   :hidden:
+
+   {% for subpackage in subpackages -%}
+   {{ subpackage }}
+   {% endfor -%}
+
+{% endif %}
+
+{%- if subpackages %}
+.. rubric:: Sub-packages
+
+.. list-table::
+   :class: autosummary-table
+
+   {% for subpackage in subpackages -%}
+   * - :mod:`{{ subpackage.rsplit('.', 1)[-1] }} <{{ subpackage }}>`
+     -
+   {% endfor %}
+{% endif -%}
