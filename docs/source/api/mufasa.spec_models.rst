@@ -6,7 +6,6 @@ mufasa.spec_models
 .. currentmodule:: mufasa.spec_models
 
 .. automodule:: mufasa.spec_models
-   :noindex:
 
 .. rubric:: Submodules
 
@@ -20,6 +19,8 @@ mufasa.spec_models
    n2hp_multiv
    nh3_deblended
    
+
+
 
 
 

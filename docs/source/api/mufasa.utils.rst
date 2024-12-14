@@ -6,7 +6,6 @@ mufasa.utils
 .. currentmodule:: mufasa.utils
 
 .. automodule:: mufasa.utils
-   :noindex:
 
 .. rubric:: Submodules
 
@@ -20,6 +19,8 @@ mufasa.utils
    multicore
    neighbours
    
+
+
 
 
 

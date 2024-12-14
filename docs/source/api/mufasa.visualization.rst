@@ -6,7 +6,6 @@ mufasa.visualization
 .. currentmodule:: mufasa.visualization
 
 .. automodule:: mufasa.visualization
-   :noindex:
 
 .. rubric:: Submodules
 
@@ -16,6 +15,8 @@ mufasa.visualization
    scatter_3D
    spec_viz
    
+
+
 
 
 
