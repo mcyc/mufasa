@@ -1,9 +1,8 @@
 # Variables
 SPHINXOPTS    ?=
-SPHINXBUILD   ?= sphinx-build
+SPHINXBUILD   = python3 -m sphinx
 SOURCEDIR     = source
 BUILDDIR      = build
-SCRIPTSDIR    = scripts
 APIDIR        = source/api
 GENERATEDDIR  = source/api/generated
 
@@ -17,8 +16,8 @@ all: apidocs html
 
 # Check dependencies
 check-deps:
-	@command -v python > /dev/null || { echo "Python not found. Aborting."; exit 1; }
-	@python -c "import sphinx" 2>/dev/null || { echo "Sphinx not installed. Aborting."; exit 1; }
+	@command -v python3 > /dev/null || { echo "Python3 not found. Aborting."; exit 1; }
+	@python3 -c "import sphinx" 2>/dev/null || { echo "Sphinx not installed. Aborting."; exit 1; }
 
 # Generate .rst files for API documentation
 apidocs: check-deps

@@ -1,6 +1,9 @@
 # Upgrade pip and setuptools to handle Git-based dependencies properly
 pip>=22.2.2
 setuptools>=65.5.1
+docutils<0.19
+python-dateutil>=2.8.2
+urllib3<2.0
 
 # Install Mufasa with all dependencies
 -e .

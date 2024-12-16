@@ -37,20 +37,20 @@ if __name__ == "__main__":
             'pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit',
             'FITS_tools @ git+https://github.com/keflavich/FITS_tools.git@b1fe5166ccf8a43105efe8201e37ab5993e880be#egg=FITS_tools',
         ],
-        extras_require={  # Optional dependencies
+        extras_require={  # Dependencies for building the documentation
             "docs": [
                 "sphinx>=4.0",
-                "sphinx-autodoc-typehints",
                 "sphinx-rtd-theme>=1.0,<2.0",
+                "sphinx-autodoc-typehints",
+                "nbsphinx",
                 "sphinx-astropy>=1.8",
                 "sphinx-copybutton>=0.5.0",
                 "pydata-sphinx-theme>=0.13.0",
                 "numpydoc>=1.1.0,<2.0",
-                "nbsphinx>=0.8.0",
                 "sphinx-issues>=2.0",
                 "sphinxext-opengraph>=0.4.0",
             ],
-            "dev": [
+            "dev": [  # Dependencies for development and testing
                 "pytest",
                 "flake8",
             ],
