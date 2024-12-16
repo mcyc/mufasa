@@ -7,7 +7,7 @@ MUlti-component Fitter for Astrophysical Spectral Applications.
 
 ## Documentation
 
-For detailed documentation, including installation instructions, usage examples, and API details, visit the [MUFASA Documentation on Read the Docs](https://mufasa.readthedocs.io/en/latest/).
+For detailed documentation, including installation instructions, usage examples, and API details, visit the MUFASA [Documentation](https://mufasa.readthedocs.io/en/latest/) on Read the Docs (RTD).
 
 ---
 
@@ -28,19 +28,14 @@ pip install -e .
 
 ### Requirements
 
-```MUFASA``` runs on ```python > v3.8``` and depends on the following packages:
+```MUFASA``` runs on ```python > v3.8```. For more details on the installation and dependencies, please see the [Install](https://mufasa.readthedocs.io/en/latest/installation.html) page on RTD.
 
-- ```numpy >= v1.19.2```
-- ```scipy >= v1.7.3```
-- ```skimage >= v0.17.2```
-- ```spectral_cube >= v0.6.0```
-- ```pyspeckit >= v1.0.1```
-- ```reproject >= v0.7.1```
-- ```FITS_tools >= v0.2```
-- ```plotly >= v4.0```
-
-If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` and  ```FITS_tools``` directly from their respective GitHub repository. The `setup.py` for `MUFASA >= v1.4.0` takes care of such a depdendcy automatically with `pip` installs.
+If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` and  ```FITS_tools``` directly from their respective GitHub repository. The `setup.py` for `MUFASA >= v1.4.0` takes care of such a dependency automatically with `pip` installs.
 
 ## Getting Started
 
-To get started quickly, please see MUFASA's [Quick Start](https://mufasa.readthedocs.io/en/latest/index.html#quick-start) on Read the Docs.
+To get started quickly, please see MUFASA's [Quick Start](https://mufasa.readthedocs.io/en/latest/index.html#quick-start) page on RTD.
+
+## Contributing
+
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to this project.
