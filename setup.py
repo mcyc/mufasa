@@ -34,13 +34,23 @@ if __name__ == "__main__":
             'plotly',
             'nbformat',
             'reproject>=0.7.1',
+            'pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit',
+            'FITS_tools @ git+https://github.com/keflavich/FITS_tools.git@b1fe5166ccf8a43105efe8201e37ab5993e880be#egg=FITS_tools',
         ],
-        extras_require={  # Optional dependencies
+        extras_require={  # Dependencies for building the documentation
             "docs": [
-                "sphinx",
-                "sphinx_rtd_theme",
+                "sphinx>=4.0",
+                "sphinx-rtd-theme>=1.0,<2.0",
+                "sphinx-autodoc-typehints",
+                "nbsphinx",
+                "sphinx-astropy>=1.8",
+                "sphinx-copybutton>=0.5.0",
+                "pydata-sphinx-theme>=0.13.0",
+                "numpydoc>=1.1.0,<2.0",
+                "sphinx-issues>=2.0",
+                "sphinxext-opengraph>=0.4.0",
             ],
-            "dev": [
+            "dev": [  # Dependencies for development and testing
                 "pytest",
                 "flake8",
             ],
@@ -48,7 +58,6 @@ if __name__ == "__main__":
         classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.7',
             'Programming Language :: Python :: 3.8',
             'Programming Language :: Python :: 3.9',
             'Programming Language :: Python :: 3.10',
@@ -57,8 +66,3 @@ if __name__ == "__main__":
         ],
         python_requires='>=3.7',  # Specify minimum Python version
     )
-
-# the following are now specified in docs/requirements.txt
-# 'pyspeckit @ git+https://github.com/pyspeckit/pyspeckit@master#egg=pyspeckit',
-# 'FITS_tools @ git+https://github.com/keflavich/FITS_tools@master#egg=FITS_tools'
-
