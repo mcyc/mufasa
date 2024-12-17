@@ -1,0 +1,6 @@
+__project__ = "mufasa"
+__title__ = "MUFASA"
+__version__ = "1.4.0"
+__author__ = "Mike Chen"
+__copyright__ = "2024, Mike Chen"
+__github_url__ = "https://github.com/mcyc/mufasa"
