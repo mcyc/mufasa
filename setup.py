@@ -1,43 +1,49 @@
 from setuptools import setup, find_packages
 import os
+import re
 
-pkg_vars = {}
+# Dynamically locate the metadata file in the same directory
+metadata_file = os.path.join(os.path.dirname(__file__), "mufasa/_metadata.py")
 
-# Safely read the version file
-version_file = "mufasa/_version.py"
-if os.path.exists(version_file):
-    with open(version_file) as fp:
-        exec(fp.read(), pkg_vars)
-else:
-    raise RuntimeError(f"Version file '{version_file}' not found!")
+def get_metadata():
+    metadata = {}
+    with open(metadata_file, "r") as f:
+        for line in f:
+            match = re.match(r"__([a-z_]+)__\s*=\s*[\"'](.+?)[\"']", line)
+            if match:
+                key, value = match.groups()
+                metadata[key] = value
+    return metadata
+
+# Load metadata
+metadata = get_metadata()
 
 # Define the setup configuration
 if __name__ == "__main__":
     setup(
-        name='mufasa',
-        version=pkg_vars['__version__'],  # Dynamically load version
-        description='MUlti-component Fitter for Astrophysical Spectral Applications',
-        author='Michael Chun-Yuan Chen',
-        author_email='mkid.chen@gmail.com',
-        url='https://github.com/mcyc/mufasa',
-        packages=find_packages(),  # Automatically find sub-packages
+        name=metadata["project"],  # e.g., mufasa
+        version=metadata["version"],  # e.g., 1.4.0
+        description="MUlti-component Fitter for Astrophysical Spectral Applications",
+        author=metadata["author"],  # Michael Chun-Yuan Chen
+        url=metadata["github_url"],  # GitHub URL
+        packages=find_packages(),
         install_requires=[
-            'numpy>=1.19.2',
-            'astropy',
-            'matplotlib',
-            'scipy>=1.7.3',
-            'scikit-image>=0.17.2',
-            'spectral-cube>=0.6.0',
-            'radio-beam',
-            'pvextractor',
-            'pandas',
-            'plotly',
-            'nbformat',
-            'reproject>=0.7.1',
-            'pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit',
-            'FITS_tools @ git+https://github.com/keflavich/FITS_tools.git@b1fe5166ccf8a43105efe8201e37ab5993e880be#egg=FITS_tools',
+            "numpy>=1.19.2",
+            "astropy",
+            "matplotlib",
+            "scipy>=1.7.3",
+            "scikit-image>=0.17.2",
+            "spectral-cube>=0.6.0",
+            "radio-beam",
+            "pvextractor",
+            "pandas",
+            "plotly",
+            "nbformat",
+            "reproject>=0.7.1",
+            "pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit",
+            "FITS_tools @ git+https://github.com/keflavich/FITS_tools.git@b1fe5166ccf8a43105efe8201e37ab5993e880be#egg=FITS_tools",
         ],
-        extras_require={  # Dependencies for building the documentation
+        extras_require={
             "docs": [
                 "sphinx>=4.0",
                 "sphinx-rtd-theme>=1.0,<2.0",
@@ -50,19 +56,18 @@ if __name__ == "__main__":
                 "sphinx-issues>=2.0",
                 "sphinxext-opengraph>=0.4.0",
             ],
-            "dev": [  # Dependencies for development and testing
-                "pytest",
-                "flake8",
-            ],
+            "dev": ["pytest", "flake8"],
         },
         classifiers=[
-            'Development Status :: 5 - Production/Stable',
-            'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.8',
-            'Programming Language :: Python :: 3.9',
-            'Programming Language :: Python :: 3.10',
-            'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
-            'Operating System :: OS Independent',
+            "Development Status :: 5 - Production/Stable",
+            "Programming Language :: Python :: 3",
+            "Programming Language :: Python :: 3.8",
+            "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
+            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.12",
+            "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+            "Operating System :: OS Independent",
         ],
-        python_requires='>=3.7',  # Specify minimum Python version
+        python_requires=">=3.8",
     )

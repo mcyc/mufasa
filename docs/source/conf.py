@@ -2,19 +2,20 @@
 import os
 import sys
 
+# Import project metadata
+from mufasa._metadata import __title__, __version__, __author__, __copyright__, __github_url__
+
 # -- Path setup ---------------------------------------------------------------
 sys.path.insert(0, os.path.abspath('../mufasa'))
 sys.path.insert(0, os.path.abspath('../../mufasa'))
 sys.path.insert(0, os.path.abspath('../sphinxext'))
 
 # -- Project information ------------------------------------------------------
-project = 'MUFASA'
-release = 'v1.4.0-dev'
-copyright = '2024, Mike Chen'
-author = 'Mike Chen'
-
-# Use Astropy's configuration setup
-from sphinx_astropy.conf.v2 import *
+project = __title__
+release = __version__
+version = ".".join(release.split(".")[:2])
+author = __author__
+copyright = __copyright__
 
 # -- General configuration ----------------------------------------------------
 extensions = [
