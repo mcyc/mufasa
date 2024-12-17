@@ -22,6 +22,12 @@ import scipy.ndimage as nd
 from spectral_cube.utils import NoBeamError # imoprt NoBeamError, since cube most likely wasn't able to read the beam either
 import gc
 
+# for Astropy 6.1.4 forward compatibility
+try:
+    from astropy.units import UnitScaleError
+except ImportError:
+    from astropy.units.core import UnitScaleError
+
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -50,8 +56,6 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
     pa = hdr['BPA']
 
     try:
-        #for Astropy 6.1.4 forward compatibility
-        from astropy.units.core import UnitScaleError
         beam = Beam(major=bmaj, minor=bmin, pa=pa)
     except UnitScaleError:
         beam = Beam(major=bmaj, minor=bmin, pa=None)
