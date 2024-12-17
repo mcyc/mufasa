@@ -146,36 +146,70 @@ class ScatterPPV(object):
         df['delt RA'] = df['delt RA'] - ra_ref
         df['delt Dec'] = df['delt Dec'] - dec_ref
 
-    def plot_ppv(self, label_key='peakT', savename=None, vel_scale=0.8, vrange=None, verr_thres=5, **kwargs):
+    def plot_ppv(self, label_key='peakT', vel_scale=0.8, xyunit='arcmin', savename=None, **kwargs):
         """
-        Generate a 3D scatter plot of the position-position-velocity (PPV) data from the best-fit model.
+        Plot the fitted model in position-position-velocity (PPV) space as a 3D scatter plot.
+
+        Points in the PPV plot are colored based on a specified key (e.g., intensity values)
+        from the DataFrame. The velocity axis can be scaled relative to the spatial axes,
+        and units for the x and y axes can be customized.
 
         Parameters
         ----------
-        label_key : str, optional
-            Column in the DataFrame used to color points, e.g., 'peakT' for peak intensity. Defaults to 'peakT'.
-        savename : str, optional
-            Path to save the 3D plot as an HTML file. If None, the plot is not saved. Defaults to None.
-        vel_scale : float, optional
-            Scale factor for the velocity axis relative to spatial axes. Defaults to 0.8.
-        vrange : tuple of float, optional
-            Velocity range (in km/s) for clipping the data. Defaults to None.
-        verr_thres : float, optional
-            Velocity error threshold (in km/s) to filter the data.
-            Points with errors above this threshold are excluded. Defaults to 5.
-        **kwargs : dict, optional
-            Additional options passed to `plot_ppv` for plot customization.
+        label_key : str, default='peakT'
+            Column name in the DataFrame used for coloring data points.
+            For example, 'peakT' for peak intensity or clustering labels.
+
+        vel_scale : float, default=0.8
+            Scaling factor for the velocity axis (z-axis) relative to the spatial axes.
+            The x-axis is normalized to 1.
+
+        xyunit : {'arcmin', 'pix'}, default='arcmin'
+            Units for the x and y coordinates:
+            - 'arcmin': Plot relative RA and Dec in arcminutes.
+            - 'pix': Plot coordinates in pixels.
+
+        savename : str, default=None
+            File path to save the generated plot as an HTML file. If None, the plot is not saved.
+
+        **kwargs : dict
+            Additional keyword arguments passed to the `scatter_3D_df` function.
+            Useful options include:
+
+            auto_open_html : bool, default=True
+                If True, automatically open the saved HTML file in a browser.
+
+            mask_df : pandas.Series or None, default=None
+                Boolean mask to filter the DataFrame before plotting.
+
+        Returns
+        -------
+        fig : plotly.graph_objs.Figure
+            A 3D scatter plot figure representing the PPV data.
+
+        Other Parameters
+        ----------------
+        kwargs : dict
+            Additional options for customizing the scatter plot, such as color mapping
+            and opacity scaling.
+
+        Notes
+        -----
+        - If `label_key` is "peakT", default color mapping ("magma_r") and opacity ranges
+          are applied automatically.
+        - The velocity axis range is derived from the 1st and 99th percentiles of the
+          "vlsr" column, with additional padding.
+        - Color scaling uses the 1st and 99th percentiles of the column specified by `label_key`.
 
         Examples
         --------
+        >>> model.plot_ppv(label_key='peakT', vel_scale=0.9, xyunit='pix', savename='ppv_plot.html')
+        >>> model.plot_ppv(label_key='cluster_label', auto_open_html=False, mask_df=mask)
 
-        Initialize a ScatterPPV object and plot the PPV scatter:
-
-        >>> sc = scatter_3D.ScatterPPV("path/to/fname.fits", fittype="nh3_multi_v")
-        >>> fig = sc.plot_ppv(label_key='peakT', vel_scale=0.5)
-        >>> fig.show()
+        See Also
+        --------
+        scatter_3D_df : Function used internally for generating the scatter plot.
         """
-
         if label_key == 'peakT':
             kwdf = dict(cmap='magma_r', opacity_ranges=5)
             kwargs = {**kwdf, **kwargs}

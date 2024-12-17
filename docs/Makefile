@@ -3,6 +3,7 @@ SPHINXOPTS    ?=
 SPHINXBUILD   = python3 -m sphinx
 SOURCEDIR     = source
 BUILDDIR      = build
+SCRIPTSDIR    = scripts
 APIDIR        = source/api
 GENERATEDDIR  = source/api/generated
 
