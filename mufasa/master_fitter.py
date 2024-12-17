@@ -210,51 +210,49 @@ class Region(object):
         get_fits(self, ncomp, update=False)
 
     def master_2comp_fit(self, snr_min=0.0, **kwargs):
-        def master_2comp_fit(self, snr_min=0.0, **kwargs):
-            """
-            Perform a comprehensive two-component fitting process on the spectral cube.
+        """
+        Perform a comprehensive two-component fitting process on the spectral cube.
 
-            This method fits the data in multiple stages, including:
-            1. Initial fit with convolved cube.
-            2. Refining bad or marginal fits.
-            3. Recovering wide separation components.
-            4. Expanding fits to surrounding pixels.
+        This method fits the data in multiple stages, including:
+        1. Initial fit with convolved cube.
+        2. Refining bad or marginal fits.
+        3. Recovering wide separation components.
+        4. Expanding fits to surrounding pixels.
 
-            Parameters
-            ----------
-            snr_min : float, optional
-                Minimum signal-to-noise ratio required for fitting. Default is 0.0.
-            **kwargs : dict, optional
-                Additional keyword arguments controlling the fitting process:
+        Parameters
+        ----------
+        snr_min : float, optional
+            Minimum signal-to-noise ratio required for fitting. Default is 0.0.
+        **kwargs : dict, optional
+            Additional keyword arguments controlling the fitting process:
 
-                - recover_wide : bool, optional
-                  If True, attempts to recover wide separation components. Defaults to True.
-                - planemask : ndarray, optional
-                  2D mask specifying which pixels to fit. Defaults to None.
-                - updateCnvFits : bool, optional
-                  If True, updates convolved fits even if they already exist. Defaults to True.
-                - refit_bad_pix : bool, optional
-                  If True, refits pixels with poor quality fits. Defaults to True.
+            - recover_wide : bool, optional
+              If True, attempts to recover wide separation components. Defaults to True.
+            - planemask : ndarray, optional
+              2D mask specifying which pixels to fit. Defaults to None.
+            - updateCnvFits : bool, optional
+              If True, updates convolved fits even if they already exist. Defaults to True.
+            - refit_bad_pix : bool, optional
+              If True, refits pixels with poor quality fits. Defaults to True.
 
-            Returns
-            -------
-            Region
-                Updated Region object with refined fitting results.
+        Returns
+        -------
+        Region
+            Updated Region object with refined fitting results.
 
-            Notes
-            -----
-            - This method uses multiple passes to refine the fitting results.
-            - The expanded fits use local guesses from neighboring pixels.
+        Notes
+        -----
+        - This method uses multiple passes to refine the fitting results.
+        - The expanded fits use local guesses from neighboring pixels.
 
-            Examples
-            --------
-            >>> region = Region("/path/to/cube.fits", "example_name", fittype="nh3_multi_v")
-            >>> region.master_2comp_fit(snr_min=5.0, recover_wide=False)
+        Examples
+        --------
+        >>> region = Region("/path/to/cube.fits", "example_name", fittype="nh3_multi_v")
+        >>> region.master_2comp_fit(snr_min=5.0, recover_wide=False)
 
-            """
-            master_2comp_fit(self, snr_min=snr_min, **kwargs)
-
+        """
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
+
 
     def standard_2comp_fit(self, planemask=None):
         """Perform a two-component fit on the spectral cube using default moment-based guesses.
