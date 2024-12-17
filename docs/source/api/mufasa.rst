@@ -45,9 +45,9 @@ mufasa
    :class: autosummary-table
 
    * - :mod:`spec_models <mufasa.spec_models>`
-     - 
+     -
    * - :mod:`utils <mufasa.utils>`
-     - 
+     -
    * - :mod:`visualization <mufasa.visualization>`
-     - 
+     -
    
