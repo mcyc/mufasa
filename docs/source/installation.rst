@@ -1,12 +1,10 @@
 Installation
 =================
-
 .. note::
 
    **Recommended Install**
     MUFASA is undergoing rapid developments at the moment,
-    install form the source (see Option 2) to stay up-to-date with the latest version.
-
+    install from the source (see Option 2) to stay up-to-date with the latest version.
 
 System Requirements
 --------------------
@@ -32,6 +30,16 @@ Instructions
        git clone https://github.com/mcyc/mufasa.git
        cd mufasa
        pip install -e .
+
+   .. note::
+       If you encounter issues with pre-existing versions of dependencies or want to ensure
+       that the pinned versions of MUFASA's dependencies are installed, use the following command:
+
+       .. code-block:: bash
+
+           pip install --upgrade --force-reinstall --no-cache-dir -e .
+
+       This command ensures that all dependencies are freshly installed, replacing any older or conflicting versions.
 
 3. **Dependencies**
    MUFASA will automatically install its dependencies during installation. If any issues occur, install them manually:
