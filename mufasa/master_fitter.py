@@ -2429,20 +2429,26 @@ def get_best_2comp_model(reg):
     >>> best_model = get_best_2comp_model(reg)
     >>> # Returns a 3D NumPy array representing the best-fit model cube.
     """
+    # Assuming lnk10, lnk20, lnk21 are already Dask arrays
     lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
 
-    mod1 = reg.ucube.pcubes['1'].get_modelcube()
-    mod2 = reg.ucube.pcubes['2'].get_modelcube()
+    mod1 = reg.ucube.pcubes['1'].get_modelcube()  # Ensure this returns a Dask array
+    mod2 = reg.ucube.pcubes['2'].get_modelcube()  # Ensure this returns a Dask array
 
-    # get the best model based on the calculated likelihood
-    modbest = copy(mod1)
-    modbest[:] = 0.0
+    # Create a copy of mod1 as modbest
+    modbest = deepcopy(mod1)
+    modbest = modbest * 0  # Reset values to 0.0 in a Dask-compatible way
 
-    mask = lnk10 > 5
-    modbest[:, mask] = mod1[:, mask]
+    # Mask 1: lnk10 > 5
+    mask1 = lnk10 > 5
+    modbest = da.where(mask1, mod1, modbest)  # Use where to selectively assign mod1 values
 
-    mask = np.logical_and(lnk21 > 5, lnk20 > 5)
-    modbest[:, mask] = mod2[:, mask]
+    # Mask 2: logical_and(lnk21 > 5, lnk20 > 5)
+    mask2 = da.logical_and(lnk21 > 5, lnk20 > 5)
+    modbest = da.where(mask2, mod2, modbest)  # Use where to selectively assign mod2 values
+
+    # Compute or persist the result if needed
+    modbest = modbest.persist()  # Persist in memory if required
 
     return modbest
 

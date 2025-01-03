@@ -33,6 +33,8 @@ from . import convolve_tools as cnvtool
 from .spec_models import meta_model
 from .utils.multicore import validate_n_cores
 from .visualization.spec_viz import Plotter
+from . import PCube
+
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -191,7 +193,8 @@ class UltraCube(object):
         cube_temp = SpectralCube.read(self.cubefile, dask=False)
         cube_temp = to_K(cube_temp) # convert the unit to K;
 
-        pcube = pyspeckit.Cube(cube=cube_temp)
+        #pcube = pyspeckit.Cube(cube=cube_temp)
+        pcube = PCube.PCube(cube=cube_temp)
 
         # premptively release memory
         del cube_temp
@@ -847,7 +850,8 @@ def load_model_fit(cube, filename, ncomp, fittype):
         The fitted pyspeckit cube with the loaded model.
     """
     #pcube = pyspeckit.Cube(cube=cube)
-    pcube = pyspeckit.Cube(cube)
+    #pcube = pyspeckit.Cube(cube)
+    pcube = PCube.PCube(cube)
 
     # register fitter
     if fittype == 'nh3_multi_v':
