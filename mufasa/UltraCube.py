@@ -1802,13 +1802,13 @@ def get_residual(cube, model, planemask=None):
                 # Compute the residual
                 residual = data_masked - model_masked
             else:
-                planemask_expanded = da.from_array(planemask, chunks=data.chunksize[1:])
-                residual = data[:, planemask_expanded] - model[:, planemask]
+                planemask_expanded = da.from_array(planemask, chunks=model.chunksize[1:])
+                residual = data[:, planemask] - model[:, planemask_expanded]
         else:
             if isinstance(data, da.Array):
                 # Non-dask (numpy array), use direct masking
-                planemask_expanded = da.from_array(planemask, chunks=model.chunksize[1:])
-                residual = data[:, planemask] - model[:, planemask_expanded]
+                planemask_expanded = da.from_array(planemask, chunks=data.chunksize[1:])
+                residual = data[:, planemask_expanded] - model[:, planemask]
             else:
                 residual = data[:, planemask] - model[:, planemask]
 
