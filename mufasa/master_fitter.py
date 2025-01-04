@@ -645,7 +645,15 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     >>> updated_reg = master_2comp_fit(region, snr_min=3.0, recover_wide=False, max_expand_iter=5, multicore=4)
     >>> # Fits the region with a minimum SNR of 3.0, disables wide recovery, and expands fits for 5 iterations.
     """
-    iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+
+    @memory_tracker()
+    def iter_2comp_fit(**kwargs):
+        return iter_2comp_fit(**kwargs)
+
+    peak_memory = iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask,
+                                 multicore=multicore)
+
+    print(f"peak memory: {peak_memory}")
 
     # assumes the user wants to recover a second component that is fainter than the primary
     recover_snr_min = 3.0
@@ -2496,13 +2504,16 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
 
     multicore = validate_n_cores(multicore)
-    newmod = pcube_ref.get_modelcube(update=False, multicore=multicore)
+    # calling get_modelcube should update it's internal model accordingly
+    _ = pcube_ref.get_modelcube(update=True, multicore=multicore, mask=mask)
 
+    '''
     # Convert `pcube._modelcube` to a numpy array if it is currently a dask array
     if isinstance(pcube._modelcube, da.Array):
         pcube._modelcube = pcube._modelcube.compute()  # Load the full array into memory
 
     pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
+    '''
 
 
 def get_skyheader(cube_header):

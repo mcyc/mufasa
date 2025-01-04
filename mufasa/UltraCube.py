@@ -1774,19 +1774,43 @@ def get_residual(cube, model, planemask=None):
     - Handles memory-efficient computation when dask is enabled.
     """
     # Get the cube data as a dask array or numpy array
-    data = cube.filled_data[:].value  # dask array if dask is enabled, numpy array otherwise
+    #data = cube.filled_data[:].value  # dask array if dask is enabled, numpy array otherwise
+    data = cube._data
+    #print(f"cube type: {type(cube)}")
+    #print(f"data type: {type(data)}")
+    #print(f"model type: {type(model)}")
 
     # Calculate residual with or without a planemask
     if planemask is None:
         residual = data - model
     else:
         # If dask, apply the mask in a memory-efficient way
-        if isinstance(data, da.Array):
-            planemask_expanded = da.from_array(planemask, chunks=data.chunksize[1:])
-            residual = data[:, planemask_expanded] - model[:, planemask]
+        if isinstance(model, da.Array):
+            if isinstance(data, da.Array):
+
+                # Flatten the spatial axes of data and model
+                data_flat = data.reshape(data.shape[0], -1)
+                model_flat = model.reshape(model.shape[0], -1)
+
+                # Flatten the planemask and ensure it is 1D
+                planemask_flat = planemask.ravel()
+
+                # Apply the mask using boolean indexing or da.compress
+                data_masked = da.compress(planemask_flat, data_flat, axis=1)  # Shape: (915, <masked>)
+                model_masked = da.compress(planemask_flat, model_flat, axis=1)  # Shape: (915, <masked>)
+
+                # Compute the residual
+                residual = data_masked - model_masked
+            else:
+                planemask_expanded = da.from_array(planemask, chunks=data.chunksize[1:])
+                residual = data[:, planemask_expanded] - model[:, planemask]
         else:
-            # Non-dask (numpy array), use direct masking
-            residual = data[:, planemask] - model[:, planemask]
+            if isinstance(data, da.Array):
+                # Non-dask (numpy array), use direct masking
+                planemask_expanded = da.from_array(planemask, chunks=model.chunksize[1:])
+                residual = data[:, planemask] - model[:, planemask_expanded]
+            else:
+                residual = data[:, planemask] - model[:, planemask]
 
     # If residual is a dask array, compute only if needed (e.g., for direct use in numpy context)
     if isinstance(residual, da.Array):
