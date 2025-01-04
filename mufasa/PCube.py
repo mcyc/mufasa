@@ -34,7 +34,7 @@ class PCube(Cube):
             return self._modelcube
 
         yy, xx = np.indices(self.parcube.shape[1:])
-        nanvals = np.any(~np.isfinite(self.parcube), axis=0)
+        nanvals = np.all(~np.isfinite(self.parcube), axis=0)
         isvalid = np.any(self.parcube, axis=0) & ~nanvals
 
         if mask is not None:

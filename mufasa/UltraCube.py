@@ -1395,7 +1395,8 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False, include_nosamp=True, planemask=None):
+def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False,
+            include_nosamp=True, planemask=None):
     """
     Calculate the residual sum of squares (RSS) for a spectral cube model fit.
 
@@ -1462,7 +1463,8 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
     # plus a buffer of size set by the expand keyword.
     if expand > 0:
         mask = expand_mask(mask, expand)
-    mask = mask.astype(float)
+
+    print(f"mask type: {type(mask)}")
 
     if planemask is None:
         residual = get_residual(cube, model)
@@ -1472,15 +1474,23 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         mask_temp = mask
         mask = mask[:, planemask]
 
-    # note: using nan-sum may walk over some potential bad pixel cases
-    rss = da.nansum((residual * mask) ** 2, axis=0) if isinstance(residual, da.Array) else np.nansum(
-        (residual * mask) ** 2, axis=0)
-    rss[rss == 0] = np.nan
+    # Ensure shapes are compatible
+    if mask.shape != residual.shape:
+        mask = da.broadcast_to(mask, residual.shape) if isinstance(mask, da.Array) else np.broadcast_to(mask,
+                                                                                                        residual.shape)
+    # Use da.where for masking instead of residual * mask
+    masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
+
+    # Calculate RSS
+    rss = da.nansum(masked_residual ** 2, axis=0) if isinstance(masked_residual, da.Array) else np.nansum(
+        masked_residual ** 2, axis=0)
+    rss = da.where(rss == 0, np.nan, rss) if isinstance(rss, da.Array) else np.where(rss == 0, np.nan, rss)
 
     returns = (rss.compute() if isinstance(rss, da.Array) else rss,)
 
     if return_size:
         nsamp = da.nansum(mask, axis=0) if isinstance(mask, da.Array) else np.nansum(mask, axis=0)
+        nsamp = nsamp.astype('float32')
         nsamp[np.isnan(rss)] = np.nan
         returns += (nsamp.compute() if isinstance(nsamp, da.Array) else nsamp,)
     if return_mask:
