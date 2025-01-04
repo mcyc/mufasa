@@ -24,7 +24,7 @@ from time import ctime
 from datetime import timezone, datetime
 import warnings
 import pandas as pd
-
+import tracemalloc
 import dask.array as da
 
 try:
@@ -119,7 +119,7 @@ class Region(object):
             # could use a checking mechanism to ensure the logfile is the right format
         except FileNotFoundError:
             columns = ['process', 'last completed', 'attempted fits (pix)', 'successful fits (pix)',
-                       'total runtime (dd:hh:mm:ss)', 'cores used']
+                       'total runtime (dd:hh:mm:ss)', 'cores used', 'peak memory (GB)']
             self.progress_log = pd.DataFrame(columns=columns)
 
 
@@ -379,6 +379,11 @@ class Region(object):
             self.timestamp = datetime.now()
             time_info = self.timestamp.isoformat(timespec=timespec)
             runtime_info = "in progress"
+
+            # Start tracing memory
+            if not tracemalloc.is_tracing():
+                tracemalloc.start()
+            peak_memory = 'None'
         else:
             timestamp = datetime.now()
             time_info = timestamp.isoformat(timespec=timespec)
@@ -405,13 +410,24 @@ class Region(object):
                     runtime_info += f"{seconds}"
                 # Clear the timestamp as the task is completed
                 self.timestamp = None
+
+                # Get memory usage in GB
+                _, peak_memory = tracemalloc.get_traced_memory()
+                peak_memory = np.round(peak_memory/10**9,2)
+                tracemalloc.stop()
             else:
                 runtime_info = "in progress" if self.timestamp is not None else "N/A"
+                if tracemalloc.is_tracing():
+                    # Get memory usage in GB
+                    _, peak_memory = tracemalloc.get_traced_memory()
+                    peak_memory = np.round(peak_memory / 10 ** 9, 2)
+                else:
+                    peak_memory = 'N/A'
 
         # Initialize progress log if it doesn't exist yet
         if not hasattr(self, 'progress_log'):
             columns = ['process', 'last completed', 'attempted fits (pix)', 'successful fits (pix)',
-                       'total runtime (dd:hh:mm:ss)', 'cores used']
+                       'total runtime (dd:hh:mm:ss)', 'cores used', 'peak memory (GB)']
             self.progress_log = pd.DataFrame(columns=columns)
 
         cores_info = int(cores) if cores is not None else "N/A"
@@ -430,6 +446,8 @@ class Region(object):
                 self.progress_log.loc[mask, 'attempted fits (pix)'] = n_attempted
             if n_success is not None:
                 self.progress_log.loc[mask, 'successful fits (pix)'] = n_success
+            if peak_memory is not None:
+                self.progress_log.loc[mask, 'peak memory (GB)'] = peak_memory
         else:
             # Add a new entry otherwise
             # Fill the additional columns with default values (e.g., "None" for unspecified fields)
@@ -439,7 +457,8 @@ class Region(object):
                 'attempted fits (pix)': n_attempted if n_attempted is not None else "None",
                 'successful fits (pix)': n_success if n_success is not None else "None",
                 'total runtime (dd:hh:mm:ss)': runtime_info,
-                'cores used': cores_info
+                'cores used': cores_info,
+                'peak memory (GB)': peak_memory if peak_memory is not None else "None",
             }
 
             if pd.__version__ >= '1.3.0':
@@ -454,6 +473,14 @@ class Region(object):
             self.progress_log = self.progress_log.sort_values(by='last completed', ascending=True)
             # Write the log as a CSV file
             self.progress_log.to_csv(self.progress_log_name, index=False)
+
+    def log_memory(self, process_name, peak_memory):
+        if process_name in self.progress_log['process'].values:
+            mask = self.progress_log['process'] == process_name
+            # Update the memory of the entry
+            self.progress_log.loc[mask, 'peak memory (GB)'] = peak_memory
+        else:
+            logger.warning(f'process_name {process_name} does not exist; no memory logged.')
 
 
 # =======================================================================================================================
@@ -646,14 +673,10 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     >>> # Fits the region with a minimum SNR of 3.0, disables wide recovery, and expands fits for 5 iterations.
     """
 
-    @memory_tracker()
-    def iter_2comp_fit(**kwargs):
-        return iter_2comp_fit(**kwargs)
-
-    peak_memory = iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask,
-                                 multicore=multicore)
-
-    print(f"peak memory: {peak_memory}")
+    iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+    #_, peak_memory = memory_tracker(iter_2comp_fit, reg, snr_min=snr_min,
+    #                                     updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+    #reg.log_memory(process_name='iter conv fits', peak_memory=peak_memory)
 
     # assumes the user wants to recover a second component that is fainter than the primary
     recover_snr_min = 3.0
