@@ -1472,12 +1472,6 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         mask_temp = mask
         mask = mask[:, planemask]
 
-    # Ensure mask matches the shape of residual
-    if residual.shape != mask.shape:
-        if mask.ndim == 2:
-            # Broadcast mask to match the shape of residual
-            mask = da.broadcast_to(mask, residual.shape)
-
     # note: using nan-sum may walk over some potential bad pixel cases
     rss = da.nansum((residual * mask) ** 2, axis=0) if isinstance(residual, da.Array) else np.nansum(
         (residual * mask) ** 2, axis=0)
@@ -1803,6 +1797,13 @@ def get_residual(cube, model, planemask=None):
             data_masked = da.where(planemask_broadcast, data, 0)
             model_masked = da.where(planemask_broadcast, model, 0)
             residual = data_masked - model_masked
+
+            # Flatten the residual spatial dimensions and the planemask
+            residual_flat = residual.reshape(residual.shape[0], -1)
+            planemask_flat = planemask.ravel()  # Flatten planemask
+
+            # Apply the mask using da.compress
+            residual = da.compress(planemask_flat, residual_flat, axis=1)
 
     # Run garbage collection for memory management
     gc.collect()
