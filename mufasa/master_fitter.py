@@ -1780,6 +1780,11 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
     UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
 
+    #save structured data
+    dataframe = dframe.make_dataframe(pcube_final.parcube)
+    savename = "{}_final.csv".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
+    dataframe.to_csv(savename, index=False)
+
     hdr2D = reg.ucube.make_header2D()
     paraDir = reg_final.ucube.paraDir
     paraRoot = reg_final.ucube.paraNameRoot
