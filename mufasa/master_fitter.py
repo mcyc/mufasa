@@ -40,6 +40,8 @@ from . import guess_refine as gss_rf
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import neighbours
+from .utils import dataframe as dframe
+from .visualization import scatter_3D
 # =======================================================================================================================
 from .utils.mufasa_log import init_logging, get_logger
 
@@ -326,9 +328,6 @@ class Region(object):
         - Initializes a `ScatterPPV` instance using the fitted parameters and calls `plot_ppv`.
         - Allows customization of plot appearance through additional arguments.
         """
-
-        from .visualization import scatter_3D
-
         try:
             filepath = "{}_final.fits".format(os.path.splitext(self.ucube.paraPaths[str(ncomp)])[0])
         except KeyError:
@@ -1780,10 +1779,10 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
     UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
 
-    #save structured data
-    dataframe = dframe.make_dataframe(pcube_final.parcube)
+    #save structured data (read the saved .fits file first, using ScatterPPV as a quick work around for now)
+    sppv = scatter_3D.ScatterPPV(savename, fittype=reg.fittype, meta_model=reg.ucube.meta_model)
     savename = "{}_final.csv".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
-    dataframe.to_csv(savename, index=False)
+    sppv.dataframe.to_csv(savename, index=False)
 
     hdr2D = reg.ucube.make_header2D()
     paraDir = reg_final.ucube.paraDir
