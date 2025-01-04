@@ -1466,7 +1466,7 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
 
     if planemask is None:
         residual = get_residual(cube, model)
-        residual = da.from_array(residual) if isinstance(cube._data, da.Array) else residual
+        residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
     else:
         residual = get_residual(cube, model, planemask=planemask)
         mask_temp = mask
@@ -1773,48 +1773,30 @@ def get_residual(cube, model, planemask=None):
       specified spatial pixels, which can reduce computation time.
     - Handles memory-efficient computation when dask is enabled.
     """
-    # Get the cube data as a dask array or numpy array
-    #data = cube.filled_data[:].value  # dask array if dask is enabled, numpy array otherwise
+    # Get the cube data as a Dask or NumPy array
     data = cube._data
-    #print(f"cube type: {type(cube)}")
-    #print(f"data type: {type(data)}")
-    #print(f"model type: {type(model)}")
 
-    # Calculate residual with or without a planemask
     if planemask is None:
         residual = data - model
     else:
-        # If dask, apply the mask in a memory-efficient way
-        if isinstance(model, da.Array):
-            if isinstance(data, da.Array):
+        if isinstance(model, da.Array) and isinstance(data, da.Array):
+            # Flatten the spatial dimensions and mask
+            data_flat = data.reshape(data.shape[0], -1)
+            model_flat = model.reshape(model.shape[0], -1)
+            planemask_flat = planemask.ravel()
 
-                # Flatten the spatial axes of data and model
-                data_flat = data.reshape(data.shape[0], -1)
-                model_flat = model.reshape(model.shape[0], -1)
+            # Apply the mask using da.compress
+            data_masked = da.compress(planemask_flat, data_flat, axis=1)
+            model_masked = da.compress(planemask_flat, model_flat, axis=1)
 
-                # Flatten the planemask and ensure it is 1D
-                planemask_flat = planemask.ravel()
-
-                # Apply the mask using boolean indexing or da.compress
-                data_masked = da.compress(planemask_flat, data_flat, axis=1)  # Shape: (915, <masked>)
-                model_masked = da.compress(planemask_flat, model_flat, axis=1)  # Shape: (915, <masked>)
-
-                # Compute the residual
-                residual = data_masked - model_masked
-            else:
-                planemask_expanded = da.from_array(planemask, chunks=model.chunksize[1:])
-                residual = data[:, planemask] - model[:, planemask_expanded]
+            # Compute the residual lazily
+            residual = data_masked - model_masked
         else:
-            if isinstance(data, da.Array):
-                # Non-dask (numpy array), use direct masking
-                planemask_expanded = da.from_array(planemask, chunks=data.chunksize[1:])
-                residual = data[:, planemask_expanded] - model[:, planemask]
-            else:
-                residual = data[:, planemask] - model[:, planemask]
-
-    # If residual is a dask array, compute only if needed (e.g., for direct use in numpy context)
-    if isinstance(residual, da.Array):
-        residual = residual.compute()
+            # Handle NumPy or mixed array cases
+            planemask_broadcast = da.broadcast_to(planemask, data.shape[1:])
+            data_masked = da.where(planemask_broadcast, data, 0)
+            model_masked = da.where(planemask_broadcast, model, 0)
+            residual = data_masked - model_masked
 
     # Run garbage collection for memory management
     gc.collect()
