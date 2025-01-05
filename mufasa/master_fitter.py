@@ -1802,7 +1802,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
             savename = f"{paraDir}/{paraRoot}_ppv3D.html" # default
             for pp in ["parameters", "parameter", "para"]:
                 if pp in paraRoot:
-                    savename = f"{paraDir}/{paraRoot.replace(pp, ppv3D)}.html"
+                    savename = f"{paraDir}/{paraRoot.replace(pp, 'ppv3D')}.html"
             sppv.plot_ppv(label_key='peakT', savename=savename, showfig=False, auto_open_html=False)
 
     def make_lnk_header(ref_header, root):
