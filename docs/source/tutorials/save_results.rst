@@ -71,12 +71,21 @@ each pixel to select the best-fit model:
 +-------------------------------+---------------------------------------------------------+
 | ``NH3_model_mom0.fits``       | Moment 0 map (integrated intensity) of the best model.  |
 +-------------------------------+---------------------------------------------------------+
-| ``NH3_mom0.fits``             | Moment 0 map (integrated intensity) of the data,        |
-|                               | masked by the best model.                               |
+| ``NH3_mom0.fits``             | Moment 0 map of the data, masked by the best model.     |
 +-------------------------------+---------------------------------------------------------+
 | ``NH3_chi2red_1c.fits``       | Reduced chi-squared map for the 1-component model.      |
 +-------------------------------+---------------------------------------------------------+
 | ``NH3_chi2red_2c.fits``       | Reduced chi-squared map for the 2-component model.      |
++-------------------------------+---------------------------------------------------------+
+
+Optionally, the following data products are also saved by default:
+
++-------------------------------+---------------------------------------------------------+
+| **File Name**                 | **Description**                                         |
++===============================+=========================================================+
+| ``NH3_para_2vcomp_final.csv`` | Final best-fit parameters in a csv table w. peak I.     |
++-------------------------------+---------------------------------------------------------+
+| ``NH3_ppv3D.html``            | Best-fit vlsr plotted in PPV as an .html file.          |
 +-------------------------------+---------------------------------------------------------+
 
 .. note::
@@ -105,7 +114,6 @@ To save the results after spectral fitting, run the following:
     )
 
     print("Results saved to:", region.ucube.paraDir)
-
 
 For initializing your :class:`~mufasa.master_fitter.Region` object, see :doc:`Loading Data and Results <load_data_n_results>`.
 
