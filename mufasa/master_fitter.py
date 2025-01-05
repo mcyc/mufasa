@@ -2541,7 +2541,6 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     >>> replace_para(pcube, pcube_ref, mask, multicore=4)
     >>> # Updates `pcube` with values from `pcube_ref` for pixels specified by `mask`.
     """
-
     # replace values in masked pixels with the reference values
     pcube.parcube[:, mask] = deepcopy(pcube_ref.parcube[:, mask])
     pcube.errcube[:, mask] = deepcopy(pcube_ref.errcube[:, mask])

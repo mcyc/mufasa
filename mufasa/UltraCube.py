@@ -1366,27 +1366,29 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 
     mask = np.logical_and(lnk21 > lnk21_thres, lnk20 > lnk20_thres)
 
+    val_fill = np.nan #the value to fill outside of mask
+
     if include_1c:
         parcube[:4, ~mask] = copy(ucube.pcubes['1'].parcube[:4, ~mask])
         errcube[:4, ~mask] = copy(ucube.pcubes['1'].errcube[:4, ~mask])
-        parcube[4:8, ~mask] = np.nan
-        errcube[4:8, ~mask] = np.nan
+        parcube[4:8, ~mask] = val_fill
+        errcube[4:8, ~mask] = val_fill
 
     else:
-        parcube[:, ~mask] = np.nan
-        errcube[:, ~mask] = np.nan
+        parcube[:, ~mask] = val_fill
+        errcube[:, ~mask] = val_fill
 
     mask = lnk10 > lnk10_thres
-    parcube[:, ~mask] = np.nan
-    errcube[:, ~mask] = np.nan
+    parcube[:, ~mask] = val_fill
+    errcube[:, ~mask] = val_fill
 
     if return_lnks:
         # set lnk pixels with no fit to nan
         mask = ucube.has_fit(ncomp=1)
-        lnk10[~mask] = np.nan
+        lnk10[~mask] = val_fill
         mask = ucube.has_fit(ncomp=2)
-        lnk20[~mask] = np.nan
-        lnk21[~mask] = np.nan
+        lnk20[~mask] = val_fill
+        lnk21[~mask] = val_fill
 
         return parcube, errcube, lnk10, lnk20, lnk21
     else:
@@ -1464,7 +1466,7 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
     if expand > 0:
         mask = expand_mask(mask, expand)
 
-    print(f"mask type: {type(mask)}")
+    logger.debug(f"mask type: {type(mask)}")
 
     if planemask is None:
         residual = get_residual(cube, model)

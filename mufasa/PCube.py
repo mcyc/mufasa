@@ -1,6 +1,7 @@
 import numpy as np
 import dask.array as da
 from dask import delayed
+from dask.distributed import Client
 from pyspeckit.cubes.SpectralCube import Cube
 
 
@@ -34,7 +35,7 @@ class PCube(Cube):
             return self._modelcube
 
         yy, xx = np.indices(self.parcube.shape[1:])
-        nanvals = np.all(~np.isfinite(self.parcube), axis=0)
+        nanvals = ~np.all(np.isfinite(self.parcube), axis=0)
         isvalid = np.any(self.parcube, axis=0) & ~nanvals
 
         if mask is not None:
@@ -51,11 +52,21 @@ class PCube(Cube):
             return self.specfit.get_full_model(pars=self.parcube[:, y, x])
 
         # Generate the Dask graph for valid pixels
-        for x, y in valid_pixels:
-            self._modelcube[:, y, x] = da.from_delayed(
-                delayed(compute_model)(x, y),
-                shape=(model_cube_shape[0],),  # Shape of the spectral axis
-                dtype=self.cube.dtype
-            )
+        if multicore > 1:
+            client = Client(n_workers=multicore)  # Start a Dask client
+            for x, y in valid_pixels:
+                self._modelcube[:, y, x] = da.from_delayed(
+                    delayed(compute_model)(x, y),
+                    shape=(model_cube_shape[0],),
+                    dtype=self.cube.dtype
+                ).compute()
+            client.close()  # Close client
+        else:
+            for x, y in valid_pixels:
+                self._modelcube[:, y, x] = da.from_delayed(
+                    delayed(compute_model)(x, y),
+                    shape=(model_cube_shape[0],),  # Shape of the spectral axis
+                    dtype=self.cube.dtype
+                )
 
         return self._modelcube

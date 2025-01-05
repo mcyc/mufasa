@@ -28,7 +28,7 @@ if __name__ == "__main__":
         url=metadata["github_url"],  # GitHub URL
         packages=find_packages(),
         install_requires=[
-            "numpy>=1.19.2",
+            "numpy>=1.24.4,<2",
             "astropy",
             "matplotlib",
             "scipy>=1.7.3",
@@ -40,6 +40,7 @@ if __name__ == "__main__":
             "plotly",
             "nbformat",
             "reproject>=0.7.1",
+            "dask[distributed]<2024.0",  # Pin to a stable Dask version
             "pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit",
             "FITS_tools @ git+https://github.com/keflavich/FITS_tools.git@b1fe5166ccf8a43105efe8201e37ab5993e880be#egg=FITS_tools",
         ],
