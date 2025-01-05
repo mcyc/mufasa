@@ -1719,7 +1719,8 @@ def save_updated_paramaps(ucube, ncomps):
 
 
 
-def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=5, lnk10_thres=5):
+def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=5, lnk10_thres=5,
+                        save_csv=True, save_Scatter3D=True):
     """Save the best two-component fit results for the specified region.
 
     Parameters
@@ -1735,12 +1736,17 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
         The log-relative-likelihood theshold to select the 2-component model over the 1-component model (default is 5)
     lnk10_thres : float, optional
         The log-relative-likelihood theshold to select the 1-component model over the noise model (default is 5)
+    save_csv : bool, optional
+        If True, saves the best two-component fit parameter as a .csv table, along with estimate peak intensity
+        for each component
+    save_Scatter3D : bool, optional
+        If True, saves 3D scatter of the best two-component fit vlsr in position-position-velocity space,
+        color and opacity coded by the estimated peak intensity of each component
 
     Returns
     -------
     None
     """
-
     ncomps = [1, 2]
     multicore = validate_n_cores(multicore)
 
@@ -1779,14 +1785,25 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
     UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
 
-    #save structured data (read the saved .fits file first, using ScatterPPV as a quick work around for now)
-    sppv = scatter_3D.ScatterPPV(savename, fittype=reg.fittype, meta_model=reg.ucube.meta_model)
-    savename = "{}_final.csv".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
-    sppv.dataframe.to_csv(savename, index=False)
-
     hdr2D = reg.ucube.make_header2D()
     paraDir = reg_final.ucube.paraDir
     paraRoot = reg_final.ucube.paraNameRoot
+
+    if save_csv or save_Scatter3D:
+        #save structured data (read the saved .fits file first, using ScatterPPV as a quick work around for now)
+        sppv = scatter_3D.ScatterPPV(savename, fittype=reg.fittype, meta_model=reg.ucube.meta_model)
+
+        if save_csv:
+            savename = "{}_final.csv".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
+            sppv.dataframe.to_csv(savename, index=False)
+
+        if save_Scatter3D:
+            #save 3D scatter
+            savename = f"{paraDir}/{paraRoot}_ppv3D.html" # default
+            for pp in ["parameters", "parameter", "para"]:
+                if pp in paraRoot:
+                    savename = f"{paraDir}/{paraRoot.replace(pp, ppv3D)}.html"
+            sppv.plot_ppv(label_key='peakT', savename=savename, showfig=False, auto_open_html=False)
 
     def make_lnk_header(ref_header, root):
 
