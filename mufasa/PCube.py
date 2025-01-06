@@ -132,7 +132,7 @@ class PCube(Cube):
                 logger.debug(f"n cores: {multicore}")
                 self._modelcube = dask_utils.lazy_pix_compute_multiprocessing(self._modelcube, isvalid,
                                                                               compute_pixel, batch_size=batch_size,
-                                                                              n_workers=multicore, task_per_core=200)
+                                                                              n_workers=multicore)
 
             else:
                 logger.debug("Computing model in single-core mode.")
