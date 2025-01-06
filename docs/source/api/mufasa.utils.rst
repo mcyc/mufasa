@@ -12,9 +12,11 @@ mufasa.utils
 .. autosummary::
    :toctree:
 
+   dask_utils
    dataframe
    interpolate
    map_divide
+   memory
    mufasa_log
    multicore
    neighbours

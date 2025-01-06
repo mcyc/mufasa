@@ -211,7 +211,7 @@ class Region(object):
         """
         get_fits(self, ncomp, update=False)
 
-    def master_2comp_fit(self, snr_min=0.0, **kwargs):
+    def master_2comp_fit(self, snr_min=3.0, **kwargs):
         """
         Perform a comprehensive two-component fitting process on the spectral cube.
 
@@ -224,7 +224,8 @@ class Region(object):
         Parameters
         ----------
         snr_min : float, optional
-            Minimum signal-to-noise ratio required for fitting. Default is 0.0.
+            Minimum signal-to-noise ratio required for fitting. Default is 3.0.
+            If set to 0.0, attempts to fit all pixels using guesses from pre-existing fits.
         **kwargs : dict, optional
             Additional keyword arguments controlling the fitting process:
 
@@ -607,7 +608,7 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-component fits
 
 
-def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
+def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
                      refit_marg=True, max_expand_iter=None, multicore=True):
     """
     Perform a two-component fit on the data cube within a Region object.
@@ -622,7 +623,7 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
         A Region object containing the data cube to be fitted.
     snr_min : float, optional
         Minimum peak signal-to-noise ratio required for fitting. Only regions with a peak SNR above this threshold
-        are considered for fitting. Default is 0.0.
+        are considered for fitting. Default is 3.
         If set to 0.0, attempts to fit all pixels using guesses from pre-existing fits.
     recover_wide : bool, optional
         If True, attempts to recover spectral components with large velocity separation. Default is True.
@@ -673,9 +674,6 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     """
 
     iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
-    #_, peak_memory = memory_tracker(iter_2comp_fit, reg, snr_min=snr_min,
-    #                                     updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
-    #reg.log_memory(process_name='iter conv fits', peak_memory=peak_memory)
 
     # assumes the user wants to recover a second component that is fainter than the primary
     recover_snr_min = 3.0

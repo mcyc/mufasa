@@ -13,6 +13,7 @@ you can also search with the search bar located on the top right corner of the w
    :maxdepth: 4
    :hidden:
 
+   mufasa.PCube
    mufasa.UltraCube
    mufasa.aic
    mufasa.clean_fits
@@ -36,6 +37,17 @@ you can also search with the search bar located on the top right corner of the w
 
    * - Object
      - Description
+   * - :obj:`~mufasa.PCube.PCube`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.PCube
+
+          .. autoshortsummary:: mufasa.PCube.PCube
+
+          .. container:: caption
+
+             :mod:`mufasa.PCube`
+   
    * - :obj:`~mufasa.UltraCube.UCubePlus`
      - .. container:: sk-apisearch-desc
 
@@ -1496,6 +1508,47 @@ you can also search with the search bar located on the top right corner of the w
              :mod:`mufasa.spec_models.nh3_deblended`
    
    
+   * - :obj:`~mufasa.utils.dask_utils.calculate_batch_size`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.calculate_batch_size
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.calculate_chunks`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.calculate_chunks
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.lazy_pix_compute`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.lazy_pix_compute
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.lazy_pix_compute_multiprocessing`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.lazy_pix_compute_multiprocessing
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   
    * - :obj:`~mufasa.utils.dataframe.assign_to_dataframe`
      - .. container:: sk-apisearch-desc
 
@@ -1568,6 +1621,17 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.map_divide`
+   
+   * - :obj:`~mufasa.utils.memory.calculate_target_memory`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.calculate_target_memory
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
    
    * - :obj:`~mufasa.utils.mufasa_log.OriginContextFilter`
      - .. container:: sk-apisearch-desc
