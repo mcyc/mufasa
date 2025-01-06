@@ -122,7 +122,7 @@ class PCube(Cube):
                 total_valid_pixels=n_pix,
                 n_cores=multicore,
                 memory_limit_mb=target_memory_mb,
-                task_per_core=10,
+                task_per_core=200,
                 min_tpc=5
             )
 
