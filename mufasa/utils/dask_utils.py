@@ -1,7 +1,7 @@
 import numpy as np
 import dask.array as da
 from dask import delayed
-from dask.distributed import Client
+from distributed import Client
 
 #======================================================================================================================#
 from .mufasa_log import get_logger
@@ -262,13 +262,17 @@ def lazy_pix_compute_multiprocessing(host_cube, isvalid, compute_pixel, batch_si
     computed_cube = da.full(host_cube.shape, np.nan, dtype=host_cube.dtype, chunks=host_cube.chunks)
 
     try:
-        # Initialize Dask client
-        client = Client(n_workers=n_workers,
-                        memory_limit="2GB",
-                        local_directory="/tmp/dask-worker-space",
-                        timeout="60s",
-                        heartbeat_interval="30s")
+        # Initialize Dask client with a dashboard
+        client = Client(
+            n_workers=n_workers,
+            memory_limit="2GB",
+            local_directory="/tmp/dask-worker-space",
+            timeout="60s",
+            heartbeat_interval="30s",
+            dashboard_address=":8787"  # Set this to enable the dashboard
+        )
         logger.info("Dask client initialized.")
+        logger.info(f"Dask dashboard available at {client.dashboard_link}")
 
         # Batch processing
         for batch in pixel_batches:
