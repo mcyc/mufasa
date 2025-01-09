@@ -3,6 +3,9 @@ import dask.array as da
 from dask import delayed, config
 from dask.distributed import Client
 import psutil
+import gc
+import dask.array as da
+from dask import config
 
 #======================================================================================================================#
 from .mufasa_log import get_logger
@@ -128,6 +131,91 @@ def calculate_batch_size(spectral_size, dtype, total_valid_pixels, n_cores, memo
     # Use the smaller of memory-constrained or task-distributed batch size
     return min(max_batch_size, suggested_batch_size), n_cores
 
+
+def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='threads', inplace=False, debug=False):
+    """
+    Compute valid pixels in a Dask array without batching or copying, with specified scheduler.
+
+    Parameters
+    ----------
+    host_cube : dask.array.Array
+        3D Dask array (spectral, y, x).
+    isvalid : numpy.ndarray or dask.array.Array
+        2D mask where True indicates valid pixels.
+    compute_pixel : callable
+        Function to compute spectral values for a given pixel (x, y).
+    scheduler : {'threads', 'processes', 'synchronous'}, optional
+        Scheduler to use for computation. Default is 'threads'.
+    inplace : bool, optional
+        If True, modifies chunks in place. Defaults to False for safer copying.
+    debug : bool, optional
+        If True, enables debugging messages and visualizations.
+
+    Returns
+    -------
+    dask.array.Array
+        Dask array with updated values for valid pixels.
+    """
+    # Ensure `isvalid` is a Dask array with proper chunks
+    _, y_chunks, x_chunks = host_cube.chunks
+    if not isinstance(isvalid, da.Array):
+        isvalid = da.from_array(isvalid, chunks=(y_chunks, x_chunks))
+    elif isvalid.chunks != (y_chunks, x_chunks):
+        isvalid = isvalid.rechunk((y_chunks, x_chunks))
+
+    def update_chunk_inplace(chunk, isvalid_chunk):
+        # Find valid pixel indices in this chunk
+        valid_pixel_indices = np.argwhere(isvalid_chunk)
+
+        if len(valid_pixel_indices) < 1:
+            return chunk
+
+        # Enable writing in-place
+        if not chunk.flags.writeable:
+            chunk.flags.writeable = True
+
+        # Modify the chunk in place
+        for local_y, local_x in valid_pixel_indices:
+            chunk[:, local_y, local_x] = compute_pixel(local_x, local_y)
+
+        return chunk
+
+    def update_chunk(chunk, isvalid_chunk):
+        # Find valid pixel indices in this chunk
+        valid_pixel_indices = np.argwhere(isvalid_chunk)
+
+        if len(valid_pixel_indices) < 1:
+            return chunk
+
+        # Create a writable copy
+        chunk_copy = np.copy(chunk)
+
+        # Modify the chunk
+        for local_y, local_x in valid_pixel_indices:
+            chunk_copy[:, local_y, local_x] = compute_pixel(local_x, local_y)
+
+        return chunk_copy
+
+    update_func = update_chunk_inplace if inplace else update_chunk
+
+    # Apply the function using map_blocks
+    with config.set(scheduler=scheduler):
+        if debug:
+            print(f"Scheduler: {scheduler}")
+        result = da.map_blocks(
+            update_func,
+            host_cube,
+            isvalid,  # Pass isvalid as an additional array
+            dtype=host_cube.dtype,
+        )
+        if debug:
+            result.visualize(filename='compute_before.svg')
+        persisted_result = result.persist()
+        del result
+        gc.collect()
+        if debug:
+            persisted_result.visualize(filename='compute_after.svg')
+        return persisted_result
 
 def lazy_pix_compute_single(host_cube, isvalid, compute_pixel):
     """
@@ -468,4 +556,10 @@ def _update_batch(block, batch_result):
     for i, (y, x) in enumerate(batch_pixels):
         block_copy[:, y, x] = batch_data[:, i]  # Assign spectral values to each pixel
 
+    # Clean up variables to free memory
+    del block
+    del batch_result
+    del batch_pixels, batch_data
+
     return block_copy
+
