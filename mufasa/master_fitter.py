@@ -383,7 +383,7 @@ class Region(object):
             # Start tracing memory
             if not tracemalloc.is_tracing():
                 tracemalloc.start()
-            peak_memory = 'None'
+            peak_memory = None
         else:
             timestamp = datetime.now()
             time_info = timestamp.isoformat(timespec=timespec)
@@ -422,7 +422,7 @@ class Region(object):
                     _, peak_memory = tracemalloc.get_traced_memory()
                     peak_memory = np.round(peak_memory / 10 ** 9, 2)
                 else:
-                    peak_memory = 'N/A'
+                    peak_memory = None
 
         # Initialize progress log if it doesn't exist yet
         if not hasattr(self, 'progress_log'):

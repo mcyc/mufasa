@@ -2,6 +2,7 @@ import numpy as np
 import dask.array as da
 from dask import delayed, config
 from dask.distributed import Client
+import psutil
 
 #======================================================================================================================#
 from .mufasa_log import get_logger
@@ -175,6 +176,100 @@ def lazy_pix_compute_single(host_cube, isvalid, compute_pixel):
             lambda block, val=pixel_value, cx=x, cy=y: _update_pixel(block, val, cx, cy),
             computed_cube, dtype=host_cube.dtype
         )
+
+    return computed_cube
+
+
+def lazy_pix_compute_dynamic(host_cube, isvalid, compute_pixel, memory_limit_mb=1024, scheduler='adaptive'):
+    """
+    Adaptive computation of valid pixels with dynamic batching and scheduling.
+
+    Parameters
+    ----------
+    host_cube : dask.array.Array
+        The 3D data cube (spectral, y, x).
+    isvalid : numpy.ndarray or dask.array.Array
+        A 2D boolean mask (y, x) where True indicates valid pixels.
+    compute_pixel : callable
+        A function that computes pixel spectral values given (x, y).
+    memory_limit_mb : int, optional
+        Memory limit per worker in MB. Default is 1024 MB.
+    scheduler : {'adaptive', 'threads', 'processes', 'synchronous'}, default='adaptive'
+        Scheduler to use for computation.
+
+    Returns
+    -------
+    dask.array.Array
+        A 3D array with computed values for valid pixels.
+    """
+    import dask.array as da
+    from dask import config
+
+    if isinstance(isvalid, da.Array):
+        isvalid = isvalid.compute()
+
+    # Calculate density of valid pixels
+    valid_pixel_count = np.sum(isvalid)
+    if valid_pixel_count == 0:
+        raise ValueError("No valid pixels found in the mask. Ensure `isvalid` is correctly defined.")
+
+    pixel_density = valid_pixel_count / isvalid.size
+
+    # Determine number of physical cores
+    n_cores = psutil.cpu_count(logical=False)
+    logger.info(f"Detected physical cores: {n_cores}")
+
+    # Determine optimal batch size dynamically
+    spectral_size = host_cube.shape[0]
+    dtype = host_cube.dtype
+    batch_size, _ = calculate_batch_size(
+        spectral_size,
+        dtype,
+        valid_pixel_count,
+        n_cores=n_cores,  # Use physical cores
+        memory_limit_mb=memory_limit_mb,
+    )
+
+    # Validate batch size
+    if batch_size <= 0:
+        logger.warning(
+            f"Calculated batch size is invalid ({batch_size}). "
+            f"Falling back to a default value based on valid pixels and cores."
+        )
+        batch_size = max(1, valid_pixel_count // n_cores)
+
+    logger.info(f"Adaptive batch size: {batch_size}")
+
+    # Dynamic scheduler
+    if scheduler == 'adaptive':
+        scheduler = 'threads' if pixel_density > 0.1 else 'processes'
+
+    # Lazy computation of valid pixels
+    computed_cube = da.full(
+        host_cube.shape, np.nan, dtype=host_cube.dtype, chunks=host_cube.chunks
+    )
+
+    def compute_batch(batch_pixels):
+        batch_data = np.full((host_cube.shape[0], len(batch_pixels)), np.nan, dtype=host_cube.dtype)
+        for i, (y, x) in enumerate(batch_pixels):
+            batch_data[:, i] = compute_pixel(x, y)
+        return batch_pixels, batch_data
+
+    # Process pixels in chunks or batches
+    valid_pixels = np.argwhere(isvalid)
+    pixel_batches = [
+        valid_pixels[i : i + batch_size]
+        for i in range(0, len(valid_pixels), batch_size)
+    ]
+
+    with config.set(scheduler=scheduler):
+        for batch in pixel_batches:
+            delayed_result = delayed(compute_batch)(batch)
+            computed_cube = da.map_blocks(
+                lambda block, result=delayed_result: _update_batch(block, result.compute()),
+                computed_cube,
+                dtype=host_cube.dtype,
+            )
 
     return computed_cube
 
