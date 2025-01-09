@@ -1,7 +1,7 @@
 import numpy as np
 import dask.array as da
-from dask import delayed
-from distributed import Client
+from dask import delayed, config
+from dask.distributed import Client
 
 #======================================================================================================================#
 from .mufasa_log import get_logger
@@ -128,7 +128,7 @@ def calculate_batch_size(spectral_size, dtype, total_valid_pixels, n_cores, memo
     return min(max_batch_size, suggested_batch_size), n_cores
 
 
-def lazy_pix_compute(host_cube, isvalid, compute_pixel):
+def lazy_pix_compute_single(host_cube, isvalid, compute_pixel):
     """
     Lazily compute values for each valid pixel specified by the isvalid mask.
 
@@ -179,65 +179,87 @@ def lazy_pix_compute(host_cube, isvalid, compute_pixel):
     return computed_cube
 
 
-def lazy_pix_compute_multiprocessing(host_cube, isvalid, compute_pixel, batch_size=100, n_workers=4):
+def lazy_pix_compute(host_cube, isvalid, compute_pixel, batch_size=100, n_workers=4, scheduler='threads'):
     """
-    Lazily compute values for valid pixels specified by the `isvalid` mask using multi-processing.
+    Lazily compute values for valid pixels specified by the `isvalid` mask using the specified scheduler.
 
-    This function processes pixels in batches for efficiency, with tasks distributed
-    across multiple workers managed by a Dask client. The results are lazily computed
-    and integrated into a Dask array, preserving memory efficiency.
+    This function computes spectral values for a subset of pixels in a data cube,
+    as determined by the `isvalid` mask. Pixels marked as valid (`True`) in the mask
+    are processed using the specified `compute_pixel` function, while others are left as NaN.
+    The computation is parallelized using Dask and can be scheduled using threads,
+    processes, or batching with a Dask client.
 
     Parameters
     ----------
     host_cube : dask.array.Array
         A 3D Dask array representing the data cube with dimensions (spectral, y, x).
+        The cube contains the spectral data to be processed.
+
     isvalid : numpy.ndarray or dask.array.Array
-        A 2D boolean mask of shape (y, x). Pixels marked as True will be processed,
-        and their computed values will be updated in the output cube.
+        A 2D boolean mask of shape (y, x). Pixels marked as `True` will be processed,
+        and their computed values will be updated in the output array. Pixels marked
+        as `False` will remain as NaN.
+
     compute_pixel : callable
-        A function that computes the spectral data for a given pixel. It should accept
-        `(x, y)` as arguments and return a 1D array of spectral values.
-    batch_size : int, optional
+        A function that computes spectral data for a given pixel. It must accept two
+        arguments, `(x, y)`, where `x` and `y` are the spatial coordinates of the pixel,
+        and return a 1D array of spectral values.
+
+    batch_size : int, optional, default=100
         The number of pixels to process in each batch. Larger batches reduce task
-        scheduling overhead but require more memory. Default is 100.
-    n_workers : int, optional
-        The number of workers to use for parallel processing. Default is 4.
+        scheduling overhead but require more memory.
+
+    n_workers : int, optional, default=4
+        The number of workers to use for parallel processing. This parameter is only
+        used when the `scheduler` is set to `'batch'`. It determines the number of Dask
+        workers launched in the local cluster.
+
+    scheduler : {'threads', 'processes', 'synchronous', 'batch'}, optional, default='threads'
+        The Dask scheduler to use for parallel computation. The available options are:
+        - `'threads'`: Use a thread-based scheduler (default). Tasks run in parallel
+          threads, sharing memory.
+        - `'processes'`: Use a process-based scheduler. Tasks run in separate processes,
+          each with its own memory space.
+        - `'synchronous'`: Use a single-threaded, synchronous scheduler. Tasks are
+          executed sequentially.
+        - `'batch'`: Use batching with a Dask distributed client for more fine-grained
+          control over the execution, including access to the Dask dashboard.
 
     Returns
     -------
     dask.array.Array
-        A Dask array with the same shape as `host_cube`, where computed values for valid
-        pixels are filled, and all other locations remain NaN.
+        A 3D Dask array with the same shape as `host_cube`. The computed values for
+        valid pixels are filled into the array, while all other locations remain NaN.
 
     Notes
     -----
-    - The computation is performed in batches to balance parallelism and memory usage.
-    - Tasks are distributed across workers using Dask's distributed scheduler.
-    - Ensure the system has sufficient resources (CPU, memory) for the requested `n_workers`
-      and `batch_size`.
+    - When the scheduler is set to `'batch'`, a local Dask distributed client is
+      initialized to manage the computation. This provides access to the Dask dashboard
+      for real-time task monitoring.
+    - Ensure that `compute_pixel` is thread-safe if using the `'threads'` scheduler.
 
     Examples
     --------
-    >>> import numpy as np
-    >>> import dask.array as da
-    >>> from mymodule import lazy_pix_compute_multiprocessing
-    >>>
-    >>> # Example 3D Dask array and mask
-    >>> cube = da.random.random((100, 50, 50), chunks=(50, 25, 25))
-    >>> isvalid = np.zeros((50, 50), dtype=bool)
-    >>> isvalid[10, 20] = True
-    >>> isvalid[30, 40] = True
-    >>>
-    >>> # Example pixel computation function
-    >>> def compute_pixel(x, y):
-    >>>     return np.arange(100) + x + y  # Example: spectral values
-    >>>
-    >>> # Perform lazy computation
-    >>> result = lazy_pix_compute_multiprocessing(cube, isvalid, compute_pixel, batch_size=50, n_workers=2)
-    >>> print(result.compute().shape)
-    (100, 50, 50)
-    """
+    Compute spectral values for a subset of pixels in a data cube:
 
+    >>> import dask.array as da
+    >>> import numpy as np
+
+    >>> def mock_compute_pixel(x, y):
+    ...     return np.array([x + y, x - y])
+
+    >>> host_cube = da.random.random((10, 100, 100), chunks=(10, 50, 50))
+    >>> isvalid = np.random.choice([True, False], size=(100, 100))
+
+    >>> result = lazy_pix_compute(
+    ...     host_cube,
+    ...     isvalid,
+    ...     compute_pixel=mock_compute_pixel,
+    ...     batch_size=10,
+    ...     scheduler='threads'
+    ... )
+    >>> print(result.compute())  # Compute the result
+    """
     # Ensure isvalid is a NumPy array for indexing
     if isinstance(isvalid, da.Array):
         isvalid = isvalid.compute()
@@ -261,29 +283,43 @@ def lazy_pix_compute_multiprocessing(host_cube, isvalid, compute_pixel, batch_si
     # Initialize computed cube
     computed_cube = da.full(host_cube.shape, np.nan, dtype=host_cube.dtype, chunks=host_cube.chunks)
 
-    try:
-        # Initialize Dask client with a dashboard
-        client = Client(
-            n_workers=n_workers,
-            memory_limit="2GB",
-            local_directory="/tmp/dask-worker-space",
-            timeout="60s",
-            heartbeat_interval="30s",
-            dashboard_address=":8787"  # Set this to enable the dashboard
-        )
-        logger.info("Dask client initialized.")
-        logger.info(f"Dask dashboard available at {client.dashboard_link}")
+    logger.info(f"Using scheduler: {scheduler}")
+    if scheduler !='batch':
+        # Use the non-batch scheduler
+        with config.set(scheduler=scheduler):
+            for batch in pixel_batches:
+                delayed_result = delayed(compute_batch)(batch)
+                computed_cube = da.map_blocks(
+                    lambda block, result=delayed_result: _update_batch(block, result.compute()),
+                    computed_cube,
+                    dtype=host_cube.dtype,
+                )
 
-        # Batch processing
-        for batch in pixel_batches:
-            delayed_result = delayed(compute_batch)(batch)
-            computed_cube = da.map_blocks(
-                lambda block, result=delayed_result: _update_batch(block, result.compute()),
-                computed_cube,
-                dtype=host_cube.dtype,
+    else:
+        # use batching
+        try:
+            # Initialize Dask client with a dashboard
+            client = Client(
+                n_workers=n_workers,
+                memory_limit="2GB",
+                local_directory="/tmp/dask-worker-space",
+                timeout="60s",
+                heartbeat_interval="30s",
+                dashboard_address=":8787"  # Set this to enable the dashboard
             )
-    finally:
-        client.close()
+            logger.debug("Dask client initialized.")
+            logger.debug(f"Dask dashboard available at {client.dashboard_link}")
+
+            # Batch processing
+            for batch in pixel_batches:
+                delayed_result = delayed(compute_batch)(batch)
+                computed_cube = da.map_blocks(
+                    lambda block, result=delayed_result: _update_batch(block, result.compute()),
+                    computed_cube,
+                    dtype=host_cube.dtype,
+                )
+        finally:
+            client.close()
 
     return computed_cube
 

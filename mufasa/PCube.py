@@ -19,7 +19,8 @@ class PCube(Cube):
     and computational efficiency.
     """
 
-    def get_modelcube(self, update=False, multicore=1, mask=None, target_memory_mb=None):
+    def get_modelcube(self, update=False, multicore=1, mask=None, target_memory_mb=None,
+                      scheduler='threads'):
         """
         Generate or update the model cube using Dask for parallel and memory-efficient processing.
 
@@ -42,6 +43,16 @@ class PCube(Cube):
         target_memory_mb : int or None, optional
             Target memory usage per chunk in megabytes. If None, the memory limit is
             estimated based on system resources. Default is None.
+            scheduler : {'threads', 'processes', 'synchronous', 'batch'}, optional, default='threads'
+            The Dask scheduler to use for parallel computation. The available options are:
+            - `'threads'`: Use a thread-based scheduler (default). Tasks run in parallel
+              threads, sharing memory.
+            - `'processes'`: Use a process-based scheduler. Tasks run in separate processes,
+              each with its own memory space.
+            - `'synchronous'`: Use a single-threaded, synchronous scheduler. Tasks are
+              executed sequentially.
+            - `'batch'`: Use batching with a Dask distributed client for more fine-grained
+              control over the execution, including access to the Dask dashboard.
 
         Returns
         -------
@@ -104,7 +115,7 @@ class PCube(Cube):
         if multicore == 1:
             # Sequential computation
             logger.info("Running in single-core mode.")
-            self._modelcube = dask_utils.lazy_pix_compute(self._modelcube, isvalid, compute_pixel)
+            self._modelcube = dask_utils.lazy_pix_compute_single(self._modelcube, isvalid, compute_pixel)
 
         else:
             # Parallel computation with Dask when justified
@@ -130,9 +141,9 @@ class PCube(Cube):
                 logger.debug("Computing model in multi-core mode with Dask.")
                 logger.debug(f"batch size: {batch_size}")
                 logger.debug(f"n cores: {multicore}")
-                self._modelcube = dask_utils.lazy_pix_compute_multiprocessing(self._modelcube, isvalid,
-                                                                              compute_pixel, batch_size=batch_size,
-                                                                              n_workers=multicore)
+
+                self._modelcube = dask_utils.lazy_pix_compute(self._modelcube, isvalid, compute_pixel,
+                                              batch_size=batch_size, n_workers=multicore, scheduler=scheduler)
 
             else:
                 logger.debug("Computing model in single-core mode.")
