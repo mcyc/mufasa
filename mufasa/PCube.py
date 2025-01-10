@@ -103,7 +103,7 @@ class PCube(Cube):
 
         if self._modelcube is None:
             # Calculate chunks
-            chunks = dask_utils.calculate_chunks(cube_shape=self.cube.shape, dtype=self.cube.dtype, target_chunk_mem_mb=128)
+            chunks = dask_utils.calculate_chunks(cube_shape=self.cube.shape, dtype=self.cube.dtype, target_chunk_mem_mb=64) #128
             # initializing modelcube
             self._modelcube = da.full(shape=self.cube.shape, fill_value=np.nan, dtype=self.cube.dtype,
                                 chunks=chunks)
@@ -118,41 +118,11 @@ class PCube(Cube):
             self._modelcube = dask_utils.lazy_pix_compute_single(self._modelcube, isvalid, compute_pixel)
 
         else:
-            # Parallel computation with Dask when justified
+            logger.info("Running in threaded mode.")
+            self._modelcube = dask_utils.lazy_pix_compute_no_batching(self._modelcube, isvalid,
+                                                                      compute_pixel, inplace=True, debug=False)
 
-            # estimate the memory available
-            memory_max = 2048 # 2 GB per worker
-            target_memory_mb = memory.calculate_target_memory(multicore, use_total=False, max_usable_fraction=0.85)
-            if target_memory_mb > memory_max:
-                target_memory_mb = memory_max
-
-            # calculate the optimal batch_size and cores
-            batch_size, multicore = dask_utils.calculate_batch_size(
-                spectral_size=self._modelcube.shape[0],
-                dtype=self._modelcube.dtype,
-                total_valid_pixels=n_pix,
-                n_cores=multicore,
-                memory_limit_mb=target_memory_mb,
-                task_per_core=200,
-                min_tpc=5
-            )
-
-            if multicore > 1 and batch_size > 0:
-                logger.debug("Computing model in multi-core mode with Dask.")
-                logger.debug(f"batch size: {batch_size}")
-                logger.debug(f"n cores: {multicore}")
-
-                self._modelcube = dask_utils.lazy_pix_compute_dynamic(self._modelcube, isvalid, compute_pixel,
-                                                           memory_limit_mb=1024, scheduler='adaptive')
-                logger.debug("Computing model in multi-core mode with Dask and adaptive mode.")
-
-                '''
-                self._modelcube = dask_utils.lazy_pix_compute(self._modelcube, isvalid, compute_pixel,
-                                              batch_size=batch_size, n_workers=multicore, scheduler=scheduler)
-                '''
-
-            else:
-                logger.debug("Computing model in single-core mode.")
-                self._modelcube = dask_utils.lazy_pix_compute(self._modelcube, isvalid, compute_pixel)
+            #self._modelcube = dask_utils.custom_task_graph_vg(self._modelcube, isvalid, compute_pixel,
+            #                                               inplace=False, debug=True)
 
         return self._modelcube

@@ -173,7 +173,7 @@ class UltraCube(object):
         self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
 
-    def load_pcube(self, pcube_ref=None):
+    def load_pcube(self, pcube_ref=None, pyspeckit=False):
         """
         Load a cube into a pyspeckit.SpectralCube object from a .fits file.
 
@@ -194,8 +194,10 @@ class UltraCube(object):
         cube_temp = SpectralCube.read(self.cubefile, dask=False)
         cube_temp = to_K(cube_temp) # convert the unit to K;
 
-        #pcube = pyspeckit.Cube(cube=cube_temp)
-        pcube = PCube.PCube(cube=cube_temp)
+        if pyspeckit:
+            pcube = pyspeckit.Cube(cube=cube_temp)
+        else:
+            pcube = PCube.PCube(cube=cube_temp)
 
         # premptively release memory
         del cube_temp
@@ -380,8 +382,8 @@ class UltraCube(object):
             logger.warning("no fit was performed and thus no file will be saved")
 
 
-    def load_model_fit(self, filename, ncomp, calc_model=True, multicore=None):
-        self.pcubes[str(ncomp)] = load_model_fit(self.cubefile, filename, ncomp, self.fittype)
+    def load_model_fit(self, filename, ncomp, calc_model=True, multicore=None, pyspeckit=False):
+        self.pcubes[str(ncomp)] = load_model_fit(self.cubefile, filename, ncomp, self.fittype, pyspeckit)
         if calc_model:
             if multicore is None: multicore = self.n_cores
             # update model mask
@@ -830,7 +832,7 @@ def save_fit(pcube, savename, ncomp, header_note=None):
 
 
 
-def load_model_fit(cube, filename, ncomp, fittype):
+def load_model_fit(cube, filename, ncomp, fittype, pyspeckit=False):
     """
     Load the spectral fit results from a .fits file.
 
@@ -850,9 +852,10 @@ def load_model_fit(cube, filename, ncomp, fittype):
     pyspeckit.Cube
         The fitted pyspeckit cube with the loaded model.
     """
-    #pcube = pyspeckit.Cube(cube=cube)
-    #pcube = pyspeckit.Cube(cube)
-    pcube = PCube.PCube(cube)
+    if pyspeckit:
+        pcube = pyspeckit.Cube(cube)
+    else:
+        pcube = PCube.PCube(cube)
 
     # register fitter
     if fittype == 'nh3_multi_v':
