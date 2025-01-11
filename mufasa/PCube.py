@@ -107,7 +107,6 @@ class PCube(Cube):
             chunks = dask_utils.calculate_chunks(cube_shape=self.cube.shape, dtype=self.cube.dtype,
                                                  target_chunk_mem_mb=target_memory_mb) #128
 
-            print(f"chunks: {chunks}")
             # initializing modelcube
             self._modelcube = da.full(shape=self.cube.shape, fill_value=np.nan, dtype=self.cube.dtype,
                                 chunks=chunks)
@@ -123,9 +122,8 @@ class PCube(Cube):
 
         else:
             logger.info("Running in threaded mode.")
-            self._modelcube = dask_utils.lazy_pix_compute_no_batching(self._modelcube, isvalid, compute_pixel)
-
-            #self._modelcube = dask_utils.custom_task_graph_vg(self._modelcube, isvalid, compute_pixel,
-            #                                               inplace=False, debug=True)
+            #self._modelcube = dask_utils.lazy_pix_compute_no_batching(self._modelcube, isvalid, compute_pixel)
+            self._modelcube = dask_utils.custom_task_graph(self._modelcube, isvalid, compute_pixel,
+                                                           use_global_xy=True, scheduler=scheduler)
 
         return self._modelcube

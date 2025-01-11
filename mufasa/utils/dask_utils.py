@@ -279,12 +279,11 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
         valid_pixel_indices = np.argwhere(isvalid_chunk)
 
         if len(valid_pixel_indices) < 1:
+            # return the chunk if there's no valid pixel in the chunk
             return chunk
 
         chunk_location = block_info[0]['chunk-location']
         chunk_offset_y, chunk_offset_x = compute_global_offsets((y_chunks, x_chunks), chunk_location[1:])
-
-        logger.info(f"offsets: {(chunk_offset_y, chunk_offset_x)} for chunk at :{block_info[0]['chunk-location']}")
 
         chunk_copy = np.copy(chunk)
         for local_y, local_x in valid_pixel_indices:
@@ -294,7 +293,7 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
 
     # Apply the function using map_blocks
     with config.set(scheduler=scheduler):
-        logger.info(f"Scheduler: {scheduler}")
+        logger.debug(f"Scheduler: {scheduler}")
         result = da.map_blocks(
             update_chunk,
             host_cube,
@@ -302,10 +301,6 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
             dtype=host_cube.dtype,
         )
         return persist_and_clean(result, debug=False, visualize_filename=None)
-        #persisted_result = result.persist
-        #del result
-        #gc.collect()
-        #return persisted_result
 
 
 def compute_chunk_relevant(isvalid):
@@ -330,9 +325,28 @@ def compute_chunk_relevant(isvalid):
     return chunk_relevant
 
 
-def custom_task_graph(host_cube, isvalid, compute_pixel, inplace=False, debug=False):
+def custom_task_graph(host_cube, isvalid, compute_pixel, use_global_xy=True, scheduler='threads'):
     """
     Build a custom task graph to process relevant chunks of host_cube based on isvalid.
+
+    Parameters
+    ----------
+    host_cube : dask.array.Array
+        3D Dask array (spectral, y, x).
+    isvalid : numpy.ndarray or dask.array.Array
+        2D mask where True indicates valid pixels.
+    compute_pixel : callable
+        Function to compute spectral values for a given pixel (x, y).
+    use_global_xy : bool, optional
+        If True, passes global coordinates to compute_pixel instead of local chunk coordinates.
+        Defaults to True.
+    scheduler : {'threads', 'processes', 'synchronous'}, optional
+        Scheduler to use for computation. Default is 'threads'.
+
+    Returns
+    -------
+    dask.array.Array
+        Dask array with updated values for valid pixels.
     """
     # Ensure `isvalid` is a Dask array with proper chunks
     _, y_chunks, x_chunks = host_cube.chunks
@@ -341,18 +355,11 @@ def custom_task_graph(host_cube, isvalid, compute_pixel, inplace=False, debug=Fa
     elif isvalid.chunks != (y_chunks, x_chunks):
         isvalid = isvalid.rechunk((y_chunks, x_chunks))
 
-    if debug:
-        print(f"isvalid shape: {isvalid.shape}, chunks: {isvalid.chunks}")
-        print(f"host_cube shape: {host_cube.shape}, chunks: {host_cube.chunks}")
-
     # Compute chunk relevance
     try:
         chunk_relevant = compute_chunk_relevant(isvalid)
     except Exception as e:
         raise RuntimeError(f"Error computing chunk relevance: {e}")
-
-    if debug:
-        print(f"Chunk relevance shape: {chunk_relevant.shape}, relevance: {chunk_relevant}")
 
     # Convert to delayed arrays
     host_cube_delayed = host_cube.to_delayed().tolist()
@@ -361,23 +368,27 @@ def custom_task_graph(host_cube, isvalid, compute_pixel, inplace=False, debug=Fa
     # Create Dask arrays for each chunk
     dask_arrays_reshaped = []
     for chunk_idx, relevant in np.ndenumerate(chunk_relevant):
-        spectral_idx = 0
         spatial_idx = chunk_idx
 
-        host_chunk = host_cube_delayed[spectral_idx][spatial_idx[0]][spatial_idx[1]]
+        host_chunk = host_cube_delayed[0][spatial_idx[0]][spatial_idx[1]]
         isvalid_chunk = isvalid_delayed[spatial_idx[0]][spatial_idx[1]]
 
         if relevant:
             @delayed
-            def process_chunk(host_chunk, isvalid_chunk):
+            def process_chunk(host_chunk, isvalid_chunk, spatial_idx):
                 valid_pixel_indices = np.argwhere(isvalid_chunk)
-                if not inplace:
-                    host_chunk = host_chunk.copy()
+
+                host_chunk = host_chunk.copy()
+                # Compute global offsets
+                chunk_location = (spatial_idx[0], spatial_idx[1])
+                chunk_offset_y, chunk_offset_x = compute_global_offsets((y_chunks, x_chunks), chunk_location)
+
                 for local_y, local_x in valid_pixel_indices:
-                    host_chunk[:, local_y, local_x] = compute_pixel(local_x, local_y)
+                    global_y, global_x = (local_y + chunk_offset_y, local_x + chunk_offset_x) if use_global_xy else (local_y, local_x)
+                    host_chunk[:, local_y, local_x] = compute_pixel(global_x, global_y)
                 return host_chunk
 
-            delayed_task = process_chunk(host_chunk, isvalid_chunk)
+            delayed_task = process_chunk(host_chunk, isvalid_chunk, spatial_idx)
         else:
             # Wrap non-relevant chunks in delayed
             delayed_task = delayed(lambda x: x)(host_chunk)
@@ -395,21 +406,13 @@ def custom_task_graph(host_cube, isvalid, compute_pixel, inplace=False, debug=Fa
     # Use da.block to combine the Dask arrays
     try:
         result = da.block(dask_arrays_reshaped)
-        if debug:
-            print("Dask array constructed successfully!")
-            print(result)
     except Exception as e:
         raise RuntimeError(f"Error constructing Dask array from Dask arrays: {e}")
 
-    if debug:
-        result.visualize(filename='compute_before.svg')
-    persisted_result = result.persist()
-    del result
-    gc.collect()
-    if debug:
-        persisted_result.visualize(filename='compute_after.svg')
-
-    return persisted_result
+    # Apply the scheduler
+    with config.set(scheduler=scheduler):
+        logger.debug(f"Using scheduler: {scheduler}")
+        return persist_and_clean(result, debug=False, visualize_filename=None)
 
 
 def lazy_pix_compute_single(host_cube, isvalid, compute_pixel):
