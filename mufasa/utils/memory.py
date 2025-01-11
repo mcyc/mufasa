@@ -1,4 +1,101 @@
 import psutil  # To detect system memory
+import os
+import threading
+import functools
+import time
+
+def monitor_peak_memory(output_container=None):
+    """
+    Decorator to monitor and display the peak memory usage of a function,
+    including intermediate peaks, and handle multi-threaded tasks.
+
+    Args:
+        output_container (list or dict, optional): A mutable object where the
+            peak memory usage will be stored. If None, it defaults to printing
+            the peak memory usage.
+
+    Returns:
+        function: A wrapped function that reports peak memory usage.
+    """
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            process = psutil.Process(os.getpid())
+            peak_memory = [0]  # Use a list to allow modification within the thread
+
+            def monitor():
+                """Continuously monitor memory usage and record the peak."""
+                while monitoring[0]:
+                    try:
+                        current_memory = process.memory_info().rss / (1024 ** 2)  # Memory in MB
+                        peak_memory[0] = max(peak_memory[0], current_memory)
+                        time.sleep(0.1)  # Sample every 100ms
+                    except psutil.NoSuchProcess:
+                        break
+
+            # Start monitoring in a separate thread
+            monitoring = [True]
+            monitor_thread = threading.Thread(target=monitor)
+            monitor_thread.start()
+
+            try:
+                # Execute the function
+                result = func(*args, **kwargs)
+            finally:
+                # Stop monitoring and wait for the thread to finish
+                monitoring[0] = False
+                monitor_thread.join()
+
+            # Store peak memory in the provided container or print it
+            if output_container is not None:
+                if isinstance(output_container, list) and len(output_container) > 0:
+                    output_container[0] = peak_memory[0]
+                elif isinstance(output_container, dict):
+                    output_container['peak_memory'] = peak_memory[0]
+                else:
+                    raise ValueError("output_container must be a list or dict.")
+            else:
+                print(f"Peak memory usage for '{func.__name__}': {peak_memory[0]:.2f} MB")
+
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def monitor_peak_memory_new(sampling_interval=0.1):  # Default to 100ms
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            process = psutil.Process(os.getpid())
+            peak_memory = [0]
+
+            def monitor():
+                while monitoring[0]:
+                    try:
+                        current_memory = process.memory_info().rss / (1024 ** 2)
+                        peak_memory[0] = max(peak_memory[0], current_memory)
+                        time.sleep(sampling_interval)
+                    except psutil.NoSuchProcess:
+                        break
+
+            monitoring = [True]
+            monitor_thread = threading.Thread(target=monitor)
+            monitor_thread.start()
+
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                monitoring[0] = False
+                monitor_thread.join()
+
+            print(f"Peak memory usage for '{func.__name__}': {peak_memory[0]:.2f} MB")
+            return result
+        return wrapper
+    return decorator
+
 
 def calculate_target_memory(multicore, use_total=False, max_usable_fraction=0.85):
     """

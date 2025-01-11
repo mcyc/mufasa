@@ -24,7 +24,6 @@ from time import ctime
 from datetime import timezone, datetime
 import warnings
 import pandas as pd
-import tracemalloc
 import dask.array as da
 
 try:
@@ -41,12 +40,12 @@ from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
 from .utils import neighbours
 from .utils import dataframe as dframe
+from .utils.memory import monitor_peak_memory
 from .visualization import scatter_3D
 # =======================================================================================================================
 from .utils.mufasa_log import init_logging, get_logger
 
 logger = get_logger(__name__)
-
 
 # =======================================================================================================================
 
@@ -99,6 +98,11 @@ class Region(object):
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
+        self.log_dict = dict(master_2comp={}, iter_2comp={}, refit_bad_2comp={}, refit_2comp_wide={},
+                             standard_2comp={}, refit_marginal_1_comp={}, refit_marginal_2_comp={},
+                             save_best_2comp={})
+
+        self.log_memory(process_name, peak_memory)
 
         if fittype is None:
             fittype = 'nh3_multi_v'
@@ -256,7 +260,34 @@ class Region(object):
         """
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
+    @monitor_peak_memory(self.log_dict['iter_2comp'])
+    def iter_2comp_fit(self, **kwargs):
+        iter_2comp_fit(self, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
 
+    @monitor_peak_memory(self.log_dict['refit_bad_2comp'])
+    def refit_bad_2comp(self, **kwargs):
+        refit_bad_2comp(reg, **kwargs)
+
+    @monitor_peak_memory(self.log_dict['refit_2comp_wide'])
+    def refit_2comp_wide(self, **kwargs):
+        refit_2comp_wide(self, **kwargs)
+
+    @monitor_peak_memory(self.log_dict['refit_marginal_n_comp'])
+    def refit_marginal(self, **kwargs):
+        refit_marginal(self, **kwargs)
+
+
+    @monitor_peak_memory(self.log_dict['refit_marginal_n_comp'])
+    def refit_marginal(self, **kwargs):
+        refit_marginal(self, **kwargs)
+
+
+    @monitor_peak_memory(self.log_dict['save_best_2comp'])
+    def save_best_2comp_fit(self, **kwargs):
+        save_best_2comp_fit(self, **kwargs)
+
+
+    @monitor_peak_memory(self.log_dict['standard_2comp'])
     def standard_2comp_fit(self, planemask=None):
         """Perform a two-component fit on the spectral cube using default moment-based guesses.
 
@@ -379,11 +410,6 @@ class Region(object):
             self.timestamp = datetime.now()
             time_info = self.timestamp.isoformat(timespec=timespec)
             runtime_info = "in progress"
-
-            # Start tracing memory
-            if not tracemalloc.is_tracing():
-                tracemalloc.start()
-            peak_memory = None
         else:
             timestamp = datetime.now()
             time_info = timestamp.isoformat(timespec=timespec)
@@ -410,19 +436,8 @@ class Region(object):
                     runtime_info += f"{seconds}"
                 # Clear the timestamp as the task is completed
                 self.timestamp = None
-
-                # Get memory usage in GB
-                _, peak_memory = tracemalloc.get_traced_memory()
-                peak_memory = np.round(peak_memory/10**9,2)
-                tracemalloc.stop()
             else:
                 runtime_info = "in progress" if self.timestamp is not None else "N/A"
-                if tracemalloc.is_tracing():
-                    # Get memory usage in GB
-                    _, peak_memory = tracemalloc.get_traced_memory()
-                    peak_memory = np.round(peak_memory / 10 ** 9, 2)
-                else:
-                    peak_memory = None
 
         # Initialize progress log if it doesn't exist yet
         if not hasattr(self, 'progress_log'):
@@ -673,7 +688,9 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
     >>> # Fits the region with a minimum SNR of 3.0, disables wide recovery, and expands fits for 5 iterations.
     """
 
-    iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+    #iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+    reg.iter_2comp_fit(snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+    reg.log_memory(process_name='iter 1 \& 2 comp fits', peak_memory=reg.log_dict['iter_2comp'])
 
     # assumes the user wants to recover a second component that is fainter than the primary
     recover_snr_min = 3.0
@@ -681,16 +698,29 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
         recover_snr_min = snr_min/3.0
 
     if refit_bad_pix:
-        refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
+        #refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
+        reg.refit_bad_2comp(snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
+        reg.log_memory(process_name='refit_bad_2comp', peak_memory=reg.log_dict['refit_bad_2comp'])
 
     if recover_wide:
-        refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
+        #refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
+        reg.refit_2comp_wide(snr_min=recover_snr_min, multicore=multicore)
+        reg.log_memory(process_name='refit_2comp_wide', peak_memory=reg.log_dict['refit_2comp_wide'])
 
     if refit_marg:
+        '''
         refit_marginal(reg, ncomp=1, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
         refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
+        '''
+        reg.refit_marginal(ncomp=1, lnk_thresh=10, holes_only=False, multicore=multicore,
+                       method='best_neighbour')
+        reg.log_memory(process_name='refit_marginal_1_comp', peak_memory=reg.log_dict['refit_marginal_n_comp'])
+
+        reg.refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=multicore,
+                       method='best_neighbour')
+        reg.log_memory(process_name='refit_marginal_2_comp', peak_memory=reg.log_dict['refit_marginal_n_comp'])
 
     if max_expand_iter != False:
         if max_expand_iter == True:
@@ -702,10 +732,11 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
             # have another pass of quality assurance
             refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
 
-    save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
+    #save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
+    reg.save_best_2comp_fit(multicore=multicore, lnk21_thres=5, lnk10_thres=5)
+    reg.log_memory(process_name='save_best_2comp', peak_memory=reg.log_dict['save_best_2comp'])
 
     return reg
-
 
 
 def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=True,
