@@ -33,6 +33,7 @@ from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
 from .spec_models import meta_model
 from .utils.multicore import validate_n_cores
+from .utils import dask_utils, dask_ops
 from .visualization.spec_viz import Plotter
 from . import PCube
 
@@ -328,6 +329,8 @@ class UltraCube(object):
             if self.pcubes[str(nc)].has_fit.sum() > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
                 mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=kwargs['multicore']) > 0
+                if isinstance(mod_mask, da.Array):
+                    mod_mask.persist()
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -360,7 +363,11 @@ class UltraCube(object):
         if self.master_model_mask is None:
             self.master_model_mask = mask
         else:
+            logger.warning("Using lotical and!")
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
+
+        if isinstance(self.master_model_mask, da.Array):
+            self.master_model_mask = dask_utils.persist_and_clean(self.master_model_mask, debug=True, visualize_filename="include_mod_mask.svg")
 
     def reset_model_mask(self, ncomps, multicore=True):
         #reset and re-generate master_model_mask for all the components in ncomps
@@ -370,6 +377,7 @@ class UltraCube(object):
             if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
+                mod_mask = dask_utils.persist_and_clean(mod_mask, debug=True, visualize_filename="reset_mod_mask.svg")
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -388,6 +396,8 @@ class UltraCube(object):
             if multicore is None: multicore = self.n_cores
             # update model mask
             mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=multicore) > 0
+            if isinstance(mod_mask, da.Array):
+                mod_mask = dask_utils.persist_and_clean(mod_mask, debug=True, visualize_filename="mod_mask_at_load.svg")
             logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
             gc.collect()
             self.include_model_mask(mod_mask)
@@ -1440,9 +1450,15 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
     else:
         mask = ~np.isnan(model)
 
+    if isinstance(mask, da.Array):
+        mask = mask.persist()
+
     if include_nosamp:
         # if there no mask in a given pixel, fill it in with combined spectral mask
-        nsamp_map = np.nansum(mask, axis=0)
+        if isinstance(mask, da.Array):
+            nsamp_map = np.nansum(mask, axis=0).compute()
+        else:
+            nsamp_map = np.nansum(mask, axis=0)
         mm = nsamp_map <= 0
         try:
             max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
@@ -1462,7 +1478,10 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
             mask = da.from_array(mask, chunks=cube._data.chunksize)
 
     # assume flat-baseline model even if no model exists
-    model[np.isnan(model)] = 0
+    if isinstance(model, da.Array):
+        model = da.where(da.isnan(model), 0, model)
+    else:
+        model[np.isnan(model)] = 0
 
     # creating mask over region where the model is non-zero,
     # plus a buffer of size set by the expand keyword.
@@ -1563,6 +1582,9 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
     else:
         mask = ~np.isnan(model)
 
+    if isinstance(mask, da.Array):
+        mask = mask.persist()
+
     residual = get_residual(cube, model)
 
     # creating mask over region where the model is non-zero,
@@ -1584,6 +1606,9 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
     rms = get_rms(residual)
     chisq /= rms ** 2
 
+    if isinstance(chisq, da.Array):
+        chisq = dask_utils.compute()
+
     gc.collect()
 
     if reduced:
@@ -1591,7 +1616,10 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
         return chisq
     else:
         # return the ch-squared values and the number of data points used
-        return chisq, np.nansum(mask, axis=0)
+        if isinstance(mask, da.Array):
+            return chisq, np.nansum(mask, axis=0).compute()
+        else:
+            return chisq, np.nansum(mask, axis=0)
 
 
 def get_masked_moment(cube, model, order=0, expand=10, mask=None):
@@ -1707,7 +1735,10 @@ def expand_mask(mask, expand):
     """
     selem = np.ones(expand,dtype=bool)
     selem.shape += (1,1,)
-    mask = nd.binary_dilation(mask, selem)
+    if isinstance(mask, da.Array):
+        mask = dask_ops.dask_binary_dilation(mask, selem)
+    else:
+        mask = nd.binary_dilation(mask, selem)
     return mask
 
 
@@ -1820,6 +1851,9 @@ def get_residual(cube, model, planemask=None):
             # Apply the mask using da.compress
             residual = da.compress(planemask_flat, residual_flat, axis=1)
 
+    if isinstance(residual, da.Array):
+        residual = dask_utils.persist_and_clean(residual, debug=False, visualize_filename=None)
+
     # Run garbage collection for memory management
     gc.collect()
 
@@ -1842,7 +1876,10 @@ def get_Tpeak(model):
         A 2D array where each element corresponds to the peak value of the model
         cube along the spectral axis for each spatial pixel.
     """
-    return np.nanmax(model, axis=0)
+    if isinstance(model, da.Array):
+        return np.nanmax(model, axis=0).compute()
+    else:
+        return np.nanmax(model, axis=0)
 
 
 def is_K(data_unit):

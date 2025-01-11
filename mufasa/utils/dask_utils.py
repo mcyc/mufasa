@@ -2,6 +2,7 @@ import numpy as np
 import dask.array as da
 from dask import delayed, config
 from dask.distributed import Client
+import gc
 import psutil
 
 #======================================================================================================================#
@@ -9,7 +10,94 @@ from .mufasa_log import get_logger
 logger = get_logger(__name__)
 #======================================================================================================================#
 
+def persist_and_clean(dask_obj, debug=False, visualize_filename=None):
+    """
+    Persist a Dask collection, clean up intermediate variables, and optionally visualize the graph.
+
+    Parameters:
+    - dask_obj: Dask collection (Array, DataFrame, or Bag) to persist
+    - debug: Whether to visualize the graph (default: False)
+    - visualize_filename: File name to save the visualization (optional, defaults to None)
+
+    Returns:
+    - persisted_result: The persisted Dask collection
+    """
+    persisted_result = dask_obj.persist()
+    del dask_obj
+    gc.collect()
+
+    if debug and visualize_filename:
+        persisted_result.visualize(filename=visualize_filename)
+
+    return persisted_result
+
+
 def calculate_chunks(cube_shape, dtype, target_chunk_mem_mb=128):
+    """
+    Calculate chunk sizes for a Dask array based on a regular grid with
+    the lowest aspect ratio (closest to square chunks).
+
+    Parameters
+    ----------
+    cube_shape : tuple
+        The shape of the data cube (spectral_axis, y, x).
+    dtype : numpy.dtype
+        The data type of the cube (e.g., np.float32, np.float64).
+    target_chunk_mem_mb : int, optional
+        Target memory size per chunk in MB. Default is 128 MB.
+
+    Returns
+    -------
+    tuple
+        Chunk sizes for the Dask array in the form (spectral_chunk, y_chunk, x_chunk).
+    """
+    spectral_axis, y_dim, x_dim = cube_shape
+    dtype_size = np.dtype(dtype).itemsize  # Size of one element in bytes
+
+    # Convert target memory from MB to bytes
+    target_chunk_mem_bytes = target_chunk_mem_mb * 1024 * 1024
+
+    # Total memory per pixel across the spectral axis
+    memory_per_pixel = spectral_axis * dtype_size
+
+    # Number of spatial pixels that fit in the target memory
+    spatial_pixels_per_chunk = target_chunk_mem_bytes // memory_per_pixel
+
+    # Initialize best chunk sizes and aspect ratio difference
+    best_y_chunk = y_dim
+    best_x_chunk = x_dim
+    best_aspect_ratio_diff = float("inf")
+
+    # Iterate over possible chunk sizes to find the closest to square
+    for y_chunk in range(1, y_dim + 1):
+        x_chunk = spatial_pixels_per_chunk // y_chunk
+        if x_chunk > x_dim:
+            continue
+
+        # Calculate aspect ratio difference
+        aspect_ratio_diff = abs(y_chunk - x_chunk)
+
+        # Update best chunk sizes if a better aspect ratio is found
+        if aspect_ratio_diff < best_aspect_ratio_diff:
+            best_y_chunk = y_chunk
+            best_x_chunk = x_chunk
+            best_aspect_ratio_diff = aspect_ratio_diff
+
+        # If perfect square chunks are found, stop searching
+        if aspect_ratio_diff == 0:
+            break
+
+    # Use the entire spectral axis in one chunk
+    spectral_chunk = spectral_axis
+
+    # ensure there are close to integer number of chunks in the data
+    n_y, n_x = np.rint(y_dim / best_y_chunk), np.rint(x_dim / best_x_chunk)
+    best_y_chunk, best_x_chunk = np.ceil(y_dim / n_y).astype(int), np.ceil(x_dim / n_x).astype(int)
+
+    return (spectral_chunk, best_y_chunk, best_x_chunk)
+
+
+def calculate_chunks_v0(cube_shape, dtype, target_chunk_mem_mb=128):
     """
     Calculate chunk sizes for a Dask array based on the given criteria.
 
@@ -152,8 +240,7 @@ def compute_global_offsets(chunks, chunk_location):
     return tuple(offsets)
 
 
-def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='threads', inplace=False, debug=False,
-                                 use_global_xy=True):
+def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='threads', use_global_xy=True):
     """
     Optimized function to compute valid pixels in a Dask array by processing only relevant chunks.
 
@@ -167,8 +254,6 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
         Function to compute spectral values for a given pixel (x, y).
     scheduler : {'threads', 'processes', 'synchronous'}, optional
         Scheduler to use for computation. Default is 'threads'.
-    inplace : bool, optional
-        If True, modifies chunks in place. Defaults to False for safer copying.
     debug : bool, optional
         If True, enables debugging messages and visualizations.
     use_global_xy : bool, optional
@@ -180,9 +265,6 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
     dask.array.Array
         Dask array with updated values for valid pixels.
     """
-
-    logger.info(f"debug {debug}")
-
     # Ensure `isvalid` is a Dask array with proper chunks
     _, y_chunks, x_chunks = host_cube.chunks
     if not isinstance(isvalid, da.Array):
@@ -190,20 +272,8 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
     elif isvalid.chunks != (y_chunks, x_chunks):
         isvalid = isvalid.rechunk((y_chunks, x_chunks))
 
-    logger.info(f"host_cube chunks: {host_cube.chunks}")
-    logger.info(f"isvalid chunks: {isvalid.chunks}")
-
-    # Identify relevant chunks
-    chunk_relevant = isvalid.map_blocks(lambda block: block.any(), dtype=bool)
-
-    def update_chunk_with_relevance(chunk, isvalid_chunk, relevance, block_info=None):
+    def update_chunk(chunk, isvalid_chunk, block_info=None):
         # Skip processing if this chunk is not relevant
-        if not relevance:
-            return chunk
-
-        logger.debug(f"block_info keys: {block_info[0].keys()}")
-        logger.debug(f"block_info: {block_info}")
-        logger.debug(f"chunk_location: {block_info[0]['chunk-location']}")
 
         # Find valid pixel indices in this chunk
         valid_pixel_indices = np.argwhere(isvalid_chunk)
@@ -216,37 +286,26 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
 
         logger.info(f"offsets: {(chunk_offset_y, chunk_offset_x)} for chunk at :{block_info[0]['chunk-location']}")
 
-        if inplace:
-            chunk.flags.writeable = True
-            for local_y, local_x in valid_pixel_indices:
-                global_y, global_x = (local_y + chunk_offset_y, local_x + chunk_offset_x) if use_global_xy else (local_y, local_x)
-                chunk[:, local_y, local_x] = compute_pixel(global_x, global_y)
-            return chunk
-        else:
-            chunk_copy = np.copy(chunk)
-            for local_y, local_x in valid_pixel_indices:
-                global_y, global_x = (local_y + chunk_offset_y, local_x + chunk_offset_x) if use_global_xy else (local_y, local_x)
-                chunk_copy[:, local_y, local_x] = compute_pixel(global_x, global_y)
-            return chunk_copy
+        chunk_copy = np.copy(chunk)
+        for local_y, local_x in valid_pixel_indices:
+            global_y, global_x = (local_y + chunk_offset_y, local_x + chunk_offset_x) if use_global_xy else (local_y, local_x)
+            chunk_copy[:, local_y, local_x] = compute_pixel(global_x, global_y)
+        return chunk_copy
 
     # Apply the function using map_blocks
     with config.set(scheduler=scheduler):
         logger.info(f"Scheduler: {scheduler}")
         result = da.map_blocks(
-            update_chunk_with_relevance,
+            update_chunk,
             host_cube,
             isvalid,
-            chunk_relevant,
             dtype=host_cube.dtype,
         )
-        if debug:
-            result.visualize(filename='compute_before.svg')
-        persisted_result = result.persist()
-        del result
-        gc.collect()
-        if debug:
-            persisted_result.visualize(filename='compute_after.svg')
-        return persisted_result
+        return persist_and_clean(result, debug=False, visualize_filename=None)
+        #persisted_result = result.persist
+        #del result
+        #gc.collect()
+        #return persisted_result
 
 
 def compute_chunk_relevant(isvalid):
@@ -288,7 +347,7 @@ def custom_task_graph(host_cube, isvalid, compute_pixel, inplace=False, debug=Fa
 
     # Compute chunk relevance
     try:
-        chunk_relevant = compute_chunk_relevant_vg(isvalid)
+        chunk_relevant = compute_chunk_relevant(isvalid)
     except Exception as e:
         raise RuntimeError(f"Error computing chunk relevance: {e}")
 

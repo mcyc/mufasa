@@ -2,7 +2,7 @@ import numpy as np
 import dask.array as da
 from pyspeckit.cubes.SpectralCube import Cube
 
-from .utils import dask_utils, memory
+from .utils import dask_utils
 
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
@@ -19,7 +19,7 @@ class PCube(Cube):
     and computational efficiency.
     """
 
-    def get_modelcube(self, update=False, multicore=1, mask=None, target_memory_mb=None,
+    def get_modelcube(self, update=False, multicore=True, mask=None, target_memory_mb=16,
                       scheduler='threads'):
         """
         Generate or update the model cube using Dask for parallel and memory-efficient processing.
@@ -85,6 +85,11 @@ class PCube(Cube):
         if self._modelcube is not None and not update:
             return self._modelcube
 
+        if multicore is False:
+            multicore = 1
+        elif isinstance(multicore, int) and multicore > 0:
+            multicore = True
+
         nanvals = ~np.all(np.isfinite(self.parcube), axis=0)
         isvalid = np.any(self.parcube, axis=0) & ~nanvals
 
@@ -97,13 +102,12 @@ class PCube(Cube):
             logger.warning("No valid pixels to update the model.")
             return self._modelcube
 
-        if multicore > n_pix:
-            # ensure we're not requesting more cores than pixels
-            multicore = n_pix
-
         if self._modelcube is None:
             # Calculate chunks
-            chunks = dask_utils.calculate_chunks(cube_shape=self.cube.shape, dtype=self.cube.dtype, target_chunk_mem_mb=64) #128
+            chunks = dask_utils.calculate_chunks(cube_shape=self.cube.shape, dtype=self.cube.dtype,
+                                                 target_chunk_mem_mb=target_memory_mb) #128
+
+            print(f"chunks: {chunks}")
             # initializing modelcube
             self._modelcube = da.full(shape=self.cube.shape, fill_value=np.nan, dtype=self.cube.dtype,
                                 chunks=chunks)
@@ -112,15 +116,14 @@ class PCube(Cube):
             """Compute the model spectrum for a single pixel."""
             return self.specfit.get_full_model(pars=self.parcube[:, y, x])
 
-        if multicore == 1:
+        if not multicore:
             # Sequential computation
             logger.info("Running in single-core mode.")
             self._modelcube = dask_utils.lazy_pix_compute_single(self._modelcube, isvalid, compute_pixel)
 
         else:
             logger.info("Running in threaded mode.")
-            self._modelcube = dask_utils.lazy_pix_compute_no_batching(self._modelcube, isvalid,
-                                                                      compute_pixel, inplace=True, debug=False)
+            self._modelcube = dask_utils.lazy_pix_compute_no_batching(self._modelcube, isvalid, compute_pixel)
 
             #self._modelcube = dask_utils.custom_task_graph_vg(self._modelcube, isvalid, compute_pixel,
             #                                               inplace=False, debug=True)
