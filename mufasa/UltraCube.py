@@ -1495,8 +1495,12 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
     else:
         residual = get_residual(cube, model, planemask=planemask)
-        mask_temp = mask
-        mask = mask[:, planemask]
+        if isinstance(mask, da.Array):
+            planemask_dask = da.from_array(planemask, chunks=(mask.chunks[1], mask.chunks[2]))
+            # Apply boolean masking
+            mask = dask_utils.persist_and_clean(mask & planemask_dask)
+        else:
+            mask = mask[:, planemask]
 
     # Ensure shapes are compatible
     if mask.shape != residual.shape:
