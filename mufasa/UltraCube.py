@@ -1494,18 +1494,28 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         residual = get_residual(cube, model)
         residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
     else:
+        # Get residual with planemask applied
         residual = get_residual(cube, model, planemask=planemask)
+
+        # Handle mask based on its type
         if isinstance(mask, da.Array):
+            # Convert planemask to a Dask array for compatibility
             planemask_dask = da.from_array(planemask, chunks=(mask.chunks[1], mask.chunks[2]))
-            # Apply boolean masking
-            mask = dask_utils.persist_and_clean(mask & planemask_dask)
+            # Reduce mask along the spatial dimensions using the planemask
+            mask = mask[:, planemask_dask]
         else:
+            # Reduce mask using NumPy's boolean indexing
             mask = mask[:, planemask]
 
-    # Ensure shapes are compatible
-    if mask.shape != residual.shape:
-        mask = da.broadcast_to(mask, residual.shape) if isinstance(mask, da.Array) else np.broadcast_to(mask,
-                                                                                                        residual.shape)
+        # Check for shape mismatch
+        if mask.shape != residual.shape:
+            msg = (
+                f"mask with shape {mask.shape} does not match the residual shape {residual.shape}. "
+                f"This shouldn't happen; there may be a bug in the code."
+            )
+            logger.error(msg)  # Use logger.error for unexpected critical issues
+            raise ValueError(msg)
+
     # Use da.where for masking instead of residual * mask
     masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
 
