@@ -62,7 +62,7 @@ class Region(object):
     """
 
     def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, initialize_logging=True,
-                 multicore=True, **kwargs):
+                 multicore=True, new_progress_log=False, **kwargs):
         """Initialize the Region object for spectral cube analysis.
 
         Parameters
@@ -82,6 +82,8 @@ class Region(object):
         multicore : bool or int, optional
             Number of CPU cores to use for parallel processing. Defaults to True, which uses all available CPUs minus 1.
             If an integer is provided, it specifies the number of cores to use.
+        new_progress_log : bool optional
+            If True, start an new csv log and write over the old one if it exists
         **kwargs : dict, optional
             Additional keyword arguments for logging initialization.
 
@@ -98,11 +100,9 @@ class Region(object):
         self.cubePath = cubePath
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
-        self.log_dict = dict(master_2comp={}, iter_2comp={}, refit_bad_2comp={}, refit_2comp_wide={},
-                             standard_2comp={}, refit_marginal_1_comp={}, refit_marginal_2_comp={},
-                             save_best_2comp={})
 
-        self.log_memory(process_name, peak_memory)
+        # a dictory to store memory monitoring
+        self.memory_log = {}
 
         if fittype is None:
             fittype = 'nh3_multi_v'
@@ -119,15 +119,14 @@ class Region(object):
         self.progress_log_name = "{}/{}_progress_log.csv".format(self.ucube.paraDir, self.ucube.paraNameRoot)
 
         self.timestemp = None
-        try:
-            from pandas import read_csv
-            self.progress_log = read_csv(self.progress_log_name)
-            # could use a checking mechanism to ensure the logfile is the right format
-        except FileNotFoundError:
-            columns = ['process', 'last completed', 'attempted fits (pix)', 'successful fits (pix)',
-                       'total runtime (dd:hh:mm:ss)', 'cores used', 'peak memory (GB)']
-            self.progress_log = pd.DataFrame(columns=columns)
 
+        if not new_progress_log:
+            try:
+                from pandas import read_csv
+                self.progress_log = read_csv(self.progress_log_name)
+                # could use a checking mechanism to ensure the logfile is the right format
+            except FileNotFoundError:
+                logger.warning("no previous progress log found, new one will be created")
 
     def get_convolved_cube(self, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None,
                            multicore=True):
@@ -260,34 +259,27 @@ class Region(object):
         """
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
-    @monitor_peak_memory(self.log_dict['iter_2comp'])
+    @monitor_peak_memory(output_attr='memory_log', key='iter_2comp')
     def iter_2comp_fit(self, **kwargs):
-        iter_2comp_fit(self, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+        iter_2comp_fit(self, **kwargs)
 
-    @monitor_peak_memory(self.log_dict['refit_bad_2comp'])
+    @monitor_peak_memory(output_attr='memory_log', key='refit_bad_2comp')
     def refit_bad_2comp(self, **kwargs):
-        refit_bad_2comp(reg, **kwargs)
+        refit_bad_2comp(self, **kwargs)
 
-    @monitor_peak_memory(self.log_dict['refit_2comp_wide'])
+    @monitor_peak_memory(output_attr='memory_log', key='refit_2comp_wide')
     def refit_2comp_wide(self, **kwargs):
         refit_2comp_wide(self, **kwargs)
 
-    @monitor_peak_memory(self.log_dict['refit_marginal_n_comp'])
+    @monitor_peak_memory(output_attr='memory_log', key='refit_marginal_nc')
     def refit_marginal(self, **kwargs):
         refit_marginal(self, **kwargs)
 
-
-    @monitor_peak_memory(self.log_dict['refit_marginal_n_comp'])
-    def refit_marginal(self, **kwargs):
-        refit_marginal(self, **kwargs)
-
-
-    @monitor_peak_memory(self.log_dict['save_best_2comp'])
+    @monitor_peak_memory(output_attr='memory_log', key='save_best_2comp')
     def save_best_2comp_fit(self, **kwargs):
         save_best_2comp_fit(self, **kwargs)
 
-
-    @monitor_peak_memory(self.log_dict['standard_2comp'])
+    @monitor_peak_memory(output_attr='memory_log', key='standard_2comp_fit')
     def standard_2comp_fit(self, planemask=None):
         """Perform a two-component fit on the spectral cube using default moment-based guesses.
 
@@ -371,7 +363,7 @@ class Region(object):
 
 
     def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds', n_attempted=None,
-                     n_success=None, finished=False, cores=None):
+                     n_success=None, finished=False, cores=None, peak_memory=None):
         """Log the progress of a process, including start/completion times, and
         attempt/success counts.
 
@@ -393,6 +385,8 @@ class Region(object):
             If True, marks the process as completed and calculates total runtime. Defaults to False.
         cores : int, optional
             Number of cores used for the process. Defaults to None.
+        peak_memory : float
+            The peak memory usage of a process in GB
 
         Returns
         -------
@@ -484,18 +478,28 @@ class Region(object):
                 self.progress_log = self.progress_log.append(info, ignore_index=True)
 
         if save:
-            # Reorder the rows by 'last completed' in chronological order
-            self.progress_log = self.progress_log.sort_values(by='last completed', ascending=True)
-            # Write the log as a CSV file
-            self.progress_log.to_csv(self.progress_log_name, index=False)
+            self.save_log_csv()
 
-    def log_memory(self, process_name, peak_memory):
+    def log_memory(self, process_name, peak_memory, save=True, timespec='seconds'):
+        # enter the peak memory usage into the progress log
         if process_name in self.progress_log['process'].values:
             mask = self.progress_log['process'] == process_name
             # Update the memory of the entry
-            self.progress_log.loc[mask, 'peak memory (GB)'] = peak_memory
+            self.progress_log.loc[mask, 'peak memory (GB)'] = np.round(peak_memory, 1)
         else:
+            # create a new entry if no matching entry exists
             logger.warning(f'process_name {process_name} does not exist; no memory logged.')
+            time_info = datetime.now().isoformat(timespec=timespec)
+            new_row = {'process':process_name, 'peak memory (GB)':peak_memory, 'last completed':time_info}
+            self.progress_log = pd.concat([self.progress_log, pd.DataFrame([new_row])], ignore_index=True)
+        if save:
+            self.save_log_csv()
+
+    def save_log_csv(self):
+        # Reorder the rows by 'last completed' in chronological order
+        self.progress_log = self.progress_log.sort_values(by='last completed', ascending=True)
+        # Write the log as a CSV file
+        self.progress_log.to_csv(self.progress_log_name, index=False)
 
 
 # =======================================================================================================================
@@ -690,7 +694,7 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
 
     #iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
     reg.iter_2comp_fit(snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
-    reg.log_memory(process_name='iter 1 \& 2 comp fits', peak_memory=reg.log_dict['iter_2comp'])
+    reg.log_memory(process_name='iter fits all', peak_memory=reg.memory_log['iter_2comp'])
 
     # assumes the user wants to recover a second component that is fainter than the primary
     recover_snr_min = 3.0
@@ -700,12 +704,12 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
     if refit_bad_pix:
         #refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
         reg.refit_bad_2comp(snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
-        reg.log_memory(process_name='refit_bad_2comp', peak_memory=reg.log_dict['refit_bad_2comp'])
+        reg.log_memory(process_name='refit_bad_2comp', peak_memory=reg.memory_log['refit_bad_2comp'])
 
     if recover_wide:
         #refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
         reg.refit_2comp_wide(snr_min=recover_snr_min, multicore=multicore)
-        reg.log_memory(process_name='refit_2comp_wide', peak_memory=reg.log_dict['refit_2comp_wide'])
+        reg.log_memory(process_name='refit_2comp_wide', peak_memory=reg.memory_log['refit_2comp_wide'])
 
     if refit_marg:
         '''
@@ -716,11 +720,11 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
         '''
         reg.refit_marginal(ncomp=1, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
-        reg.log_memory(process_name='refit_marginal_1_comp', peak_memory=reg.log_dict['refit_marginal_n_comp'])
+        reg.log_memory(process_name='refit_marginal_1_comp', peak_memory=reg.memory_log['refit_marginal_nc'])
 
-        reg.refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=multicore,
+        reg.refit_marginal(ncomp=2, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
-        reg.log_memory(process_name='refit_marginal_2_comp', peak_memory=reg.log_dict['refit_marginal_n_comp'])
+        reg.log_memory(process_name='refit_marginal_2_comp', peak_memory=reg.memory_log['refit_marginal_nc'])
 
     if max_expand_iter != False:
         if max_expand_iter == True:
@@ -734,7 +738,7 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
 
     #save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
     reg.save_best_2comp_fit(multicore=multicore, lnk21_thres=5, lnk10_thres=5)
-    reg.log_memory(process_name='save_best_2comp', peak_memory=reg.log_dict['save_best_2comp'])
+    reg.log_memory(process_name='save_best_2comp', peak_memory=reg.memory_log['save_best_2comp'])
 
     return reg
 

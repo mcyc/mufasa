@@ -4,7 +4,84 @@ import threading
 import functools
 import time
 
-def monitor_peak_memory(output_container=None):
+from .mufasa_log import get_logger
+logger = get_logger(__name__)
+
+def monitor_peak_memory(output_attr=None, key=None, unit='GB'):
+    """
+    Decorator to monitor and display the peak memory usage of a function,
+    including intermediate peaks, and handle multi-threaded tasks.
+
+    Args:
+        output_attr (str, optional): The name of the instance attribute where
+            peak memory usage will be stored. If None, memory usage is printed.
+        key (str, optional): A key to store the memory usage in a dictionary
+            attribute specified by `output_attr`. If `output_attr` is a string
+            and `key` is provided, the attribute is treated as a dictionary.
+    """
+    ipw = 3
+    if unit == 'KB':
+        ipw = 1
+    elif unit == 'MB':
+        ipw = 2
+    elif unit == 'TB':
+        ipw = 4
+    elif unit != 'GB':
+        logger.warning(f"unit {unit} is not reconized, defaulting to GB")
+        unit = 'GB'
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            process = psutil.Process(os.getpid())
+            peak_memory = [0]  # Use a list to allow modification within the thread
+            # determine unit conversion
+            def monitor():
+                """Continuously monitor memory usage and record the peak."""
+                while monitoring[0]:
+                    try:
+                        current_memory = process.memory_info().rss / (1024 ** ipw)  # Memory in MB
+                        peak_memory[0] = max(peak_memory[0], current_memory)
+                        time.sleep(0.1)  # Sample every 100ms
+                    except psutil.NoSuchProcess:
+                        break
+
+            # Start monitoring in a separate thread
+            monitoring = [True]
+            monitor_thread = threading.Thread(target=monitor)
+            monitor_thread.start()
+
+            try:
+                # Execute the function
+                result = func(self, *args, **kwargs)
+            finally:
+                # Stop monitoring and wait for the thread to finish
+                monitoring[0] = False
+                monitor_thread.join()
+
+            # Store peak memory in the specified attribute or print it
+            if output_attr is not None:
+                if not hasattr(self, output_attr):
+                    setattr(self, output_attr, {} if key else None)
+                attr_value = getattr(self, output_attr)
+
+                if isinstance(attr_value, dict) and key is not None:
+                    attr_value[key] = peak_memory[0]
+                elif key is None:
+                    setattr(self, output_attr, peak_memory[0])
+                else:
+                    raise ValueError(f"{output_attr} must be a dictionary when key is specified.")
+            else:
+                print(f"Peak memory usage for '{func.__name__}': {peak_memory[0]:.2f} {unit}")
+
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def peak_memory(output_container=None):
     """
     Decorator to monitor and display the peak memory usage of a function,
     including intermediate peaks, and handle multi-threaded tasks.
