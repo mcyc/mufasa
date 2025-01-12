@@ -688,8 +688,6 @@ def lazy_pix_compute(host_cube, isvalid, compute_pixel, batch_size=100, n_worker
                 heartbeat_interval="30s",
                 dashboard_address=":8787"  # Set this to enable the dashboard
             )
-            logger.debug("Dask client initialized.")
-            logger.debug(f"Dask dashboard available at {client.dashboard_link}")
 
             # Batch processing
             for batch in pixel_batches:

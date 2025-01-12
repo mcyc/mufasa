@@ -1843,16 +1843,14 @@ def get_residual(cube, model, planemask=None):
         else:
             # Handle NumPy or mixed array cases
             logger.debug(f"==== computing mixed masked residual ====")
-            logger.debug(f"model type:{type(model)}; mask type:{type(mask)}")
-            logger.debug(f"model shape:{type(model.shape)}; mask shape:{type(mask.shape)}")
+            logger.debug(f"model type:{type(model)}; data type:{type(data)}")
+            logger.debug(f"model shape:{type(model.shape)}; data shape:{type(data.shape)}")
 
             if isinstance(model, da.Array):
                 model = dask_ops.apply_planemask(model, planemask, persist=False)
 
             if isinstance(mask, da.Array):
-                mask = dask_ops.apply_planemask(mask, planemask, persist=False)
-
-            residual = (data - model).compute()
+                data = dask_ops.apply_planemask(data, planemask, persist=False)
             #planemask_broadcast = da.broadcast_to(planemask, data.shape[1:])
             #data_masked = da.where(planemask_broadcast, data, 0)
             #model_masked = da.where(planemask_broadcast, model, 0)
@@ -1867,6 +1865,7 @@ def get_residual(cube, model, planemask=None):
 
     if isinstance(residual, da.Array):
         residual = dask_utils.persist_and_clean(residual, debug=False, visualize_filename=None)
+        residual = (data - model).compute()
 
     # Run garbage collection for memory management
     gc.collect()
