@@ -1450,7 +1450,11 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         mask = ~np.isnan(model)
 
     if isinstance(mask, da.Array):
-        mask = mask.persist()
+        #planemask = planemask.persist()
+        mask = dask_utils.persist_and_clean(mask)
+        # have the planemask being ndarray just to be safe
+        mask = mask.compute()
+        gc.collect()
 
     if include_nosamp:
         # if there no mask in a given pixel, fill it in with combined spectral mask
@@ -1489,7 +1493,7 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
 
     if planemask is None:
         residual = get_residual(cube, model)
-        residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
+        #residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
     else:
         # Get residual with planemask applied
         residual = get_residual(cube, model, planemask=planemask)
@@ -1513,14 +1517,14 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
     masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
 
     # Calculate RSS
-    rss = da.nansum(masked_residual ** 2, axis=0) if isinstance(masked_residual, da.Array) else np.nansum(
+    rss = da.nansum(masked_residual ** 2, axis=0).compute() if isinstance(masked_residual, da.Array) else np.nansum(
         masked_residual ** 2, axis=0)
     rss = da.where(rss == 0, np.nan, rss) if isinstance(rss, da.Array) else np.where(rss == 0, np.nan, rss)
 
     returns = (rss.compute() if isinstance(rss, da.Array) else rss,)
 
     if return_size:
-        nsamp = da.nansum(mask, axis=0) if isinstance(mask, da.Array) else np.nansum(mask, axis=0)
+        nsamp = da.nansum(mask, axis=0).compute() if isinstance(mask, da.Array) else np.nansum(mask, axis=0)
         nsamp = nsamp.astype(np.float64)
         nsamp[np.isnan(rss)] = np.nan
         returns += (nsamp.compute() if isinstance(nsamp, da.Array) else nsamp,)

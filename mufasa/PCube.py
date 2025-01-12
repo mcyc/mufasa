@@ -1,8 +1,10 @@
 import numpy as np
 import dask.array as da
 from pyspeckit.cubes.SpectralCube import Cube
+from copy import deepcopy
 
 from .utils import dask_utils
+from .utils.multicore import validate_n_cores
 
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
@@ -90,8 +92,9 @@ class PCube(Cube):
         elif isinstance(multicore, int) and multicore > 0:
             multicore = True
 
-        nanvals = ~np.all(np.isfinite(self.parcube), axis=0)
-        isvalid = np.any(self.parcube, axis=0) & ~nanvals
+        # update the has fit just in case there were changes
+        isfinite = np.all(np.isfinite(self.parcube), axis=0)
+        isvalid = isfinite & self._has_fit(get=True)
 
         if mask is not None:
             isvalid &= mask
@@ -127,3 +130,68 @@ class PCube(Cube):
                                                            use_global_xy=True, scheduler=scheduler)
 
         return self._modelcube
+
+
+    def _has_fit(self, get=False):
+        if np.any(np.all(self.parcube == 0, axis=(1, 2))):
+            # there are some slices where all parameters are zero, we should
+            # ignore this when establishing whether there's a fit (some
+            # parameters, like fortho, can be locked to zero)
+            self.has_fit = np.all((np.isfinite(self.parcube)), axis=0)
+        else:
+            self.has_fit = np.all((self.parcube != 0) &
+                                  (np.isfinite(self.parcube)), axis=0)
+
+        if get:
+            return self.has_fit
+
+    def replace_para_n_mod(self, pcube_ref, planemask, multicore=None):
+        """
+        Replace parameter values in a parameter cube with those from a reference cube for specific pixels and update
+        its model accordingly.
+
+        This function updates the `parcube`, `errcube`, and `has_fit` attributes of the input `pcube` based on a mask,
+        using the corresponding values from the reference cube (`pcube_ref`).
+
+        Parameters
+        ----------
+        self : mufasa.PCube.PCube
+            The parameter cube to be updated. This cube contains the current fitted parameters and their errors.
+        pcube_ref : pyspeckit.cube
+            The reference parameter cube containing the values to replace in `pcube`.
+        planemask : numpy.ndarray
+            A boolean 2D array indicating the spatial pixels to update. Pixels with `True` in the mask will be updated.
+        multicore : int or None, optional
+            Number of cores to use for parallel computation. Defaults to None, in which case a single core is used.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        - Updates the following attributes of `pcube`:
+          - `parcube` (fitted parameters)
+          - `errcube` (parameter errors)
+          - `has_fit` (boolean map indicating successful fits)
+        - Also updates the `_modelcube` attribute of `pcube` with the corresponding model values from `pcube_ref`.
+        - If `multicore` is specified, it controls the parallelism when computing the model cube from `pcube_ref`.
+
+        Examples
+        --------
+        >>> replace_para_n_mod(self, pcube_ref, planemask, multicore=4)
+        >>> # Updates `pcube` with values from `pcube_ref` for pixels specified by `mask`.
+        """
+        # Replace values in masked pixels with the reference values
+        self.parcube[:, planemask] = deepcopy(pcube_ref.parcube[:, planemask])
+        self.errcube[:, planemask] = deepcopy(pcube_ref.errcube[:, planemask])
+
+        # Update has_fit
+        if isinstance(self, PCube):
+            self._has_fit(get=False)
+        else:
+            self.has_fit[planemask] = deepcopy(pcube_ref.has_fit[planemask])
+
+        # Validate the number of cores and update the model cube
+        multicore = validate_n_cores(multicore)
+        _ = self.get_modelcube(update=True, multicore=multicore, mask=planemask)

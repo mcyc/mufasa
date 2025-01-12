@@ -33,6 +33,7 @@ except ImportError:
     pass
 
 from . import UltraCube as UCube
+from .PCube import PCube
 from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
@@ -456,7 +457,7 @@ class Region(object):
             if n_success is not None:
                 self.progress_log.loc[mask, 'successful fits (pix)'] = n_success
             if peak_memory is not None:
-                self.progress_log.loc[mask, 'peak memory (GB)'] = peak_memory
+                self.progress_log.loc[mask, 'peak memory (GB)'] = np.round(peak_memory, 1)
         else:
             # Add a new entry otherwise
             # Fill the additional columns with default values (e.g., "None" for unspecified fields)
@@ -1036,7 +1037,10 @@ def refit_swap_2comp(reg, snr_min=3):
     # adopt the better fit parameters into the final map
     good_mask = lnk_NvsO > 0
     # replace the values
-    replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+    if isinstance(reg.ucube.pcubes['2'], PCube):
+        reg.ucube.pcubes['2'].replace_para_n_mod(ucube_new.pcubes['2'], good_mask)
+    else:
+        replace_para_n_mod(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
     # re-fit and save the updated model
     save_updated_paramaps(reg.ucube, ncomps=[2, 1])
@@ -1518,7 +1522,10 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=
 
         logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
         # replace the values
-        replace_para(ucube.pcubes[str(ncomp)], ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
+        if isinstance(ucube.pcubes[str(ncomp)], PCube):
+            ucube.pcubes[str(ncomp)].replace_para_n_mod(ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
+        else:
+            replace_para_n_mod(ucube.pcubes[str(ncomp)], ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
         replace_rss(ucube, ucube_new, ncomp=ncomp, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
@@ -2537,12 +2544,21 @@ def get_best_2comp_model(reg):
 
     return modbest
 
+def replace_para(pcube, pcube_ref, mask, **kwargs):
+    """
+    Replace parameter values in a parameter cube using a reference cube for specific pixels (Deprecated).
 
-def replace_para(pcube, pcube_ref, mask, multicore=None):
-    """Replace parameter values in a parameter cube with those from a reference
-    cube for specific pixels.
+    .. deprecated:: 1.0
+        This function will be removed in a future release. Use `replace_para_n_mod` instead.
+    """
+    return replace_para_n_mod(pcube, pcube_ref, mask, **kwargs)
 
-    This function updates the `parcube`, `errcube`, and `has_fit` attributes of the input `pcube` based on a mask,
+
+def replace_para_n_mod(pcube, pcube_ref, mask, multicore=None):
+    """
+    Replace parameter values in a parameter cube with those from a reference cube for specific pixels and update its model accordingly.
+
+    This function updates the `parcube`, `errcube`, and `has_fit` attributes of the input `self` based on a planemask,
     using the corresponding values from the reference cube (`pcube_ref`).
 
     Parameters
@@ -2552,7 +2568,7 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     pcube_ref : pyspeckit.cube.ParCube
         The reference parameter cube containing the values to replace in `pcube`.
     mask : numpy.ndarray
-        A boolean 2D array indicating the spatial pixels to update. Pixels with `True` in the mask will be updated.
+        A boolean 2D array indicating the spatial pixels to update. Pixels with `True` in the planemask will be updated.
     multicore : int or None, optional
         Number of cores to use for parallel computation. Defaults to None, in which case a single core is used.
 
@@ -2562,34 +2578,31 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
 
     Notes
     -----
-    - Updates the following attributes of `pcube`:
+    - Updates the following attributes of `self`:
       - `parcube` (fitted parameters)
       - `errcube` (parameter errors)
       - `has_fit` (boolean map indicating successful fits)
-    - Also updates the `_modelcube` attribute of `pcube` with the corresponding model values from `pcube_ref`.
+    - Also updates the `_modelcube` attribute of `self` with the corresponding model values from `pcube_ref`.
     - If `multicore` is specified, it controls the parallelism when computing the model cube from `pcube_ref`.
 
     Examples
     --------
-    >>> replace_para(pcube, pcube_ref, mask, multicore=4)
-    >>> # Updates `pcube` with values from `pcube_ref` for pixels specified by `mask`.
+    >>> replace_para_n_mod(self, pcube_ref, planemask, multicore=4)
+    >>> # Updates `self` with values from `pcube_ref` for pixels specified by `planemask`.
     """
-    # replace values in masked pixels with the reference values
+    # Replace values in masked pixels with the reference values
     pcube.parcube[:, mask] = deepcopy(pcube_ref.parcube[:, mask])
     pcube.errcube[:, mask] = deepcopy(pcube_ref.errcube[:, mask])
-    pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
 
+    # Update has_fit
+    if isinstance(pcube, PCube):
+        pcube._has_fit(get=False)
+    else:
+        pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
+
+    # Validate the number of cores and update the model cube
     multicore = validate_n_cores(multicore)
-    # calling get_modelcube should update it's internal model accordingly
-    _ = pcube_ref.get_modelcube(update=True, multicore=multicore, mask=mask)
-
-    '''
-    # Convert `pcube._modelcube` to a numpy array if it is currently a dask array
-    if isinstance(pcube._modelcube, da.Array):
-        pcube._modelcube = pcube._modelcube.compute()  # Load the full array into memory
-
-    pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
-    '''
+    _ = pcube.get_modelcube(update=True, multicore=multicore, mask=mask)
 
 
 def get_skyheader(cube_header):
