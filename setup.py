@@ -51,7 +51,7 @@ if __name__ == "__main__":
                 "sphinx-rtd-theme>=1.0,<2.0",
                 "sphinx-autodoc-typehints",
                 "nbsphinx",
-                "sphinx-astropy", #>=1.8
+                "sphinx-astropy>=1.8",
                 "sphinx-copybutton>=0.5.0",
                 "pydata-sphinx-theme>=0.13.0",
                 "numpydoc>=1.1.0,<2.0",
