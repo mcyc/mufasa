@@ -1849,7 +1849,7 @@ def get_residual(cube, model, planemask=None):
             if isinstance(model, da.Array):
                 model = dask_ops.apply_planemask(model, planemask, persist=False)
 
-            if isinstance(mask, da.Array):
+            if isinstance(data, da.Array):
                 data = dask_ops.apply_planemask(data, planemask, persist=False)
 
             residual = (data - model)
