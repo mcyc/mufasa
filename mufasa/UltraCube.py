@@ -1832,6 +1832,33 @@ def get_residual(cube, model, planemask=None):
     if planemask is None:
         residual = data - model
     else:
+        # only operate on the masked pixels
+        logger.debug(f"==== computing 2D-masked residual ====")
+        logger.debug(f"model type:{type(model)}; data type:{type(data)}")
+        logger.debug(f"model shape:{type(model.shape)}; data shape:{type(data.shape)}")
+        # mask model
+        if isinstance(model, da.Array):
+            model_masked = dask_ops.apply_planemask(model, planemask, persist=False)
+        elif isinstance(model, np.ndarray):
+            model_masked = model[:, model]
+        else:
+            msg = (f"The model type is {type(model)}. This shouldn't happen; there may be a bug in the code.")
+            logger.error(msg)  # Use logger.error for unexpected critical issues
+            raise TypeError(msg)
+
+        # mask data
+        if isinstance(data, da.Array):
+            data_masked = dask_ops.apply_planemask(data, planemask, persist=False)
+        elif isinstance(data, np.ndarray):
+            data_masked = data[:, planemask]
+        else:
+            msg = (f"The data type is {type(data)}. This shouldn't happen; there may be a bug in the code.")
+            logger.error(msg)  # Use logger.error for unexpected critical issues
+            raise TypeError(msg)
+
+        residual = data_masked - model_masked
+
+        '''
         if isinstance(model, da.Array) and isinstance(data, da.Array):
             data_masked = dask_ops.apply_planemask(data, planemask, persist=False)
             model_masked = dask_ops.apply_planemask(model, planemask, persist=False)
@@ -1851,8 +1878,10 @@ def get_residual(cube, model, planemask=None):
 
             if isinstance(data, da.Array):
                 data = dask_ops.apply_planemask(data, planemask, persist=False)
-
+                
             residual = (data - model)
+        
+            
             #planemask_broadcast = da.broadcast_to(planemask, data.shape[1:])
             #data_masked = da.where(planemask_broadcast, data, 0)
             #model_masked = da.where(planemask_broadcast, model, 0)
@@ -1864,14 +1893,14 @@ def get_residual(cube, model, planemask=None):
 
             # Apply the mask using da.compress
             #residual = da.compress(planemask_flat, residual_flat, axis=1)
+        '''
 
-    if isinstance(residual, da.Array):
+    if isinstance(residual, da.Array): # may be redundant, but better safe than sorry
         residual = dask_utils.persist_and_clean(residual, debug=False, visualize_filename=None)
         residual.compute()
 
     # Run garbage collection for memory management
     gc.collect()
-
     return residual
 
 
