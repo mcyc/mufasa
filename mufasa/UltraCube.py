@@ -363,7 +363,7 @@ class UltraCube(object):
         if self.master_model_mask is None:
             self.master_model_mask = mask
         else:
-            logger.warning("Using lotical and!")
+            logger.debug("Using logical_or() to join masks")
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
 
         if isinstance(self.master_model_mask, da.Array):
@@ -1851,6 +1851,8 @@ def get_residual(cube, model, planemask=None):
 
             if isinstance(mask, da.Array):
                 data = dask_ops.apply_planemask(data, planemask, persist=False)
+
+            residual = (data - model)
             #planemask_broadcast = da.broadcast_to(planemask, data.shape[1:])
             #data_masked = da.where(planemask_broadcast, data, 0)
             #model_masked = da.where(planemask_broadcast, model, 0)
@@ -1865,7 +1867,7 @@ def get_residual(cube, model, planemask=None):
 
     if isinstance(residual, da.Array):
         residual = dask_utils.persist_and_clean(residual, debug=False, visualize_filename=None)
-        residual = (data - model).compute()
+        residual.compute()
 
     # Run garbage collection for memory management
     gc.collect()
