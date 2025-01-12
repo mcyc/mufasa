@@ -875,6 +875,16 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.master_fitter`
+   * - :obj:`~mufasa.master_fitter.replace_para_n_mod`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.master_fitter
+
+          .. autoshortsummary:: mufasa.master_fitter.replace_para_n_mod
+
+          .. container:: caption
+
+             :mod:`mufasa.master_fitter`
    * - :obj:`~mufasa.master_fitter.replace_rss`
      - .. container:: sk-apisearch-desc
 
@@ -1508,6 +1518,27 @@ you can also search with the search bar located on the top right corner of the w
              :mod:`mufasa.spec_models.nh3_deblended`
    
    
+   * - :obj:`~mufasa.utils.dask_ops.apply_planemask`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_ops
+
+          .. autoshortsummary:: mufasa.utils.dask_ops.apply_planemask
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_ops`
+   * - :obj:`~mufasa.utils.dask_ops.dask_binary_dilation`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_ops
+
+          .. autoshortsummary:: mufasa.utils.dask_ops.dask_binary_dilation
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_ops`
+   
    * - :obj:`~mufasa.utils.dask_utils.calculate_batch_size`
      - .. container:: sk-apisearch-desc
 
@@ -1528,6 +1559,46 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.calculate_chunks_v0`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.calculate_chunks_v0
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.compute_chunk_relevant`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.compute_chunk_relevant
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.compute_global_offsets`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.compute_global_offsets
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.custom_task_graph`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.custom_task_graph
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
    * - :obj:`~mufasa.utils.dask_utils.lazy_pix_compute`
      - .. container:: sk-apisearch-desc
 
@@ -1538,12 +1609,42 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.dask_utils`
-   * - :obj:`~mufasa.utils.dask_utils.lazy_pix_compute_multiprocessing`
+   * - :obj:`~mufasa.utils.dask_utils.lazy_pix_compute_dynamic`
      - .. container:: sk-apisearch-desc
 
           .. currentmodule:: mufasa.utils.dask_utils
 
-          .. autoshortsummary:: mufasa.utils.dask_utils.lazy_pix_compute_multiprocessing
+          .. autoshortsummary:: mufasa.utils.dask_utils.lazy_pix_compute_dynamic
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.lazy_pix_compute_no_batching`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.lazy_pix_compute_no_batching
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.lazy_pix_compute_single`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.lazy_pix_compute_single
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.dask_utils`
+   * - :obj:`~mufasa.utils.dask_utils.persist_and_clean`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.dask_utils
+
+          .. autoshortsummary:: mufasa.utils.dask_utils.persist_and_clean
 
           .. container:: caption
 
@@ -1632,6 +1733,37 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.monitor_peak_memory`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.monitor_peak_memory
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.monitor_peak_memory_new`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.monitor_peak_memory_new
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.peak_memory`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.peak_memory
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   
    
    * - :obj:`~mufasa.utils.mufasa_log.OriginContextFilter`
      - .. container:: sk-apisearch-desc
@@ -1679,6 +1811,16 @@ you can also search with the search bar located on the top right corner of the w
           .. currentmodule:: mufasa.utils.mufasa_log
 
           .. autoshortsummary:: mufasa.utils.mufasa_log.reset_logger
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.mufasa_log`
+   * - :obj:`~mufasa.utils.mufasa_log.timing_decorator`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.mufasa_log
+
+          .. autoshortsummary:: mufasa.utils.mufasa_log.timing_decorator
 
           .. container:: caption
 

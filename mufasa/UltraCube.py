@@ -1003,9 +1003,11 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
     else:
         modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
+    results =  get_rss(cube, modcube, expand=expand, usemask=usemask, mask=mask,
+                       return_size=return_size, planemask=planemask)
+
     gc.collect()
-    return get_rss(cube, modcube, expand=expand, usemask=usemask, mask=mask, return_size=return_size,
-                   planemask=planemask)
+    return results
 
 
 def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None, expand=20):
@@ -1410,7 +1412,7 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 # statistics tools
 
 def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False,
-            include_nosamp=True, planemask=None):
+            include_nosamp=True, planemask=None, has_model=None):
     """
     Calculate the residual sum of squares (RSS) for a spectral cube model fit.
 
@@ -1418,8 +1420,8 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
     ----------
     cube : SpectralCube
         The spectral data cube to analyze.
-    model : numpy.ndarray
-        The model array to compare against the data cube.
+    model : numpy.ndarray or int
+        The model array to compare against the data cube. If the model is 0, simply the calculation to save memory
     expand : int, optional
         Number of channels to expand the region where the RSS is calculated along the spectral dimension. Default is 20.
     usemask : bool, optional
@@ -1434,7 +1436,9 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         Whether to include spectral regions with no sample data by filling gaps with a default mask. Default is True.
     planemask : numpy.ndarray, optional
         A 2D mask specifying where to calculate RSS for optimized computation. Default is None.
-
+    has_model : numpy.ndarray, optional
+        A 2D mask specifying where the model exists to ensure pixels outside of it returns only NaN values. If None
+        A has_model mask will be caculated based on the model, which will take more
     Returns
     -------
     tuple
@@ -1442,62 +1446,14 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         - Sample size per pixel (if `return_size` is True).
         - Final mask used (if `return_mask` is True).
     """
-    if usemask:
-        if mask is None:
-            # may want to change this for future models that includes absorptions
-            mask = model > 0
-    else:
-        mask = ~np.isnan(model)
+    def _expand_mask(mask, expand):
+        # Add a buffer to the mask of size set by the expand keyword.
+        if expand > 0:
+            mask = expand_mask(mask, expand)
 
-    if isinstance(mask, da.Array):
-        #planemask = planemask.persist()
-        mask = dask_utils.persist_and_clean(mask)
-        # have the planemask being ndarray just to be safe
-        mask = mask.compute()
-        gc.collect()
+        return mask
 
-    if include_nosamp:
-        # if there no mask in a given pixel, fill it in with combined spectral mask
-        if isinstance(mask, da.Array):
-            nsamp_map = np.nansum(mask, axis=0).compute()
-        else:
-            nsamp_map = np.nansum(mask, axis=0)
-        mm = nsamp_map <= 0
-        try:
-            max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
-            spec_mask_fill = copy(mask[:, max_y[0], max_x[0]])
-        except:
-            spec_mask_fill = np.any(mask, axis=(1, 2))
-
-        # Handle dask compatibility by computing the mask if necessary
-        if isinstance(mask, da.Array):
-            mask = mask.compute()
-
-        # Apply the mask update with numpy-compatible indexing
-        mask[:, mm] = spec_mask_fill[:, np.newaxis]
-
-        # Convert back to dask if needed
-        if isinstance(cube._data, da.Array):
-            mask = da.from_array(mask, chunks=cube._data.chunksize)
-
-    # assume flat-baseline model even if no model exists
-    if isinstance(model, da.Array):
-        model = da.where(da.isnan(model), 0, model)
-    else:
-        model[np.isnan(model)] = 0
-
-    # creating mask over region where the model is non-zero,
-    # plus a buffer of size set by the expand keyword.
-    if expand > 0:
-        mask = expand_mask(mask, expand)
-
-    if planemask is None:
-        residual = get_residual(cube, model)
-        #residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
-    else:
-        # Get residual with planemask applied
-        residual = get_residual(cube, model, planemask=planemask)
-
+    def _planemask_mask(mask, planemask):
         # Handle mask based on its type
         if isinstance(mask, da.Array):
             mask = dask_ops.apply_planemask(mask, planemask, persist=True)
@@ -1513,8 +1469,95 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
             logger.error(msg)  # Use logger.error for unexpected critical issues
             raise ValueError(msg)
 
-    # Use da.where for masking instead of residual * mask
-    masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
+        return mask
+
+    if isinstance(model, np.ndarray) or isinstance(model, da.Array):
+        # full computation for typical models
+        if usemask:
+            if mask is None:
+                # may want to change this for future models that includes absorptions
+                mask = model > 0
+        else:
+            mask = ~np.isnan(model)
+
+        if isinstance(mask, da.Array):
+            #planemask = planemask.persist()
+            mask = dask_utils.persist_and_clean(mask)
+            # have the planemask being ndarray just to be safe
+            mask = mask.compute()
+            gc.collect()
+
+        if include_nosamp:
+            # if there no mask in a given pixel, fill it in with combined spectral mask
+            if isinstance(mask, da.Array):
+                nsamp_map = np.nansum(mask, axis=0).compute()
+            else:
+                nsamp_map = np.nansum(mask, axis=0)
+            mm = nsamp_map <= 0
+            try:
+                max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
+                spec_mask_fill = copy(mask[:, max_y[0], max_x[0]])
+            except:
+                spec_mask_fill = np.any(mask, axis=(1, 2))
+
+            # Handle dask compatibility by computing the mask if necessary
+            if isinstance(mask, da.Array):
+                mask = mask.compute()
+
+            # Apply the mask update with numpy-compatible indexing
+            mask[:, mm] = spec_mask_fill[:, np.newaxis]
+
+            # Convert back to dask if needed
+            if isinstance(cube._data, da.Array):
+                mask = da.from_array(mask, chunks=cube._data.chunksize)
+
+        # assume flat-baseline model even if no model exists
+        if isinstance(model, da.Array):
+            model = da.where(da.isnan(model), 0, model)
+        else:
+            model[np.isnan(model)] = 0
+
+        # Add a buffer to the mask of size set by the expand keyword.
+        mask = _expand_mask(mask, expand)
+
+        if planemask is None:
+            residual = get_residual(cube, model)
+            # residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
+        else:
+            # Get residual with planemask applied
+            residual = get_residual(cube, model, planemask=planemask)
+
+            # mask mask with planemask
+            mask = _planemask_mask(mask, planemask)
+
+        # Use da.where for masking instead of residual * mask
+        masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
+
+    elif isinstance(model, int) and model == 0:
+        # simplified calculation if the mode is just 0 (i.e. noise)
+        logger.warning("using noise model for rrs calculation")
+        if not usemask:
+            msg = ("Model cannot be 0 if usemask=False")
+            raise TypeError(msg)
+
+        if mask is not None:
+            mask = _expand_mask(mask, expand)
+
+        if planemask is None:
+            residual = cube
+        else:
+            residual = apply_planemask(cube, planemask, persist=True)
+
+            # mask mask with planemask
+            mask = _planemask_mask(mask, planemask)
+
+        if mask is None:
+            logger.warning("mask is None for calculating rrs when mask is zero")
+            mask = np.ones(residual.shape, dtype=bool)
+            masked_residual = residual
+        else:
+            # Use da.where for masking instead of residual * mask
+            masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
 
     # Calculate RSS
     rss = da.nansum(masked_residual ** 2, axis=0).compute() if isinstance(masked_residual, da.Array) else np.nansum(

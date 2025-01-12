@@ -5,7 +5,7 @@ API_REFERENCE = {
         'module': 'mufasa.PCube',
         'description': '''Undocumented''',
         'members': [
-            {'name': 'PCube', 'type': 'class', 'description': '''A specialized subclass of :class:`pyspeckit.'''}
+            {'name': 'PCube', 'type': 'class', 'description': '''A specialized subclass of :class:`Cube` tailored for Mufasa-specific workflows.'''}
         ]
     },
     'mufasa.UltraCube': {
@@ -135,7 +135,8 @@ API_REFERENCE = {
             {'name': 'refit_marginal', 'type': 'function', 'description': '''Refit pixels with fits that appears marginally okay, as deterined by the.'''},
             {'name': 'refit_swap_2comp', 'type': 'function', 'description': '''Refit the cube by using the previous fit result as guesses, but with the.'''},
             {'name': 'replace_bad_pix', 'type': 'function', 'description': '''Refit pixels marked by the mask as "bad" and adopt the new model if it.'''},
-            {'name': 'replace_para', 'type': 'function', 'description': '''Replace parameter values in a parameter cube with those from a reference.'''},
+            {'name': 'replace_para', 'type': 'function', 'description': '''Replace parameter values in a parameter cube using a reference cube for specific pixels (Deprecated).'''},
+            {'name': 'replace_para_n_mod', 'type': 'function', 'description': '''Replace parameter values in a parameter cube with those from a reference cube for specific pixels and update its model accordingly.'''},
             {'name': 'replace_rss', 'type': 'function', 'description': '''Replace RSS-related maps in a `UltraCube` object for specific.'''},
             {'name': 'save_best_2comp_fit', 'type': 'function', 'description': '''Save the best two-component fit results for the specified region.'''},
             {'name': 'save_map', 'type': 'function', 'description': '''Save a 2D map as a FITS file.'''},
@@ -277,14 +278,24 @@ API_REFERENCE = {
         'module': 'mufasa.utils',
         'description': '''This sub-package provides utility functions and tools for data processing,.''',
         'members': [
+            {'name': 'mufasa.utils.dask_ops', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.dask_utils', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.dataframe', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.interpolate', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.map_divide', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.memory', 'type': 'module', 'description': '''No description available.'''},
+            {'name': 'mufasa.utils.misc', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.mufasa_log', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.multicore', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.neighbours', 'type': 'module', 'description': '''No description available.'''}
+        ]
+    },
+    'mufasa.utils.dask_ops': {
+        'module': 'mufasa.utils.dask_ops',
+        'description': '''Undocumented''',
+        'members': [
+            {'name': 'apply_planemask', 'type': 'function', 'description': '''Apply a 2D boolean mask to a 3D cube, extracting pixel values within the mask.'''},
+            {'name': 'dask_binary_dilation', 'type': 'function', 'description': '''Perform binary dilation on a Dask array mask with a structuring element.'''}
         ]
     },
     'mufasa.utils.dask_utils': {
@@ -292,9 +303,16 @@ API_REFERENCE = {
         'description': '''Undocumented''',
         'members': [
             {'name': 'calculate_batch_size', 'type': 'function', 'description': '''Dynamically calculate the optimal batch size for processing valid pixels.'''},
-            {'name': 'calculate_chunks', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array based on the given criteria.'''},
-            {'name': 'lazy_pix_compute', 'type': 'function', 'description': '''Lazily compute values for each valid pixel specified by the isvalid mask.'''},
-            {'name': 'lazy_pix_compute_multiprocessing', 'type': 'function', 'description': '''Lazily compute values for valid pixels specified by the isvalid mask using batch processing.'''}
+            {'name': 'calculate_chunks', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array based on a regular grid with.'''},
+            {'name': 'calculate_chunks_v0', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array based on the given criteria.'''},
+            {'name': 'compute_chunk_relevant', 'type': 'function', 'description': '''Compute chunk relevance for a 2D mask (isvalid) based on its chunking.'''},
+            {'name': 'compute_global_offsets', 'type': 'function', 'description': '''Compute the global offsets given the chunk sizes and the chunk location.'''},
+            {'name': 'custom_task_graph', 'type': 'function', 'description': '''Build a custom task graph to process relevant chunks of host_cube based on isvalid.'''},
+            {'name': 'lazy_pix_compute', 'type': 'function', 'description': '''Lazily compute values for valid pixels specified by the `isvalid` mask using the specified scheduler.'''},
+            {'name': 'lazy_pix_compute_dynamic', 'type': 'function', 'description': '''Adaptive computation of valid pixels with dynamic batching and scheduling.'''},
+            {'name': 'lazy_pix_compute_no_batching', 'type': 'function', 'description': '''Optimized function to compute valid pixels in a Dask array by processing only relevant chunks.'''},
+            {'name': 'lazy_pix_compute_single', 'type': 'function', 'description': '''Lazily compute values for each valid pixel specified by the isvalid mask.'''},
+            {'name': 'persist_and_clean', 'type': 'function', 'description': '''Persist a Dask collection, clean up intermediate variables, and optionally visualize the graph.'''}
         ]
     },
     'mufasa.utils.dataframe': {
@@ -326,7 +344,17 @@ API_REFERENCE = {
         'module': 'mufasa.utils.memory',
         'description': '''Undocumented''',
         'members': [
-            {'name': 'calculate_target_memory', 'type': 'function', 'description': '''Calculate the target memory per chunk based on system memory and the number of cores.'''}
+            {'name': 'calculate_target_memory', 'type': 'function', 'description': '''Calculate the target memory per chunk based on system memory and the number of cores.'''},
+            {'name': 'monitor_peak_memory', 'type': 'function', 'description': '''Decorator to monitor and display the peak memory usage of a function,.'''},
+            {'name': 'monitor_peak_memory_new', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'peak_memory', 'type': 'function', 'description': '''Decorator to monitor and display the peak memory usage of a function,.'''}
+        ]
+    },
+    'mufasa.utils.misc': {
+        'module': 'mufasa.utils.misc',
+        'description': '''Undocumented''',
+        'members': [
+
         ]
     },
     'mufasa.utils.mufasa_log': {
@@ -337,7 +365,8 @@ API_REFERENCE = {
             {'name': 'WarningContextFilter', 'type': 'class', 'description': '''Filter instances are used to perform arbitrary filtering of LogRecords.'''},
             {'name': 'get_logger', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'init_logging', 'type': 'function', 'description': ''':param logfile: file to save to (default mufasa.'''},
-            {'name': 'reset_logger', 'type': 'function', 'description': '''Undocumented'''}
+            {'name': 'reset_logger', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'timing_decorator', 'type': 'function', 'description': '''A decorator that measures the execution time of a function.'''}
         ]
     },
     'mufasa.utils.multicore': {
