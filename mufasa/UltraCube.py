@@ -1834,13 +1834,14 @@ def get_residual(cube, model, planemask=None):
     else:
         # only operate on the masked pixels
         logger.debug(f"==== computing 2D-masked residual ====")
+        logger.debug(f"planemask type:{type(planemask)}; planemask shape:{planemask.shape}")
         logger.debug(f"model type:{type(model)}; data type:{type(data)}")
-        logger.debug(f"model shape:{type(model.shape)}; data shape:{type(data.shape)}")
+        logger.debug(f"model shape:{model.shape}; data shape:{data.shape}")
         # mask model
         if isinstance(model, da.Array):
             model_masked = dask_ops.apply_planemask(model, planemask, persist=False)
         elif isinstance(model, np.ndarray):
-            model_masked = model[:, model]
+            model_masked = model[:, planemask]
         else:
             msg = (f"The model type is {type(model)}. This shouldn't happen; there may be a bug in the code.")
             logger.error(msg)  # Use logger.error for unexpected critical issues
