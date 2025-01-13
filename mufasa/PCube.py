@@ -10,6 +10,7 @@ from pyspeckit.cubes.SpectralCube import Cube
 from copy import deepcopy
 
 from .utils import dask_utils
+from .utils.dask_utils import _is_valid_chunk
 from .utils.multicore import validate_n_cores
 
 #======================================================================================================================#
@@ -233,53 +234,3 @@ class PCube(Cube):
         # Validate the number of cores and update the model cube
         multicore = validate_n_cores(multicore)
         _ = self.get_modelcube(update=True, multicore=multicore, mask=planemask)
-
-
-def _is_valid_chunk(chunks):
-    """
-    Validate the compatibility of the `chunks` argument with Dask.
-
-    Parameters
-    ----------
-    chunks : None, dict, tuple, or list
-        The chunking strategy to validate. Valid inputs are:
-        - None: Indicates no chunking is specified.
-        - dict: A dictionary where keys are strings (dimension names) and values are integers or tuples of integers.
-        - tuple or list: A sequence of integers or tuples of integers specifying chunk sizes for each dimension.
-
-    Returns
-    -------
-    bool
-        True if `chunks` is valid.
-
-    Raises
-    ------
-    ValueError
-        If `chunks` is not None, a dictionary, a tuple, or a list, or if the contents of the dictionary or sequence
-        do not adhere to the expected structure.
-    """
-    if chunks is None:
-        return True  # None is acceptable for chunks
-
-    if isinstance(chunks, dict):
-        # Ensure all keys are strings and values are integers or tuples of integers
-        if not all(isinstance(key, str) for key in chunks):
-            raise ValueError("When `chunks` is a dictionary, all keys must be strings.")
-        if not all(
-                isinstance(value, (int, tuple)) and
-                (isinstance(value, tuple) and all(isinstance(v, int) for v in value) or isinstance(value, int))
-                for value in chunks.values()
-        ):
-            raise ValueError("When `chunks` is a dictionary, all values must be integers or tuples of integers.")
-    elif isinstance(chunks, (tuple, list)):
-        # Ensure all elements are integers or tuples of integers
-        if not all(
-                isinstance(c, (int, tuple)) and
-                (isinstance(c, tuple) and all(isinstance(v, int) for v in c) or isinstance(c, int))
-                for c in chunks
-        ):
-            raise ValueError("When `chunks` is a list or tuple, all elements must be integers or tuples of integers.")
-    else:
-        raise ValueError("`chunks` must be None, a dictionary, or a tuple/list of integers.")
-
-    return True
