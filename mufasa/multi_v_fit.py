@@ -17,6 +17,7 @@ import os, errno
 import multiprocessing
 import warnings
 from datetime import datetime
+import gc
 
 from astropy import units as u
 from astropy.units import UnitConversionError
@@ -39,7 +40,7 @@ from . import moment_guess as momgue
 from . import guess_refine as g_refine
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
-from .utils import interpolate
+from .utils import interpolate, dask_utils
 from . import __version__
 from .spec_models.meta_model import MetaModel
 
@@ -321,6 +322,9 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
                                           linewidth_sigma=linewidth_sigma, trim=None,
                                           central_win_hwidth=mod_info.central_win_hwidth,
                                           return_rms=True)
+    # release memories
+    if isinstance(cube._data, dask.array.Array):
+        cube._data = dask_utils.persist_and_clean(cube._data)
 
     peaksnr = signals.get_snr(cube, rms=rms)
 
@@ -364,6 +368,7 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
     # interpolate the moment maps
     mmm = interpolate.iter_expand(np.array([m0, m1, m2]), mask=planemask)
     m0, m1, m2 = mmm[0], mmm[1], mmm[2]
+    gc.collect()
 
     logger.info("velocity fitting limits: ({}, {})".format(np.round(vmin, 2), np.round(vmax, 2)))
 
@@ -371,6 +376,12 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
     # tex and tau guesses are chosen to reflect low density, diffusive gas that are likley to have low SNR
     gg = momgue.moment_guesses(m1, m2, ncomp, sigmin=sigmin, moment0=m0, linetype=mod_info.linetype,
                                mom0_floor=None)
+
+    del m0, m1, m2
+    gc.collect()
+
+    if isinstance(cube._data, dask.array.Array):
+        cube._data = dask_utils.persist_and_clean(cube._data)
 
     if guesses is None:
         guesses = gg

@@ -12,7 +12,7 @@ __author__ = 'mcychen'
 import os
 import numpy as np
 import multiprocessing
-from spectral_cube import SpectralCube
+from spectral_cube import SpectralCube, DaskSpectralCube
 from astropy import units as u
 from skimage.morphology import binary_dilation, remove_small_holes, remove_small_objects, square, disk
 from skimage.filters import threshold_local
@@ -39,7 +39,7 @@ from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
-from .utils import neighbours
+from .utils import neighbours, dask_utils
 from .utils import dataframe as dframe
 from .utils.memory import monitor_peak_memory
 from .visualization import scatter_3D
@@ -1856,6 +1856,9 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
     UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
 
+    del pcube_final
+    gc.collect()
+
     hdr2D = reg.ucube.make_header2D()
     paraDir = reg_final.ucube.paraDir
     paraRoot = reg_final.ucube.paraNameRoot
@@ -1950,34 +1953,29 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
 
     # create moment0 map
     modbest = get_best_2comp_model(reg_final)
-    cube_mod = SpectralCube(data=modbest, wcs=copy(reg_final.ucube.pcubes['2'].wcs),
+    gc.collect()
+    cube_mod = DaskSpectralCube(data=modbest, wcs=copy(reg_final.ucube.pcubes['2'].wcs),
                             header=copy(reg_final.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
+    if reg.ucube.n_cores > 1:
+        cube_mod.use_dask_scheduler('threads')
     mom0_mod = cube_mod.moment0()
     savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
+    if isinstance(modbest, da.Array):
+        modbest.persist()
+    del cube_mod, mom0_mod
+    gc.collect()
 
     # created masked mom0 map with model as the mask
     mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=20, mask=None)
     savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
-
-    # save reduced chi-squred maps
-    # would be useful to check if 3rd component is needed
-    '''
-    savename = make_save_name(paraRoot, paraDir, "chi2red_final")
-    chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=modbest, expand=20, reduced=True, usemask=True,
-                              mask=None)
-    hdr_save = hdr2D.copy()
-    hdr_save.set(keyword='NOTES', value='chi-squared values of the best 1- or 2-comp fit model',
-                 comment=None, before='DATE')
-    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
-    save_map(chi_map, hdr_save, savename)
-    logger.debug('{} saved.'.format(savename))
-    '''
+    del mom0, modbest
+    gc.collect()
 
     # save reduced chi-squred maps for 1 comp and 2 comp individually
     chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
@@ -2540,9 +2538,7 @@ def get_best_2comp_model(reg):
     modbest = da.where(mask2, mod2, modbest)  # Use where to selectively assign mod2 values
 
     # Compute or persist the result if needed
-    modbest = modbest.persist()  # Persist in memory if required
-
-    return modbest
+    return dask_utils.persist_and_clean(modbest)
 
 def replace_para(pcube, pcube_ref, mask, **kwargs):
     """

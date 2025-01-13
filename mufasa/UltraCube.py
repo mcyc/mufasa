@@ -16,6 +16,7 @@ import numpy as np
 from spectral_cube import SpectralCube
 # prevent any spectral-cube related warnings from being displayed.
 from spectral_cube.utils import SpectralCubeWarning
+from spectral_cube.dask_spectral_cube import DaskSpectralCube
 warnings.filterwarnings(action='ignore', category=SpectralCubeWarning, append=True)
 from copy import copy
 
@@ -172,6 +173,8 @@ class UltraCube(object):
                 cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
 
         self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+        if self.n_cores > 1:
+            self.cube.use_dask_scheduler('threads')
 
 
     def load_pcube(self, pcube_ref=None, pyspeckit=False):
