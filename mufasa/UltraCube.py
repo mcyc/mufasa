@@ -1412,7 +1412,7 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 # statistics tools
 
 def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False,
-            include_nosamp=True, planemask=None, has_model=None):
+            include_nosamp=True, planemask=None):
     """
     Calculate the residual sum of squares (RSS) for a spectral cube model fit.
 
@@ -1436,9 +1436,6 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         Whether to include spectral regions with no sample data by filling gaps with a default mask. Default is True.
     planemask : numpy.ndarray, optional
         A 2D mask specifying where to calculate RSS for optimized computation. Default is None.
-    has_model : numpy.ndarray, optional
-        A 2D mask specifying where the model exists to ensure pixels outside of it returns only NaN values. If None
-        A has_model mask will be caculated based on the model, which will take more
     Returns
     -------
     tuple

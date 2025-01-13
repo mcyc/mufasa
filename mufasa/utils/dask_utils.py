@@ -1,3 +1,7 @@
+"""
+This module provides general purpose tool and wrappers to handle dask object.
+Some of the key methods support parallel computing with effecient memory usage.
+"""
 import numpy as np
 import dask.array as da
 from dask import delayed, config
@@ -12,15 +16,31 @@ logger = get_logger(__name__)
 
 def persist_and_clean(dask_obj, debug=False, visualize_filename=None):
     """
-    Persist a Dask collection, clean up intermediate variables, and optionally visualize the graph.
+    Persist a Dask collection and optionally visualize its computation graph.
 
-    Parameters:
-    - dask_obj: Dask collection (Array, DataFrame, or Bag) to persist
-    - debug: Whether to visualize the graph (default: False)
-    - visualize_filename: File name to save the visualization (optional, defaults to None)
+    Parameters
+    ----------
+    dask_obj : dask.array.Array or dask.dataframe.DataFrame or dask.bag.Bag
+        The Dask collection to persist.
+    debug : bool, optional, default=False
+        If True, visualize the computation graph.
+    visualize_filename : str or None, optional, default=None
+        File name to save the visualization of the computation graph.
+        If None, no file is saved.
 
-    Returns:
-    - persisted_result: The persisted Dask collection
+    Returns
+    -------
+    dask_obj
+        The persisted Dask collection.
+
+    Examples
+    --------
+    Persist a Dask array and visualize its graph:
+
+    >>> import dask.array as da
+    >>> x = da.random.random((1000, 1000), chunks=(100, 100))
+    >>> x_persisted = persist_and_clean(x, debug=True, visualize_filename="graph.png")
+    >>> print(x_persisted)
     """
     persisted_result = dask_obj.persist()
     del dask_obj
@@ -34,22 +54,44 @@ def persist_and_clean(dask_obj, debug=False, visualize_filename=None):
 
 def calculate_chunks(cube_shape, dtype, target_chunk_mem_mb=128):
     """
-    Calculate chunk sizes for a Dask array based on a regular grid with
-    the lowest aspect ratio (closest to square chunks).
+    Calculate chunk sizes for a Dask array with an optimal aspect ratio and target memory usage.
+
+    This function computes chunk sizes for a data cube that approximate square chunks
+    (lowest aspect ratio difference) while adhering to a target memory limit per chunk.
 
     Parameters
     ----------
-    cube_shape : tuple
-        The shape of the data cube (spectral_axis, y, x).
+    cube_shape : tuple of int
+        The shape of the data cube in the form (spectral_axis, y, x).
     dtype : numpy.dtype
-        The data type of the cube (e.g., np.float32, np.float64).
-    target_chunk_mem_mb : int, optional
-        Target memory size per chunk in MB. Default is 128 MB.
+        The data type of the data cube (e.g., `numpy.float32`, `numpy.float64`).
+    target_chunk_mem_mb : int, optional, default=128
+        The target memory size per chunk, in megabytes.
 
     Returns
     -------
-    tuple
-        Chunk sizes for the Dask array in the form (spectral_chunk, y_chunk, x_chunk).
+    tuple of int
+        Optimal chunk sizes for the Dask array in the form
+        (spectral_chunk, y_chunk, x_chunk).
+
+    Notes
+    -----
+    - The function prioritizes chunks with a low aspect ratio to maintain
+      computational efficiency.
+    - The spectral axis is kept in a single chunk.
+
+    Examples
+    --------
+    Calculate chunks for a data cube with a shape of (100, 1000, 1000)
+    and a `float32` data type:
+
+    >>> calculate_chunks((100, 1000, 1000), np.float32, target_chunk_mem_mb=64)
+    (100, 250, 250)
+
+    Calculate chunks with a higher memory limit:
+
+    >>> calculate_chunks((100, 1000, 1000), np.float32, target_chunk_mem_mb=512)
+    (100, 500, 500)
     """
     spectral_axis, y_dim, x_dim = cube_shape
     dtype_size = np.dtype(dtype).itemsize  # Size of one element in bytes
@@ -90,103 +132,70 @@ def calculate_chunks(cube_shape, dtype, target_chunk_mem_mb=128):
     # Use the entire spectral axis in one chunk
     spectral_chunk = spectral_axis
 
-    # ensure there are close to integer number of chunks in the data
+    # Ensure there are close to integer number of chunks in the data
     n_y, n_x = np.rint(y_dim / best_y_chunk), np.rint(x_dim / best_x_chunk)
-    best_y_chunk, best_x_chunk = np.ceil(y_dim / n_y).astype(int), np.ceil(x_dim / n_x).astype(int)
+    best_y_chunk = np.ceil(y_dim / n_y).astype(int)
+    best_x_chunk = np.ceil(x_dim / n_x).astype(int)
 
     return (spectral_chunk, best_y_chunk, best_x_chunk)
-
-
-def calculate_chunks_v0(cube_shape, dtype, target_chunk_mem_mb=128):
-    """
-    Calculate chunk sizes for a Dask array based on the given criteria.
-
-    Parameters
-    ----------
-    cube_shape : tuple
-        The shape of the data cube (spectral_axis, y, x).
-    dtype : numpy.dtype
-        The data type of the cube (e.g., np.float32, np.float64).
-    target_chunk_mem_mb : int, optional
-        Target memory size per chunk in MB. Default is 128 MB.
-
-    Returns
-    -------
-    tuple
-        Chunk sizes for the Dask array in the form (spectral_chunk, y_chunk, x_chunk).
-    """
-    spectral_axis, y_dim, x_dim = cube_shape
-    dtype_size = np.dtype(dtype).itemsize  # Size of one element in bytes
-
-    # Entire spectral axis in one chunk
-    spectral_chunk = spectral_axis
-
-    # Calculate memory per pixel along the spectral axis
-    memory_per_pixel = spectral_axis * dtype_size
-
-    # Total memory target for spatial chunk
-    target_chunk_mem_bytes = target_chunk_mem_mb * 1024 * 1024
-
-    # Number of pixels per chunk to fit in memory
-    pixels_per_chunk = target_chunk_mem_bytes // memory_per_pixel
-
-    # Determine spatial chunk size
-    spatial_chunk_size = int(np.sqrt(pixels_per_chunk))  # Assume square chunks
-    y_chunk = min(y_dim, spatial_chunk_size)
-    x_chunk = min(x_dim, spatial_chunk_size)
-
-    return (spectral_chunk, y_chunk, x_chunk)
 
 
 def calculate_batch_size(spectral_size, dtype, total_valid_pixels, n_cores, memory_limit_mb=1024,
                          task_per_core=10, min_tpc=5):
     """
-    Dynamically calculate the optimal batch size for processing valid pixels.
+    Calculate the optimal batch size and adjusted number of workers for processing valid pixels.
 
-    This function computes the batch size based on memory constraints, the number of available workers,
-    and the desired number of tasks per core. The goal is to balance memory usage and parallelism while
-    ensuring efficient task distribution.
+    This function computes an optimal batch size for processing data, balancing memory constraints
+    and task distribution across available workers. It ensures efficient parallelism while respecting
+    memory limits and task-per-core requirements.
 
     Parameters
     ----------
     spectral_size : int
         Length of the spectral axis (z-dimension) of the data cube.
     dtype : numpy.dtype
-        Data type of the cube (e.g., np.float32, np.float64). Used to calculate memory usage per pixel.
+        Data type of the cube (e.g., `numpy.float32`, `numpy.float64`) used to calculate memory usage per pixel.
     total_valid_pixels : int
-        Total number of valid pixels to process. These are the pixels specified by a mask or selection criteria.
+        Total number of valid pixels to process. Typically defined by a mask or selection criteria.
     n_cores : int
         Number of workers available for parallel processing.
-    memory_limit_mb : int, optional
-        Approximate memory limit per worker in megabytes. Default is 1024 MB (1 GB).
-    task_per_core : int, optional
-        Target number of tasks per core to ensure sufficient parallelism. Default is 10 tasks per worker.
-    min_tpc : int, optional
-        Minimum number of tasks per core to maintain efficient distribution. Default is 5 tasks per worker.
+    memory_limit_mb : int, optional, default=1024
+        Approximate memory limit per worker in megabytes.
+    task_per_core : int, optional, default=10
+        Target number of tasks per core for efficient parallelism.
+    min_tpc : int, optional, default=5
+        Minimum number of tasks per core to ensure effective task distribution.
 
     Returns
     -------
-    tuple
-        - int : Optimal batch size for processing valid pixels.
-        - int : Adjusted number of workers to balance the workload and ensure efficient task distribution.
+    tuple of int
+        - Optimal batch size for processing valid pixels.
+        - Adjusted number of workers to balance workload and task distribution.
 
     Notes
     -----
-    - The function calculates the maximum batch size that fits within the memory limit of a single worker.
-    - It then adjusts the batch size and the number of workers based on the total number of valid pixels and the
-      desired task-per-core ratio.
-    - If the total number of tasks is insufficient to meet the minimum tasks per core, the function reduces the
-      number of workers or sets the batch size to 0, signaling that the workload needs adjustment.
+    - The batch size is constrained by the memory limit per worker and the total valid pixels.
+    - If the total number of tasks does not meet the minimum tasks-per-core requirement, the function adjusts
+      the number of workers or signals that the workload needs adjustment by setting the batch size to 0.
+    - The function prioritizes evenly distributed tasks while respecting memory constraints.
 
-    Example
-    -------
+    Examples
+    --------
+    Compute the batch size and adjusted number of workers for a data cube:
+
     >>> spectral_size = 1000
     >>> dtype = np.float32
     >>> total_valid_pixels = 10000
-    >>> n_workers = 4
+    >>> n_cores = 4
     >>> calculate_batch_size(spectral_size, dtype, total_valid_pixels, n_cores)
     (250, 4)
+
+    Adjust the memory limit and tasks-per-core:
+
+    >>> calculate_batch_size(1000, np.float32, 20000, 8, memory_limit_mb=512, task_per_core=20)
+    (125, 8)
     """
+
     # Memory per spectrum in bytes
     memory_per_spectrum = spectral_size * np.dtype(dtype).itemsize
 
@@ -219,19 +228,26 @@ def calculate_batch_size(spectral_size, dtype, total_valid_pixels, n_cores, memo
 
 def compute_global_offsets(chunks, chunk_location):
     """
-    Compute the global offsets given the chunk sizes and the chunk location.
+    Calculate global offsets for a chunk's position in a multidimensional array.
 
     Parameters
     ----------
-    chunks : tuple
-        A tuple containing the chunk sizes for each dimension.
-    chunk_location : tuple
-        A tuple containing the chunk position indices.
+    chunks : tuple of tuple of int
+        Chunk sizes for each dimension. For example, `((4, 4, 4), (6, 6), (5, 5, 5, 5))`.
+    chunk_location : tuple of int
+        Indices of the chunk along each dimension. For example, `(1, 0, 2)`.
 
     Returns
     -------
-    offsets : tuple
-        A tuple containing the global offsets for each dimension.
+    tuple of int
+        Global offsets for the chunk along each dimension.
+
+    Examples
+    --------
+    >>> chunks = ((4, 4, 4), (6, 6), (5, 5, 5, 5))
+    >>> chunk_location = (1, 0, 2)
+    >>> compute_global_offsets(chunks, chunk_location)
+    (4, 0, 10)
     """
     offsets = []
     for dim_chunks, loc in zip(chunks, chunk_location):
@@ -242,28 +258,45 @@ def compute_global_offsets(chunks, chunk_location):
 
 def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='threads', use_global_xy=True):
     """
-    Optimized function to compute valid pixels in a Dask array by processing only relevant chunks.
+    Compute valid pixels in a Dask array by processing only relevant chunks.
 
     Parameters
     ----------
     host_cube : dask.array.Array
-        3D Dask array (spectral, y, x).
+        A 3D Dask array with dimensions (spectral, y, x).
     isvalid : numpy.ndarray or dask.array.Array
-        2D mask where True indicates valid pixels.
+        A 2D mask where `True` indicates valid pixels to process.
     compute_pixel : callable
-        Function to compute spectral values for a given pixel (x, y).
-    scheduler : {'threads', 'processes', 'synchronous'}, optional
-        Scheduler to use for computation. Default is 'threads'.
-    debug : bool, optional
-        If True, enables debugging messages and visualizations.
-    use_global_xy : bool, optional
-        If True, passes global coordinates to compute_pixel instead of local chunk coordinates.
-        Defaults to True.
+        Function that computes spectral values for a given pixel `(x, y)`.
+        The signature should be `compute_pixel(global_x, global_y)`.
+    scheduler : {'threads', 'processes', 'synchronous'}, optional, default='threads'
+        Scheduler to use for Dask computation.
+    use_global_xy : bool, optional, default=True
+        If `True`, passes global coordinates `(global_x, global_y)` to `compute_pixel`.
+        If `False`, uses local chunk coordinates.
 
     Returns
     -------
     dask.array.Array
-        Dask array with updated values for valid pixels.
+        A Dask array with updated values for valid pixels.
+
+    Notes
+    -----
+    - Only relevant chunks containing valid pixels are processed to optimize performance.
+    - If no valid pixels are present in a chunk, the chunk is returned unchanged.
+
+    Examples
+    --------
+    Compute valid pixels for a Dask array:
+
+    >>> import dask.array as da
+    >>> import numpy as np
+    >>> host_cube = da.random.random((10, 100, 100), chunks=(5, 50, 50))
+    >>> isvalid = np.random.choice([True, False], size=(100, 100), p=[0.1, 0.9])
+    >>> def compute_pixel(x, y):
+    ...     return np.ones(10) * (x + y)
+    >>> result = lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel)
+    >>> result.compute()
     """
     # Ensure `isvalid` is a Dask array with proper chunks
     _, y_chunks, x_chunks = host_cube.chunks
@@ -305,17 +338,30 @@ def lazy_pix_compute_no_batching(host_cube, isvalid, compute_pixel, scheduler='t
 
 def compute_chunk_relevant(isvalid):
     """
-    Compute chunk relevance for a 2D mask (isvalid) based on its chunking.
+    Determine the relevance of chunks in a 2D Boolean mask.
+
+    For each chunk in the 2D Dask array, checks whether the chunk contains any
+    `True` values. Outputs a 2D Boolean array indicating which chunks are relevant.
 
     Parameters
     ----------
     isvalid : dask.array.Array
-        2D Boolean mask with spatial chunking.
+        A 2D Boolean mask with spatial chunking.
 
     Returns
     -------
     numpy.ndarray
-        2D Boolean array indicating relevance of each chunk.
+        A 2D Boolean array where each element indicates whether the corresponding
+        chunk in the input mask contains any `True` values.
+
+    Examples
+    --------
+    >>> import dask.array as da
+    >>> import numpy as np
+    >>> isvalid = da.from_array(np.array([[True, False], [False, False]]), chunks=(1, 2))
+    >>> compute_chunk_relevant(isvalid)
+    array([[ True],
+           [False]])
     """
     chunk_relevant = isvalid.map_blocks(
         lambda block: np.array([[block.any()]]),  # Reduce block and wrap as 2D
@@ -327,26 +373,49 @@ def compute_chunk_relevant(isvalid):
 
 def custom_task_graph(host_cube, isvalid, compute_pixel, use_global_xy=True, scheduler='threads'):
     """
-    Build a custom task graph to process relevant chunks of host_cube based on isvalid.
+    Construct a custom task graph to process valid pixels in a Dask array.
+
+    This function processes only the relevant chunks of the input 3D Dask array, updating
+    pixel values based on a provided function and a 2D validity mask.
 
     Parameters
     ----------
     host_cube : dask.array.Array
-        3D Dask array (spectral, y, x).
+        A 3D Dask array with dimensions (spectral, y, x).
     isvalid : numpy.ndarray or dask.array.Array
-        2D mask where True indicates valid pixels.
+        A 2D mask where `True` indicates valid pixels to process.
     compute_pixel : callable
-        Function to compute spectral values for a given pixel (x, y).
-    use_global_xy : bool, optional
-        If True, passes global coordinates to compute_pixel instead of local chunk coordinates.
-        Defaults to True.
-    scheduler : {'threads', 'processes', 'synchronous'}, optional
-        Scheduler to use for computation. Default is 'threads'.
+        A function to compute spectral values for a given pixel `(x, y)`. The function signature
+        should be `compute_pixel(global_x, global_y)`.
+    use_global_xy : bool, optional, default=True
+        If `True`, passes global coordinates `(global_x, global_y)` to `compute_pixel`.
+        If `False`, uses local chunk coordinates.
+    scheduler : {'threads', 'processes', 'synchronous'}, optional, default='threads'
+        The Dask scheduler to use for computation.
 
     Returns
     -------
     dask.array.Array
-        Dask array with updated values for valid pixels.
+        A 3D Dask array with updated values for valid pixels.
+
+    Notes
+    -----
+    - Non-relevant chunks (those with no valid pixels) are returned unchanged.
+    - Relevant chunks are processed to update pixel values using the provided `compute_pixel` function.
+    - The function leverages Dask's `da.block` and delayed tasks to construct the final Dask array.
+
+    Examples
+    --------
+    Process a Dask array with a custom task graph:
+
+    >>> import dask.array as da
+    >>> import numpy as np
+    >>> host_cube = da.random.random((10, 100, 100), chunks=(5, 50, 50))
+    >>> isvalid = np.random.choice([True, False], size=(100, 100), p=[0.1, 0.9])
+    >>> def compute_pixel(x, y):
+    ...     return np.ones(10) * (x + y)
+    >>> result = custom_task_graph(host_cube, isvalid, compute_pixel, scheduler='threads')
+    >>> result.compute()
     """
     # Ensure `isvalid` is a Dask array with proper chunks
     _, y_chunks, x_chunks = host_cube.chunks
@@ -417,24 +486,42 @@ def custom_task_graph(host_cube, isvalid, compute_pixel, use_global_xy=True, sch
 
 def lazy_pix_compute_single(host_cube, isvalid, compute_pixel):
     """
-    Lazily compute values for each valid pixel specified by the isvalid mask.
+    Lazily compute spectral values for valid pixels in a data cube.
 
     Parameters
     ----------
     host_cube : dask.array.Array
-        A 3D Dask array representing the data cube (spectral, y, x).
+        A 3D Dask array representing the data cube with dimensions (spectral, y, x).
     isvalid : numpy.ndarray or dask.array.Array
-        A 2D boolean mask with the same spatial dimensions as `host_cube` (y, x).
-        True indicates pixels to compute.
+        A 2D Boolean mask of shape (y, x). Pixels with `True` are computed, and others remain `NaN`.
     compute_pixel : callable
-        A function that computes values for a pixel. Should accept `(x, y)`
-        as arguments and return a 1D array representing the spectral axis.
+        A function that computes spectral values for a pixel. It should accept `(x, y)` as inputs
+        and return a 1D array of spectral values.
 
     Returns
     -------
     dask.array.Array
-        A new Dask array with the same shape as `host_cube`, where the
-        computed values for valid pixels are filled, and other values remain NaN.
+        A 3D Dask array with the same shape as `host_cube`, where computed values replace `NaN`
+        for valid pixels.
+
+    Notes
+    -----
+    - Pixels not marked as valid (`False` in `isvalid`) remain as `NaN` in the output array.
+    - The computation for each pixel is performed lazily using Dask's delayed framework.
+    - This function assumes `isvalid` has the same spatial dimensions as `host_cube`.
+
+    Examples
+    --------
+    Compute spectral values for a subset of pixels in a Dask array:
+
+    >>> import dask.array as da
+    >>> import numpy as np
+    >>> host_cube = da.random.random((10, 100, 100), chunks=(5, 50, 50))
+    >>> isvalid = np.random.choice([True, False], size=(100, 100), p=[0.1, 0.9])
+    >>> def compute_pixel(x, y):
+    ...     return np.ones(10) * (x + y)
+    >>> result = lazy_pix_compute_single(host_cube, isvalid, compute_pixel)
+    >>> result.compute()
     """
     # Ensure isvalid is a NumPy array for indexing
     if isinstance(isvalid, da.Array):
@@ -468,29 +555,52 @@ def lazy_pix_compute_single(host_cube, isvalid, compute_pixel):
 
 def lazy_pix_compute_dynamic(host_cube, isvalid, compute_pixel, memory_limit_mb=1024, scheduler='adaptive'):
     """
-    Adaptive computation of valid pixels with dynamic batching and scheduling.
+    Compute valid pixels in a 3D data cube adaptively with dynamic batching and scheduling.
+
+    This function dynamically determines the optimal batch size and scheduler based on memory limits,
+    CPU cores, and valid pixel density. It processes only the relevant pixels in the data cube lazily.
 
     Parameters
     ----------
     host_cube : dask.array.Array
-        The 3D data cube (spectral, y, x).
+        A 3D Dask array representing the data cube with dimensions (spectral, y, x).
     isvalid : numpy.ndarray or dask.array.Array
-        A 2D boolean mask (y, x) where True indicates valid pixels.
+        A 2D Boolean mask of shape (y, x). Pixels with `True` are computed, while others remain `NaN`.
     compute_pixel : callable
-        A function that computes pixel spectral values given (x, y).
-    memory_limit_mb : int, optional
-        Memory limit per worker in MB. Default is 1024 MB.
-    scheduler : {'adaptive', 'threads', 'processes', 'synchronous'}, default='adaptive'
-        Scheduler to use for computation.
+        A function that computes spectral values for a pixel. It should accept `(x, y)` as inputs
+        and return a 1D array of spectral values.
+    memory_limit_mb : int, optional, default=1024
+        Memory limit per worker in megabytes. Used to determine batch size.
+    scheduler : {'adaptive', 'threads', 'processes', 'synchronous'}, optional, default='adaptive'
+        The scheduler to use for Dask computation. If 'adaptive', selects 'threads' for high-density
+        masks and 'processes' for low-density masks.
 
     Returns
     -------
     dask.array.Array
-        A 3D array with computed values for valid pixels.
-    """
-    import dask.array as da
-    from dask import config
+        A 3D Dask array with the same shape as `host_cube`, where computed values replace `NaN`
+        for valid pixels.
 
+    Notes
+    -----
+    - The batch size is determined dynamically based on memory constraints and valid pixel density.
+    - The scheduler is chosen adaptively if 'adaptive' is specified, prioritizing thread-based or
+      process-based execution depending on mask density.
+    - Pixels not marked as valid remain `NaN` in the output array.
+
+    Examples
+    --------
+    Compute valid pixels adaptively for a Dask array:
+
+    >>> import dask.array as da
+    >>> import numpy as np
+    >>> host_cube = da.random.random((10, 100, 100), chunks=(5, 50, 50))
+    >>> isvalid = np.random.choice([True, False], size=(100, 100), p=[0.1, 0.9])
+    >>> def compute_pixel(x, y):
+    ...     return np.ones(10) * (x + y)
+    >>> result = lazy_pix_compute_dynamic(host_cube, isvalid, compute_pixel, memory_limit_mb=512, scheduler='adaptive')
+    >>> result.compute()
+    """
     if isinstance(isvalid, da.Array):
         isvalid = isvalid.compute()
 
@@ -562,70 +672,52 @@ def lazy_pix_compute_dynamic(host_cube, isvalid, compute_pixel, memory_limit_mb=
 
 def lazy_pix_compute(host_cube, isvalid, compute_pixel, batch_size=100, n_workers=4, scheduler='threads'):
     """
-    Lazily compute values for valid pixels specified by the `isvalid` mask using the specified scheduler.
+    Lazily compute spectral values for valid pixels in a data cube.
 
-    This function computes spectral values for a subset of pixels in a data cube,
-    as determined by the `isvalid` mask. Pixels marked as valid (`True`) in the mask
-    are processed using the specified `compute_pixel` function, while others are left as NaN.
-    The computation is parallelized using Dask and can be scheduled using threads,
-    processes, or batching with a Dask client.
+    This function processes only the pixels marked as `True` in the `isvalid` mask,
+    using the provided `compute_pixel` function. It supports parallel computation
+    through Dask's schedulers or a distributed client for batching.
 
     Parameters
     ----------
     host_cube : dask.array.Array
-        A 3D Dask array representing the data cube with dimensions (spectral, y, x).
-        The cube contains the spectral data to be processed.
-
+        A 3D Dask array with dimensions (spectral, y, x), representing the data cube.
     isvalid : numpy.ndarray or dask.array.Array
-        A 2D boolean mask of shape (y, x). Pixels marked as `True` will be processed,
-        and their computed values will be updated in the output array. Pixels marked
-        as `False` will remain as NaN.
-
+        A 2D Boolean mask of shape (y, x). Pixels marked as `True` are processed;
+        others remain `NaN`.
     compute_pixel : callable
-        A function that computes spectral data for a given pixel. It must accept two
-        arguments, `(x, y)`, where `x` and `y` are the spatial coordinates of the pixel,
-        and return a 1D array of spectral values.
-
+        A function that computes spectral values for a pixel. It must accept two arguments,
+        `(x, y)`, and return a 1D array of spectral values.
     batch_size : int, optional, default=100
-        The number of pixels to process in each batch. Larger batches reduce task
-        scheduling overhead but require more memory.
-
+        Number of pixels to process in each batch. Larger batches reduce scheduling
+        overhead but require more memory.
     n_workers : int, optional, default=4
-        The number of workers to use for parallel processing. This parameter is only
-        used when the `scheduler` is set to `'batch'`. It determines the number of Dask
-        workers launched in the local cluster.
-
+        Number of workers for parallel processing. Used only with the `'batch'` scheduler.
     scheduler : {'threads', 'processes', 'synchronous', 'batch'}, optional, default='threads'
-        The Dask scheduler to use for parallel computation. The available options are:
-        - `'threads'`: Use a thread-based scheduler (default). Tasks run in parallel
-          threads, sharing memory.
-        - `'processes'`: Use a process-based scheduler. Tasks run in separate processes,
-          each with its own memory space.
-        - `'synchronous'`: Use a single-threaded, synchronous scheduler. Tasks are
-          executed sequentially.
-        - `'batch'`: Use batching with a Dask distributed client for more fine-grained
-          control over the execution, including access to the Dask dashboard.
+        The scheduler to use for computation:
+        - `'threads'`: Thread-based execution with shared memory.
+        - `'processes'`: Process-based execution with separate memory spaces.
+        - `'synchronous'`: Single-threaded execution.
+        - `'batch'`: Uses a Dask distributed client for batching and access to a dashboard.
 
     Returns
     -------
     dask.array.Array
-        A 3D Dask array with the same shape as `host_cube`. The computed values for
-        valid pixels are filled into the array, while all other locations remain NaN.
+        A 3D Dask array with computed values for valid pixels. Non-valid pixels remain `NaN`.
 
     Notes
     -----
-    - When the scheduler is set to `'batch'`, a local Dask distributed client is
-      initialized to manage the computation. This provides access to the Dask dashboard
-      for real-time task monitoring.
+    - When using the `'batch'` scheduler, a local Dask distributed client is initialized
+      for batch execution and dashboard monitoring.
     - Ensure that `compute_pixel` is thread-safe if using the `'threads'` scheduler.
+    - Batching is suitable for large datasets or dense masks, as it minimizes overhead.
 
     Examples
     --------
-    Compute spectral values for a subset of pixels in a data cube:
+    Compute spectral values for valid pixels in a data cube:
 
     >>> import dask.array as da
     >>> import numpy as np
-
     >>> def mock_compute_pixel(x, y):
     ...     return np.array([x + y, x - y])
 
@@ -639,7 +731,7 @@ def lazy_pix_compute(host_cube, isvalid, compute_pixel, batch_size=100, n_worker
     ...     batch_size=10,
     ...     scheduler='threads'
     ... )
-    >>> print(result.compute())  # Compute the result
+    >>> result.compute()  # Trigger computation and retrieve the result.
     """
     # Ensure isvalid is a NumPy array for indexing
     if isinstance(isvalid, da.Array):
@@ -704,14 +796,18 @@ def lazy_pix_compute(host_cube, isvalid, compute_pixel, batch_size=100, n_worker
 
 def _update_pixel(block, value, x, y):
     """
-    Helper function to update a single pixel in a block.
+    Update a single pixel in a block of a Dask array.
+
+    This helper function modifies a copy of the block by assigning the provided
+    spectral value to the specified pixel coordinates.
 
     Parameters
     ----------
     block : np.ndarray
-        The block of the Dask array being processed.
+        A block from the Dask array being processed. Typically a 3D array
+        with dimensions (spectral, y, x).
     value : np.ndarray
-        The computed value for the pixel (1D array along the spectral axis).
+        A 1D array representing the computed spectral values for the pixel.
     x : int
         The x-coordinate of the pixel within the block.
     y : int
@@ -720,7 +816,13 @@ def _update_pixel(block, value, x, y):
     Returns
     -------
     np.ndarray
-        A copy of the block with the pixel updated.
+        A copy of the block with the specified pixel updated with the new value.
+
+    Notes
+    -----
+    - The function creates a copy of the input block to ensure that updates
+      do not modify the original array in place.
+    - Coordinates `(x, y)` are relative to the block, not global coordinates.
     """
     block_copy = block.copy()
     block_copy[:, y, x] = value
@@ -729,22 +831,51 @@ def _update_pixel(block, value, x, y):
 
 def _update_batch(block, batch_result):
     """
-    Update multiple pixels in a block based on batch results.
+    Update multiple pixels in a block of a Dask array using batch results.
+
+    This function modifies a copy of the block by applying computed spectral values
+    for a batch of pixels.
 
     Parameters
     ----------
     block : numpy.ndarray
-        The block of the Dask array being processed.
+        A 3D block from the Dask array being processed. The block has dimensions
+        (spectral_axis, y, x).
     batch_result : tuple
-        A tuple where:
-        - batch_result[0] is a list of (y, x) pixel coordinates for the batch.
-        - batch_result[1] is a 2D numpy.ndarray containing the computed spectral values
-          for the batch. Shape: (spectral_axis, num_pixels).
+        A tuple containing:
+        - batch_result[0]: list of tuple of int
+            A list of `(y, x)` pixel coordinates for the batch.
+        - batch_result[1]: numpy.ndarray
+            A 2D array of computed spectral values for the batch. Shape:
+            `(spectral_axis, num_pixels)`.
 
     Returns
     -------
     numpy.ndarray
-        Updated block with the batch results applied.
+        A copy of the input block with the specified pixels updated based on the
+        batch results.
+
+    Notes
+    -----
+    - The function creates a copy of the input block to ensure the original block
+      remains unmodified.
+    - Coordinates `(y, x)` in `batch_result[0]` are relative to the block, not
+      global coordinates.
+
+    Examples
+    --------
+    Update a block with batch results:
+
+    >>> block = np.zeros((5, 4, 4))  # (spectral_axis, y, x)
+    >>> batch_result = (
+    ...     [(0, 1), (2, 3)],  # Pixel coordinates
+    ...     np.array([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])  # Spectral values
+    ... )
+    >>> updated_block = _update_batch(block, batch_result)
+    >>> updated_block[:, 0, 1]  # Spectral values for pixel (0, 1)
+    array([ 1.,  3.,  5.,  7.,  9.])
+    >>> updated_block[:, 2, 3]  # Spectral values for pixel (2, 3)
+    array([ 2.,  4.,  6.,  8., 10.])
     """
     block_copy = block.copy()  # Create a writable copy
     batch_pixels, batch_data = batch_result

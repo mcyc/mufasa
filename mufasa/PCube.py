@@ -1,3 +1,9 @@
+"""
+The `mufasa.PCube` module provides dask-centered subclass of `pyspeckit`'s :class:`Cube`
+that features some enhancing class methods tailored for MUFASA
+
+"""
+
 import numpy as np
 import dask.array as da
 from pyspeckit.cubes.SpectralCube import Cube
@@ -21,68 +27,62 @@ class PCube(Cube):
     and computational efficiency.
     """
 
-    def get_modelcube(self, update=False, multicore=True, mask=None, target_memory_mb=16,
-                      scheduler='threads'):
+    def get_modelcube(self, update=False, multicore=True, mask=None, target_memory_mb=16, scheduler='threads'):
         """
-        Generate or update the model cube using Dask for parallel and memory-efficient processing.
+        Generate or update the model cube using parallel, memory-efficient processing with Dask.
 
-        This method computes a model cube by applying the `specfit.get_full_model` function
-        to valid pixels in the cube. It supports both single-core and multi-core processing,
+        This method computes the model cube by applying the `specfit.get_full_model` function
+        to valid pixels in the data cube. It supports both single-core and multi-core processing,
         with optional masking and memory-based chunking.
 
         Parameters
         ----------
-        update : bool, optional
-            Whether to force recalculation of the model cube. If False and the model cube
-            already exists, the cached version is returned. Default is False.
-        multicore : int, optional
-            Number of cores to use for parallel processing. If set to 1, computation
-            is performed sequentially. Default is 1.
-        mask : numpy.ndarray or None, optional
-            A 2D boolean mask with the same spatial dimensions as the cube (ny, nx).
-            Pixels marked as True in the mask are included in the computation.
-            If None, all valid pixels are included. Default is None.
-        target_memory_mb : int or None, optional
-            Target memory usage per chunk in megabytes. If None, the memory limit is
-            estimated based on system resources. Default is None.
-            scheduler : {'threads', 'processes', 'synchronous', 'batch'}, optional, default='threads'
-            The Dask scheduler to use for parallel computation. The available options are:
-            - `'threads'`: Use a thread-based scheduler (default). Tasks run in parallel
-              threads, sharing memory.
-            - `'processes'`: Use a process-based scheduler. Tasks run in separate processes,
-              each with its own memory space.
-            - `'synchronous'`: Use a single-threaded, synchronous scheduler. Tasks are
-              executed sequentially.
-            - `'batch'`: Use batching with a Dask distributed client for more fine-grained
-              control over the execution, including access to the Dask dashboard.
+        update : bool, optional, default=False
+            If `True`, forces recalculation of the model cube. If `False` and a model cube
+            already exists, returns the cached version.
+        multicore : bool or int, optional, default=True
+            Enables multi-core processing if `True`. If an integer is provided, it specifies
+            the number of cores to use. If `False`, computation is performed in single-core mode.
+        mask : numpy.ndarray or None, optional, default=None
+            A 2D Boolean mask of shape `(ny, nx)`. Pixels marked as `True` are included in
+            the computation. If `None`, all valid pixels are processed.
+        target_memory_mb : int, optional, default=16
+            The target memory usage per chunk in megabytes. If `None`, memory is estimated
+            based on available system resources.
+        scheduler : {'threads', 'processes', 'synchronous', 'batch'}, optional, default='threads'
+            The Dask scheduler for parallel computation:
+            - `'threads'`: Use thread-based parallelism (default).
+            - `'processes'`: Use process-based parallelism.
+            - `'synchronous'`: Perform computations sequentially.
+            - `'batch'`: Use Dask's distributed client for batching and dashboard monitoring.
 
         Returns
         -------
         dask.array.Array
-            A Dask array representing the computed model cube. Pixels that were not
-            included in the computation (due to masking or invalid data) are set to NaN.
+            A Dask array representing the computed model cube. Non-valid pixels are set to `NaN`.
 
         Notes
         -----
-        - The computation is performed pixel-by-pixel, preserving the spectral axis in full.
-        - For single-core computation, the method calls `lazy_pix_compute` to process each valid pixel sequentially.
-          See :func:`mufasa.utils.dask_utils.lazy_pix_compute`.
-        - For multi-core computation, the method calls `lazy_pix_compute_multiprocessing`, which uses Dask's
-          parallel computing capabilities with batch processing for efficiency. See
-          :func:`mufasa.utils.dask_utils.lazy_pix_compute_multiprocessing`.
-        - The number of cores is adjusted based on the number of valid pixels to avoid unnecessary resource allocation.
-        - The memory per worker is limited by the system's available resources, and batch processing ensures
-          memory-efficient computation. Chunk sizes are calculated dynamically using
-          :func:`mufasa.utils.dask_utils.calculate_chunks`.
-        - The optimal batch size for multi-core processing is determined using
-          :func:`mufasa.utils.dask_utils.calculate_batch_size`.
+        - The method preserves the full spectral axis during computation.
+        - If `update` is `False` and the model cube already exists, it returns the cached version.
+        - For single-core computation, the `lazy_pix_compute_single` function is used.
+        - For multi-core computation, the `custom_task_graph` function is used to process the model cube efficiently.
+        - Chunk sizes are dynamically calculated using `calculate_chunks` for optimal memory usage.
+        - The `calculate_batch_size` function determines the batch size for multi-core processing.
 
-        Example
-        -------
-        >>> cube = MySpectralCube(...)  # User-defined subclass of SpectralCube
-        >>> model_cube = cube.get_modelcube(update=True, multicore=4)
+        Examples
+        --------
+        Generate the model cube using multi-core processing:
+
+        >>> cube = MySpectralCube(...)  # A user-defined subclass of SpectralCube
+        >>> model_cube = cube.get_modelcube(update=True, multicore=4, scheduler='threads')
         >>> print(model_cube.shape)
         (100, 200, 200)  # Example dimensions
+
+        Use a mask to compute the model cube for specific regions:
+
+        >>> mask = np.random.choice([True, False], size=(200, 200))
+        >>> model_cube = cube.get_modelcube(mask=mask, multicore=False)
         """
         if self._modelcube is not None and not update:
             return self._modelcube
@@ -131,8 +131,28 @@ class PCube(Cube):
 
         return self._modelcube
 
-
     def _has_fit(self, get=False):
+        """
+        Check if valid fits exist for each pixel in the parameter cube.
+
+        Valid fits are determined by non-zero and finite parameter values.
+
+        Parameters
+        ----------
+        get : bool, default=False
+            If True, return the computed mask. If False, update `self.has_fit`.
+
+        Returns
+        -------
+        numpy.ndarray, optional
+            A 2D Boolean mask indicating valid fits for each pixel. Returned only
+            if `get=True`.
+
+        Notes
+        -----
+        - All-zero parameter slices are ignored in determining valid fits.
+        - Updates `self.has_fit` when `get=False`.
+        """
         if np.any(np.all(self.parcube == 0, axis=(1, 2))):
             # there are some slices where all parameters are zero, we should
             # ignore this when establishing whether there's a fit (some
@@ -147,22 +167,16 @@ class PCube(Cube):
 
     def replace_para_n_mod(self, pcube_ref, planemask, multicore=None):
         """
-        Replace parameter values in a parameter cube with those from a reference cube for specific pixels and update
-        its model accordingly.
-
-        This function updates the `parcube`, `errcube`, and `has_fit` attributes of the input `pcube` based on a mask,
-        using the corresponding values from the reference cube (`pcube_ref`).
+        Replace parameter values in a parameter cube and update the model.
 
         Parameters
         ----------
-        self : mufasa.PCube.PCube
-            The parameter cube to be updated. This cube contains the current fitted parameters and their errors.
         pcube_ref : pyspeckit.cube
-            The reference parameter cube containing the values to replace in `pcube`.
+            Reference parameter cube containing the values to replace in the target cube.
         planemask : numpy.ndarray
-            A boolean 2D array indicating the spatial pixels to update. Pixels with `True` in the mask will be updated.
+            A 2D Boolean mask where `True` indicates pixels to update.
         multicore : int or None, optional
-            Number of cores to use for parallel computation. Defaults to None, in which case a single core is used.
+            Number of cores to use for parallel computation. If `None`, a single core is used.
 
         Returns
         -------
@@ -170,17 +184,12 @@ class PCube(Cube):
 
         Notes
         -----
-        - Updates the following attributes of `pcube`:
-          - `parcube` (fitted parameters)
-          - `errcube` (parameter errors)
-          - `has_fit` (boolean map indicating successful fits)
-        - Also updates the `_modelcube` attribute of `pcube` with the corresponding model values from `pcube_ref`.
-        - If `multicore` is specified, it controls the parallelism when computing the model cube from `pcube_ref`.
-
-        Examples
-        --------
-        >>> replace_para_n_mod(self, pcube_ref, planemask, multicore=4)
-        >>> # Updates `pcube` with values from `pcube_ref` for pixels specified by `mask`.
+        - Updates the following attributes of the target `PCube`:
+          - `parcube`: Fitted parameter values.
+          - `errcube`: Parameter errors.
+          - `has_fit`: Boolean map indicating successful fits.
+        - The `_modelcube` is updated using the corresponding model values from `pcube_ref`.
+        - If `multicore` is provided, it controls the level of parallelism when updating the model cube.
         """
         # Replace values in masked pixels with the reference values
         self.parcube[:, planemask] = deepcopy(pcube_ref.parcube[:, planemask])

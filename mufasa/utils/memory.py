@@ -1,3 +1,9 @@
+"""
+This module provides tools to monitor memory usage and
+estimate the memory allocations needed
+
+"""
+
 import psutil  # To detect system memory
 import os
 import threading
@@ -9,15 +15,59 @@ logger = get_logger(__name__)
 
 def monitor_peak_memory(output_attr=None, key=None, unit='GB'):
     """
-    Decorator to monitor and display the peak memory usage of a function,
-    including intermediate peaks, and handle multi-threaded tasks.
+    Decorator to monitor and record the peak memory usage of a function.
 
-    Args:
-        output_attr (str, optional): The name of the instance attribute where
-            peak memory usage will be stored. If None, memory usage is printed.
-        key (str, optional): A key to store the memory usage in a dictionary
-            attribute specified by `output_attr`. If `output_attr` is a string
-            and `key` is provided, the attribute is treated as a dictionary.
+    This decorator measures the peak memory usage, including intermediate peaks,
+    during the execution of a function. It supports multi-threaded tasks and
+    can store results in an instance attribute or print them.
+
+    Parameters
+    ----------
+    output_attr : str or None, optional
+        The name of the instance attribute to store the peak memory usage.
+        If `None`, the memory usage is printed. If specified and a key is
+        provided, the attribute is treated as a dictionary. Default is `None`.
+    key : str or None, optional
+        The dictionary key to use when storing memory usage in the attribute
+        specified by `output_attr`. If `None`, the value is stored directly
+        in the attribute. Default is `None`.
+    unit : {'KB', 'MB', 'GB', 'TB'}, default='GB'
+        The unit for reporting memory usage. If an unrecognized unit is given,
+        a warning is logged, and the default ('GB') is used.
+
+    Returns
+    -------
+    callable
+        A decorator that monitors peak memory usage for the decorated function.
+
+    Raises
+    ------
+    ValueError
+        If `output_attr` is specified as a non-dictionary attribute and a `key`
+        is also provided.
+
+    Examples
+    --------
+    Monitor memory usage and print results:
+
+    >>> @monitor_peak_memory()
+    ... def my_function(self):
+    ...     # Function logic here
+    ...     pass
+
+    Store memory usage in an instance attribute:
+
+    >>> @monitor_peak_memory(output_attr='memory_usage', key='task1')
+    ... def my_function(self):
+    ...     # Function logic here
+    ...     pass
+    >>> self.memory_usage['task1']  # Access the stored peak memory
+
+    Use a custom unit for memory usage:
+
+    >>> @monitor_peak_memory(unit='MB')
+    ... def my_function(self):
+    ...     pass
     """
     ipw = 3
     if unit == 'KB':
@@ -142,75 +192,39 @@ def peak_memory(output_container=None):
     return decorator
 
 
-def monitor_peak_memory_new(sampling_interval=0.1):  # Default to 100ms
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            process = psutil.Process(os.getpid())
-            peak_memory = [0]
-
-            def monitor():
-                while monitoring[0]:
-                    try:
-                        current_memory = process.memory_info().rss / (1024 ** 2)
-                        peak_memory[0] = max(peak_memory[0], current_memory)
-                        time.sleep(sampling_interval)
-                    except psutil.NoSuchProcess:
-                        break
-
-            monitoring = [True]
-            monitor_thread = threading.Thread(target=monitor)
-            monitor_thread.start()
-
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                monitoring[0] = False
-                monitor_thread.join()
-
-            print(f"Peak memory usage for '{func.__name__}': {peak_memory[0]:.2f} MB")
-            return result
-        return wrapper
-    return decorator
-
-
 def calculate_target_memory(multicore, use_total=False, max_usable_fraction=0.85):
     """
-    Calculate the target memory per chunk based on system memory and the number of cores.
-
-    This function dynamically computes the target memory available for each chunk
-    by considering the system's total or available memory, the number of cores in use,
-    and a specified fraction of memory to utilize.
+    Calculate target memory per core for chunked computations.
 
     Parameters
     ----------
     multicore : int
-        The number of cores available for computation. The memory will be divided evenly
-        across these cores.
-    use_total : bool, optional
-        If True, the calculation is based on the total system memory. Otherwise,
-        it uses the available memory. Default is False.
-    max_usable_fraction : float, optional
-        The maximum fraction of memory to allocate for computation. For example,
-        a value of 0.85 means 85% of the memory is considered usable. Default is 0.85.
+        Number of cores available for computation. Memory is divided evenly
+        among these cores.
+    use_total : bool, optional, default=False
+        If `True`, calculate based on the total system memory. If `False`, use
+        available memory instead.
+    max_usable_fraction : float, optional, default=0.85
+        Maximum fraction of memory to allocate for computation. For example,
+        `0.85` means 85% of memory is considered usable.
 
     Returns
     -------
     target_memory_mb : float
-        The target memory per chunk, in megabytes (MB), calculated as:
-        `(usable_memory / multicore)`, where usable memory is determined based on
-        the input parameters.
+        Target memory per core, in megabytes (MB).
 
     Examples
     --------
+    Calculate target memory per core using available system memory:
+
     >>> calculate_target_memory(multicore=4, use_total=False, max_usable_fraction=0.9)
     4096.0  # Example value, system-dependent
 
     Notes
     -----
-    - If `use_total` is set to True, the calculation includes memory currently in use by other processes.
-    - Ensure that `multicore` is greater than zero to avoid division errors.
-    - The returned memory value is specific to each core and assumes tasks are distributed evenly.
+    - If `use_total=True`, the calculation includes memory currently in use by other processes.
+    - Ensure `multicore > 0` to avoid division errors.
+    - The calculated memory assumes even distribution across all cores.
     """
     memory_info = psutil.virtual_memory()
     memory_to_use = memory_info.total if use_total else memory_info.available

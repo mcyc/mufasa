@@ -18,7 +18,6 @@ mufasa.utils
    interpolate
    map_divide
    memory
-   misc
    mufasa_log
    multicore
    neighbours

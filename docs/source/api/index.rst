@@ -1559,16 +1559,6 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.dask_utils`
-   * - :obj:`~mufasa.utils.dask_utils.calculate_chunks_v0`
-     - .. container:: sk-apisearch-desc
-
-          .. currentmodule:: mufasa.utils.dask_utils
-
-          .. autoshortsummary:: mufasa.utils.dask_utils.calculate_chunks_v0
-
-          .. container:: caption
-
-             :mod:`mufasa.utils.dask_utils`
    * - :obj:`~mufasa.utils.dask_utils.compute_chunk_relevant`
      - .. container:: sk-apisearch-desc
 
@@ -1743,16 +1733,6 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.memory`
-   * - :obj:`~mufasa.utils.memory.monitor_peak_memory_new`
-     - .. container:: sk-apisearch-desc
-
-          .. currentmodule:: mufasa.utils.memory
-
-          .. autoshortsummary:: mufasa.utils.memory.monitor_peak_memory_new
-
-          .. container:: caption
-
-             :mod:`mufasa.utils.memory`
    * - :obj:`~mufasa.utils.memory.peak_memory`
      - .. container:: sk-apisearch-desc
 
@@ -1763,7 +1743,6 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.memory`
-   
    
    * - :obj:`~mufasa.utils.mufasa_log.OriginContextFilter`
      - .. container:: sk-apisearch-desc

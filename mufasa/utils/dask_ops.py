@@ -1,3 +1,8 @@
+"""
+This module provides tools and wrappers to perform dask operations
+that can't be performed in short-handed way like numpy arrays
+
+"""
 import dask.array as da
 import numpy as np
 from scipy.ndimage import binary_dilation
@@ -6,14 +11,50 @@ from . import dask_utils
 
 def dask_binary_dilation(mask, selem):
     """
-    Perform binary dilation on a Dask array mask with a structuring element.
+    Perform binary dilation on a Dask array using a specified structuring element.
 
-    Parameters:
-    - mask: Dask array to be dilated
-    - selem: Structuring element (can be a Dask array or NumPy array)
+    Parameters
+    ----------
+    mask : dask.array.Array
+        The 2D Dask array to be dilated.
+    selem : numpy.ndarray or dask.array.Array
+        The structuring element used for dilation. Must be a 2D array.
 
-    Returns:
-    - Dask array after binary dilation
+    Returns
+    -------
+    dask.array.Array
+        A Dask array representing the dilated mask.
+
+    Raises
+    ------
+    ValueError
+        If `selem` is not a NumPy or Dask array.
+
+    Notes
+    -----
+    - The structuring element (`selem`) determines the neighborhood over which dilation
+      is applied.
+    - The function uses Dask's `map_overlap` to handle chunk-wise dilation with
+      appropriate overlap for boundary regions.
+    - The depth of overlap is automatically calculated as half the size of the
+      structuring element along each dimension.
+
+    Examples
+    --------
+    Apply binary dilation to a Dask array with a simple structuring element:
+
+    >>> import dask.array as da
+    >>> import numpy as np
+    >>> from scipy.ndimage import generate_binary_structure
+
+    >>> mask = da.from_array(np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]]), chunks=(3, 3))
+    >>> selem = generate_binary_structure(2, 1)  # Cross-shaped structuring element
+
+    >>> dilated_mask = dask_binary_dilation(mask, selem)
+    >>> dilated_mask.compute()
+    array([[1, 1, 1],
+           [1, 1, 1],
+           [1, 1, 1]])
     """
     # Ensure selem is a NumPy array, as binary_dilation requires it
     if isinstance(selem, da.Array):
@@ -32,33 +73,28 @@ def dask_binary_dilation(mask, selem):
 
 def apply_planemask(cube, planemask, persist=True):
     """
-    Apply a 2D boolean mask to a 3D cube, extracting pixel values within the mask.
-
-    This operation is equivalent to `cube[:, planemask]` in NumPy and reduces the spatial
-    dimensions `(m, n)` of the cube to a single dimension `q`, where `q` is the number of
-    `True` values in the `planemask`.
+    Apply a 2D Boolean mask to a 3D cube, extracting pixel values within the mask.
 
     Parameters
     ----------
     cube : dask.array.Array
-        A 3D Dask array of shape `(l, m, n)`, where `l` is the number of slices and
+        A 3D Dask array of shape `(l, m, n)`, where `l` is the number of slices, and
         `(m, n)` are the spatial dimensions.
     planemask : numpy.ndarray or dask.array.Array
-        A 2D boolean mask of shape `(m, n)` specifying the spatial regions to include.
+        A 2D Boolean mask of shape `(m, n)` specifying the spatial regions to include.
     persist : bool, default=True
-        If True, persist the resulting Dask array in memory for optimized access.
-        If False, the result remains as a lazily evaluated Dask array.
+        Whether to persist the resulting Dask array in memory for optimized access.
 
     Returns
     -------
     dask.array.Array
-        A 2D Dask array of shape `(l, q)`, where `q = planemask.sum()` is the total number
+        A 2D Dask array of shape `(l, q)`, where `q = planemask.sum()` is the number
         of `True` values in the `planemask`.
 
     Raises
     ------
     ValueError
-        If `cube` is not a 3D array, `planemask` is not a 2D array, or if the spatial
+        If `cube` is not a 3D array, `planemask` is not a 2D array, or the spatial
         dimensions of `cube` and `planemask` do not match.
 
     Examples

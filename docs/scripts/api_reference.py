@@ -3,7 +3,7 @@
 API_REFERENCE = {
     'mufasa.PCube': {
         'module': 'mufasa.PCube',
-        'description': '''Undocumented''',
+        'description': '''The `mufasa.''',
         'members': [
             {'name': 'PCube', 'type': 'class', 'description': '''A specialized subclass of :class:`Cube` tailored for Mufasa-specific workflows.'''}
         ]
@@ -284,7 +284,6 @@ API_REFERENCE = {
             {'name': 'mufasa.utils.interpolate', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.map_divide', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.memory', 'type': 'module', 'description': '''No description available.'''},
-            {'name': 'mufasa.utils.misc', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.mufasa_log', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.multicore', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.neighbours', 'type': 'module', 'description': '''No description available.'''}
@@ -292,27 +291,26 @@ API_REFERENCE = {
     },
     'mufasa.utils.dask_ops': {
         'module': 'mufasa.utils.dask_ops',
-        'description': '''Undocumented''',
+        'description': '''This module provides tools and wrappers to perform dask operations.''',
         'members': [
-            {'name': 'apply_planemask', 'type': 'function', 'description': '''Apply a 2D boolean mask to a 3D cube, extracting pixel values within the mask.'''},
-            {'name': 'dask_binary_dilation', 'type': 'function', 'description': '''Perform binary dilation on a Dask array mask with a structuring element.'''}
+            {'name': 'apply_planemask', 'type': 'function', 'description': '''Apply a 2D Boolean mask to a 3D cube, extracting pixel values within the mask.'''},
+            {'name': 'dask_binary_dilation', 'type': 'function', 'description': '''Perform binary dilation on a Dask array using a specified structuring element.'''}
         ]
     },
     'mufasa.utils.dask_utils': {
         'module': 'mufasa.utils.dask_utils',
-        'description': '''Undocumented''',
+        'description': '''This module provides general purpose tool and wrappers to handle dask object.''',
         'members': [
-            {'name': 'calculate_batch_size', 'type': 'function', 'description': '''Dynamically calculate the optimal batch size for processing valid pixels.'''},
-            {'name': 'calculate_chunks', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array based on a regular grid with.'''},
-            {'name': 'calculate_chunks_v0', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array based on the given criteria.'''},
-            {'name': 'compute_chunk_relevant', 'type': 'function', 'description': '''Compute chunk relevance for a 2D mask (isvalid) based on its chunking.'''},
-            {'name': 'compute_global_offsets', 'type': 'function', 'description': '''Compute the global offsets given the chunk sizes and the chunk location.'''},
-            {'name': 'custom_task_graph', 'type': 'function', 'description': '''Build a custom task graph to process relevant chunks of host_cube based on isvalid.'''},
-            {'name': 'lazy_pix_compute', 'type': 'function', 'description': '''Lazily compute values for valid pixels specified by the `isvalid` mask using the specified scheduler.'''},
-            {'name': 'lazy_pix_compute_dynamic', 'type': 'function', 'description': '''Adaptive computation of valid pixels with dynamic batching and scheduling.'''},
-            {'name': 'lazy_pix_compute_no_batching', 'type': 'function', 'description': '''Optimized function to compute valid pixels in a Dask array by processing only relevant chunks.'''},
-            {'name': 'lazy_pix_compute_single', 'type': 'function', 'description': '''Lazily compute values for each valid pixel specified by the isvalid mask.'''},
-            {'name': 'persist_and_clean', 'type': 'function', 'description': '''Persist a Dask collection, clean up intermediate variables, and optionally visualize the graph.'''}
+            {'name': 'calculate_batch_size', 'type': 'function', 'description': '''Calculate the optimal batch size and adjusted number of workers for processing valid pixels.'''},
+            {'name': 'calculate_chunks', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array with an optimal aspect ratio and target memory usage.'''},
+            {'name': 'compute_chunk_relevant', 'type': 'function', 'description': '''Determine the relevance of chunks in a 2D Boolean mask.'''},
+            {'name': 'compute_global_offsets', 'type': 'function', 'description': '''Calculate global offsets for a chunk's position in a multidimensional array.'''},
+            {'name': 'custom_task_graph', 'type': 'function', 'description': '''Construct a custom task graph to process valid pixels in a Dask array.'''},
+            {'name': 'lazy_pix_compute', 'type': 'function', 'description': '''Lazily compute spectral values for valid pixels in a data cube.'''},
+            {'name': 'lazy_pix_compute_dynamic', 'type': 'function', 'description': '''Compute valid pixels in a 3D data cube adaptively with dynamic batching and scheduling.'''},
+            {'name': 'lazy_pix_compute_no_batching', 'type': 'function', 'description': '''Compute valid pixels in a Dask array by processing only relevant chunks.'''},
+            {'name': 'lazy_pix_compute_single', 'type': 'function', 'description': '''Lazily compute spectral values for valid pixels in a data cube.'''},
+            {'name': 'persist_and_clean', 'type': 'function', 'description': '''Persist a Dask collection and optionally visualize its computation graph.'''}
         ]
     },
     'mufasa.utils.dataframe': {
@@ -342,19 +340,11 @@ API_REFERENCE = {
     },
     'mufasa.utils.memory': {
         'module': 'mufasa.utils.memory',
-        'description': '''Undocumented''',
+        'description': '''This module provides tools to monitor memory usage and.''',
         'members': [
-            {'name': 'calculate_target_memory', 'type': 'function', 'description': '''Calculate the target memory per chunk based on system memory and the number of cores.'''},
-            {'name': 'monitor_peak_memory', 'type': 'function', 'description': '''Decorator to monitor and display the peak memory usage of a function,.'''},
-            {'name': 'monitor_peak_memory_new', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'calculate_target_memory', 'type': 'function', 'description': '''Calculate target memory per core for chunked computations.'''},
+            {'name': 'monitor_peak_memory', 'type': 'function', 'description': '''Decorator to monitor and record the peak memory usage of a function.'''},
             {'name': 'peak_memory', 'type': 'function', 'description': '''Decorator to monitor and display the peak memory usage of a function,.'''}
-        ]
-    },
-    'mufasa.utils.misc': {
-        'module': 'mufasa.utils.misc',
-        'description': '''Undocumented''',
-        'members': [
-
         ]
     },
     'mufasa.utils.mufasa_log': {
