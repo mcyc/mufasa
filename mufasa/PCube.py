@@ -120,11 +120,11 @@ class PCube(Cube):
 
         if not multicore:
             # Sequential computation
-            logger.info("Running in single-core mode.")
+            logger.debug("Running in single-core mode.")
             self._modelcube = dask_utils.lazy_pix_compute_single(self._modelcube, isvalid, compute_pixel)
 
         else:
-            logger.info("Running in threaded mode.")
+            logger.debug("Running in threaded mode.")
             #self._modelcube = dask_utils.lazy_pix_compute_no_batching(self._modelcube, isvalid, compute_pixel)
             self._modelcube = dask_utils.custom_task_graph(self._modelcube, isvalid, compute_pixel,
                                                            use_global_xy=True, scheduler=scheduler)
