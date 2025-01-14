@@ -145,7 +145,7 @@ class UltraCube(object):
         """
         return mvf.make_header(ndim=2, ref_header=self.cube.header)
 
-    def load_cube(self, fitsfile):
+    def load_cube(self, fitsfile, chunks=None, chunk_memory_size=16):
         """
         Load a spectral cube from a FITS file and convert its units to K and km/s.
 
@@ -163,6 +163,20 @@ class UltraCube(object):
         None
         """
         cube = SpectralCube.read(fitsfile, use_dask=True)
+
+        # Validate and set chunks
+        if dask_utils._is_valid_chunk(chunks) and chunks is not None:
+            self.chunks = chunks
+        else:
+            self.chunks = dask_utils.calculate_chunks(
+                cube_shape=cube.shape,
+                dtype=cube._data.dtype,
+                target_chunk_mem_mb=chunk_memory_size
+            )
+        # rechunk using MUFASA's chunking scheme (perserves spectral axis)
+        cube = cube.rechunk(self.chunks)
+
+        # convert the cube unit
         cube = to_K(cube)
 
         if cube.spectral_axis.unit.is_equivalent(u.Hz):
@@ -1149,34 +1163,34 @@ def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20)
 
 
 def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0, planemask=None):
-    """
+    r"""
     Calculate the relative likelihood of two models based on their AICc values.
 
     This function computes the logarithmic relative likelihood of model A
     compared to model B, given their corrected Akaike Information Criterion (AICc)
-    values. It can optionally use a second `UltraCube` instance for comparisons.
+    values. Optionally, it allows for comparisons using a second `UltraCube` instance.
 
     Parameters
     ----------
     ucube : UltraCube
-        An instance of the `UltraCube` class containing the spectral data,
+        Instance of the `UltraCube` class containing the spectral data,
         fitted models, and associated parameters for model A.
     ncomp_A : int
         Number of components in model A.
     ncomp_B : int
         Number of components in model B.
     ucube_B : UltraCube, optional
-        An optional second `UltraCube` instance for model B. If provided,
-        AICc values for both models are calculated independently, and a
-        common mask is used. Default is None.
+        Optional second `UltraCube` instance for model B. If provided,
+        AICc values for both models are calculated independently, using a
+        common mask. Default is None.
     multicore : bool, optional
-        Whether to enable parallel processing. Default is True.
+        Enables parallel processing if set to `True`. Default is `True`.
     expand : int, optional
-        Number of spectral channels to expand the region where AICc values
-        are calculated. Default is 0.
+        Number of spectral channels to expand in the region where AICc values
+        are calculated. Only used if `ucube_B` is provided. Default is `0`.
     planemask : numpy.ndarray, optional
         A 2D spatial boolean array specifying which pixels to calculate the
-        relative likelihood for. If None, all pixels are considered. Default is None.
+        relative likelihood for. If `None`, all pixels are considered. Default is `None`.
 
     Returns
     -------
@@ -1186,23 +1200,24 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
 
     Notes
     -----
-    - The likelihood is derived from the difference in AICc values:
+    The relative likelihood is derived from the difference in AICc values:
 
-        .. math::
+    .. math::
 
-            \ln(\mathcal{L}_A / \mathcal{L}_B) = (AICc_B - AICc_A) / 2
+        \ln(\mathcal{L}_A / \mathcal{L}_B) = \frac{AICc_B - AICc_A}{2}
 
-      where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of models A and B.
+    where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of models A and B.
+
     - If `ucube_B` is provided, the models are compared over their common mask, and the AICc values
-      are recalculated fresh.
-    - This function handles mismatches in sample size (`NSamp`) by resetting and updating model masks.
-    - Currently, the expand argument is only used if ucube_B is provided
+      are recalculated.
+    - Mismatches in the sample size (`NSamp`) are handled by resetting and updating model masks.
+    - The `expand` argument is currently used only if `ucube_B` is provided.
 
     Raises
     ------
     ValueError
-        If the required AICc values for the models cannot be calculated due to missing data or invalid masks.
-
+        If the required AICc values for the models cannot be calculated due to missing data
+        or invalid masks.
     """
     if not ucube_B is None:
         # if a second UCube is provide for model comparison, use their common mask and calculate AICc values
@@ -1247,7 +1262,7 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
     return lnk
 
 def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
-    """
+    r"""
     Compute log-likelihood ratio maps for model comparisons up to a specified number of components.
 
     This function calculates log-likelihood ratio (lnk) maps for comparing spectral
@@ -1257,36 +1272,40 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
     Parameters
     ----------
     ucube : UltraCube
-        An instance of the `UltraCube` class containing the spectral data and fitted models.
+        Instance of the `UltraCube` class containing the spectral data and fitted models.
     ncomp_max : int, optional
-        The maximum number of components to include in the model comparison.
-        Default is 2.
+        Maximum number of components to include in the model comparison.
+        Default is `2`.
     rest_model_mask : bool, optional
-        If True, resets and updates the master model mask in `ucube` for components
-        being compared. Default is True.
+        If `True`, resets and updates the master model mask in `ucube` for components
+        being compared. Default is `True`.
     multicore : bool, optional
-        Whether to enable parallel processing for calculations. Default is True.
+        Enables parallel processing for calculations if set to `True`. Default is `True`.
 
     Returns
     -------
     lnk_maps : tuple of numpy.ndarray
-        Log-likelihood ratio maps for the model comparisons. The returned maps include:
+        Log-likelihood ratio maps for model comparisons. The returned tuple includes:
         - `lnk10`: Comparison between 1-component and 0-component models.
         - `lnk20` (if `ncomp_max >= 2`): Comparison between 2-component and 0-component models.
         - `lnk21` (if `ncomp_max >= 2`): Comparison between 2-component and 1-component models.
 
     Notes
     -----
-    - Log-likelihood ratios are calculated using AICc values for each model as:
+    Log-likelihood ratios are calculated using the AICc values for each model as:
 
-        .. math::
+    .. math::
 
-            \ln(\mathcal{L}_A / \mathcal{L}_B) = (AICc_B - AICc_A) / 2
+        \ln(\mathcal{L}_A / \mathcal{L}_B) = \frac{AICc_B - AICc_A}{2}
 
-      where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of
-      models A and B, respectively.
+    where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of
+    models A and B, respectively.
+
     - If `ncomp_max` is greater than 2, the function does not compute higher-order
-      comparisons and simply returns the log-likelihood maps for up to 2 components.
+      comparisons and returns the log-likelihood maps for up to 2 components only.
+    - The `rest_model_mask` parameter ensures that the master model mask in `ucube`
+      is updated to include components being compared, which can be useful for ensuring
+      consistent sample sizes.
 
     Raises
     ------

@@ -80,6 +80,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         newcube = cnv_cube.reproject(nhdr, order='bilinear')
     else:
         newcube = cnv_cube
+    gc.collect()
 
     if savename != None:
         newcube.write(savename, overwrite=True)
