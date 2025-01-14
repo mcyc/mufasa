@@ -24,6 +24,7 @@ import pyspeckit
 import gc
 from astropy import units as u
 from astropy.units import UnitConversionError
+import astropy.io.fits as fits
 import scipy.ndimage as nd
 from astropy.stats import mad_std
 
@@ -855,6 +856,68 @@ def save_fit(pcube, savename, ncomp, header_note=None):
     """
     # specifically save ammonia multi-component model with the right fits header
     mvf.save_pcube(pcube, savename, ncomp, header_note=header_note)
+
+
+def save_para(savename, parcube, errcube, cube_header, ncomp, npara=4, header_note=None):
+    # a method to save the fitted parameter cube with relavent header information
+
+    # create a new header using the pcube's cube header as a template
+    hdr_new = mvf.make_header(ndim=3, ref_header=cube_header)
+
+    if header_note is None:
+        header_note = f'Parameter maps derived from {ncomp}-comp model fits'
+
+    hdr_new.set(keyword='NOTES', value=header_note, comment=None, before='DATE')
+
+    # modify the units of the plane accordingly
+    hdr_new.set(keyword ='CDELT3', value=1, comment='[unitless] Coordinate increment at reference point')
+    hdr_new.set(keyword ='CTYPE3', value='FITPAR', comment='fitted parameters')
+    hdr_new.set(keyword ='CRVAL3', value=0, comment='[unitless] Coordinate value at reference point')
+    hdr_new.set(keyword='CRPIX3', value=1, comment='[unitless] Pixel coordinate of reference point')
+    hdr_new.set(keyword ='CUNIT3', value='None', comment='[unitless] Units of coordinate increment and value')
+
+    if ncomp == 1:
+        hdr_new.set(keyword ='PLANE0', value= 'VELOCITY', comment='[km/s] vlsr')
+        hdr_new.set(keyword ='PLANE1', value= 'SIGMA', comment='[km/s] velocity dispersion')
+        hdr_new.set(keyword ='PLANE2', value  = 'TEX', comment='[K] excitation temperature')
+        hdr_new.set(keyword ='PLANE3', value  = 'TAU', comment='[unitless] peak optical depth')
+
+        hdr_new.set(keyword ='PLANE4', value  = 'eVELOCITY', comment='[km/s] estimated error of vlsr')
+        hdr_new.set(keyword ='PLANE5', value  = 'eSIGMA', comment='[km/s] estimated error velocity dispersion')
+        hdr_new.set(keyword ='PLANE6', value = 'eTEX', comment='[K] estimated error excitation temperature')
+        hdr_new.set(keyword ='PLANE7', value = 'eTAU', comment='[unitless] estimated error of peak optical depth')
+
+    elif ncomp > 1:
+        for i in range(0, ncomp):
+            hdr_new.set(keyword=f'PLANE{i * npara + 0}', value=f'VELOCITY_{i + 1}',
+                        comment=f'[km/s] vlsr of component {i+1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 1}', value=f'SIGMA_{i + 1}',
+                        comment=f'[km/s] velocity dispersion of component {i + 1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 2}', value=f'TEX_{i + 1}',
+                        comment=f'[K] excitation temperature of component {i + 1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 3}', value=f'TAU_{i + 1}',
+                        comment=f'[unitless] peak optical depth of component {i + 1}')
+
+        # the loop is split into two so the numbers will be written in ascending order
+        for i in range(0, ncomp):
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 0}', value=f'eVELOCITY_{i + 1}',
+                        comment=f'[km/s] estimated error of component {i+1} vlsr')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 1}', value=f'eSIGMA_{i + 1}',
+                        comment=f'[km/s] estimated error of component {i + 1} velocity dispersion')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 2}', value=f'eTEX_{i + 1}',
+                        comment=f'[K] estimated error of component {i + 1} excitation temperature')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 3}', value=f'eTAU_{i + 1}',
+                        comment=f'[unitless] estimated error of component {i + 1} peak optical depth')
+
+    fitcubefile = fits.PrimaryHDU(data=np.concatenate([parcube, errcube]), header=hdr_new)
+    fitcubefile.writeto(savename, overwrite=True)
+    logger.debug("{} saved.".format(savename))
 
 
 

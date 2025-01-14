@@ -826,6 +826,15 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
             kwargs['maskmap'] = planemask
             n_pix = np.sum(np.all(np.isfinite(guesses), axis=0) & planemask)
 
+        # conserve memory
+        if not use_cnv_lnk:
+            del reg.ucube_cnv.pcubes[str(nc)]
+            gc.collect()
+
+        if nc == 2:
+            del reg.ucube_cnv
+            gc.collect()
+
         reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_pix, n_success='N/A')
 
         reg.ucube.get_model_fit([nc], **kwargs)
@@ -1826,7 +1835,8 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
 
     if from_saved_para:
         # create a new Region object to start fresh
-        reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
+        # reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
+        reg_final = reg
 
         # load files using paths from reg if they exist
         for nc in ncomps:
@@ -1839,11 +1849,11 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
         reg_final = reg
 
     # make the two-component parameter maps with the best fit model
-    pcube_final = reg_final.ucube.pcubes['2']
+    #pcube_final = reg_final.ucube.pcubes['2']
     kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True)
     parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
-    pcube_final.parcube = parcube
-    pcube_final.errcube = errcube
+    #pcube_final.parcube = parcube
+    #pcube_final.errcube = errcube
 
     # use the default file format to save the final results
     nc = 2
@@ -1854,10 +1864,13 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
 
     savename = "{}_final.fits".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
     notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
-    UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
+    #UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
+    pcube_header = reg_final.ucube.pcubes['2'].header
+    UCube.save_para(savename, parcube=parcube, errcube=errcube, cube_header=pcube_header,
+                    ncomp=2, npara=4, header_note=notes)
 
-    del pcube_final
-    gc.collect()
+    #del pcube_final
+    #gc.collect()
 
     hdr2D = reg.ucube.make_header2D()
     paraDir = reg_final.ucube.paraDir
