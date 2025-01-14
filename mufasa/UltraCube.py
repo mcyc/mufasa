@@ -116,6 +116,9 @@ class UltraCube(object):
                 # Load from a SpectralCube instance
                 self.cube = cube
 
+        # the spatial footprint of the cube
+        self.cube_footprint = np.any(self.cube.get_mask_array(),axis=0)
+
         if fittype is not None:
             # for the current usage, setting ncomp=1 is fine. Changes to MetalModel in the future will be needed
             # to elimiate needing ncomp during its intialization
@@ -464,6 +467,19 @@ class UltraCube(object):
 
     def get_rss(self, ncomp, mask=None, planemask=None, update=True, expand=20):
         # residual sum of squares
+
+        compID = str(ncomp)
+
+        if not compID in self.rss_maps:
+            # for the first time calculating, only compute where the cube is finite
+            self.rss_maps[compID] = np.zeros(self.cube_footprint.shape, dtype=float)
+            self.rss_maps[compID][:] = np.nan
+            self.NSamp_maps[compID] = np.zeros(self.cube_footprint.shape, dtype=float)
+            if planemask is not None:
+                planemask = planemask & self.cube_footprint
+            else:
+                planemask = self.cube_footprint
+
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
@@ -477,11 +493,11 @@ class UltraCube(object):
         mask = np.logical_or(mask, rrs <= 0)
         rrs[mask] = np.nan
         if planemask is None:
-            self.rss_maps[str(ncomp)] = rrs
-            self.NSamp_maps[str(ncomp)] = nsamp
+            self.rss_maps[compID] = rrs
+            self.NSamp_maps[compID] = nsamp
         else:
-            self.rss_maps[str(ncomp)][planemask] = rrs
-            self.NSamp_maps[str(ncomp)][planemask] = nsamp
+            self.rss_maps[compID][planemask] = rrs
+            self.NSamp_maps[compID][planemask] = nsamp
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -512,6 +528,15 @@ class UltraCube(object):
             # note that zero component is assumed to have no free-parameter (i.e., no fitting)
             p = ncomp * 4
             self.get_rss(ncomp, update=update, planemask=planemask, expand=expand, **kwargs)
+
+            if not compID in self.AICc_maps:
+                self.AICc_maps[compID] = np.zeros(self.cube_footprint.shape, dtype=float)
+                self.AICc_maps[compID][:] = np.nan
+                if planemask is not None:
+                    planemask = planemask & self.cube_footprint
+                else:
+                    planemask = self.cube_footprint
+
             if planemask is None or not compID in self.AICc_maps:
                 self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
             else:
@@ -1182,10 +1207,10 @@ def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20)
 
     Returns
     -------
-    AICc_map : numpy.ndarray
-        A 2D array containing the computed AICc values for the specified regions.
-    NSamp_map : numpy.ndarray, optional
-        A 2D array containing the effective sample size for each spatial pixel.
+    AICc : numpy.ndarray
+        An array containing the computed AICc values for the specified regions.
+    NSamp : numpy.ndarray, optional
+        An array containing the effective sample size for each spatial pixel.
         Only returned if `return_NSamp` is True.
 
     Notes
@@ -1215,14 +1240,14 @@ def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20)
         modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
     # get the rss value and sample size
-    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask,
+    rss, NSamp = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask,
                                  return_size=True, return_mask=False, planemask=planemask)
-    AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
+    AICc = aic.AICc(rss=rss, p=p, N=NSamp)
 
     if return_NSamp:
-        return AICc_map, NSamp_map
+        return AICc, NSamp
     else:
-        return AICc_map
+        return AICc
 
 
 def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0, planemask=None):

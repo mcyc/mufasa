@@ -123,81 +123,6 @@ def register_pcube(pcube, mod_info):
     logger.debug("the line to fit is {0}".format(mod_info.linenames))
     return pcube
 
-# setup_cube is depreciated
-'''
-def setup_cube(cube, mod_info, return_spectral_cube=False):
-
-    if hasattr(cube, 'spectral_axis'):
-        # if it's a SpectralCube object
-        pcube = pyspeckit.Cube(cube=cube)
-
-        if isinstance(cube._data, dask.array.Array):
-            logger.info("SpectralCube uses dask")
-            # load the entire array onto pcube
-            pcube.data = cube._data.compute()
-            pcube.data = cube._data.compute()
-
-
-        if False:# #isinstance(cube._data, np.ndarray):
-            logger.info("SpectralCube does not use dask")
-            pcube = pyspeckit.Cube(cube=cube)
-
-        elif False: # isinstance(cube._data, dask.array.Array):
-            logger.info("SpectralCube uses dask")
-
-            if cube.spectral_axis.flags['OWNDATA']:
-                xarr = SpectroscopicAxis(cube.spectral_axis,
-                                         unit=cube.spectral_axis.unit,
-                                         refX=cube.wcs.wcs.restfrq,
-                                         refX_unit='Hz')
-            else:
-                xarr = SpectroscopicAxis(cube.spectral_axis.copy(),
-                                         unit=cube.spectral_axis.unit,
-                                         refX=cube.wcs.wcs.restfrq,
-                                         refX_unit='Hz')
-
-            pcube = pyspeckit.Cube(cube=cube._data.compute(), xarr=xarr, header=cube.header)
-
-            if (cube.unit in ('undefined', u.dimensionless_unscaled)
-                    and 'BUNIT' in cube._meta):
-                pcube.unit = cube._meta['BUNIT']
-            else:
-                pcube.unit = cube.unit
-
-    elif isinstance(cube, str):
-        cubename = cube
-        if return_spectral_cube:
-            cube = SpectralCube.read(cube)
-            # pcube = pyspeckit.Cube(filename=cubename)
-            pcube = pyspeckit.Cube(cube=cube)
-
-        else:
-            pcube = pyspeckit.Cube(filename=cubename)
-
-    pcube.unit = "K"
-    if np.isnan(pcube.wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        pcube.xarr.refX = mod_info.freq_dict[linename] * u.Hz
-    pcube.xarr.velocity_convention = 'radio'
-
-    # always register the fitter just in case different lines are used
-    fitter = mod_info.fitter
-    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
-    logger.debug("number of parameters is {0}".format(fitter.npars))
-    logger.debug("the line to fit is {0}".format(mod_info.linenames))
-
-    if return_spectral_cube:
-        # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
-        # note: this assume the data cube has the right units
-        if np.isnan(cube._wcs.wcs.restfrq):
-            # Specify the rest frequency not present
-            cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
-        cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-
-        return pcube, cube
-    else:
-        return pcube
-'''
 
 def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
@@ -216,9 +141,6 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
     taumax = mod_info.taumax
     taumin = mod_info.taumin
     eps = mod_info.eps
-
-    # deprecated and no longer needed
-    #pcube = setup_cube(cube, mod_info, return_spectral_cube=False)
 
     register_pcube(pcube, mod_info)
 
