@@ -737,7 +737,6 @@ def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCn
             # have another pass of quality assurance
             refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
 
-    #save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
     reg.save_best_2comp_fit(multicore=multicore, lnk21_thres=5, lnk10_thres=5)
     reg.log_memory(process_name='save_best_2comp', peak_memory=reg.memory_log['save_best_2comp'])
 
@@ -1834,54 +1833,41 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     save_updated_paramaps(reg.ucube, ncomps=ncomps)
 
     if from_saved_para:
-        # create a new Region object to start fresh
-        # reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
-        reg_final = reg
-
         # load files using paths from reg if they exist
         for nc in ncomps:
             if not str(nc) in reg.ucube.pcubes:
-                reg_final.load_fits(ncomp=[nc])
+                reg.load_fits(ncomp=[nc])
             else:
                 logger.debug("Loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
-                reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
-    else:
-        reg_final = reg
+                reg.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
 
     # make the two-component parameter maps with the best fit model
-    #pcube_final = reg_final.ucube.pcubes['2']
     kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True)
-    parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
-    #pcube_final.parcube = parcube
-    #pcube_final.errcube = errcube
+    parcube, errcube, lnk10, lnk20, lnk21 = reg.ucube.get_best_2c_parcube(**kwargs)
 
     # use the default file format to save the final results
     nc = 2
-    if not str(nc) in reg_final.ucube.paraPaths:
-        reg_final.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(
-            reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot, nc
+    if not str(nc) in reg.ucube.paraPaths:
+        reg.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(
+            reg.ucube.paraDir, reg.ucube.paraNameRoot, nc
         )
 
-    savename = "{}_final.fits".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
+    savename = "{}_final.fits".format(os.path.splitext(reg.ucube.paraPaths['2'])[0])
     notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
-    #UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
-    pcube_header = reg_final.ucube.pcubes['2'].header
+    pcube_header = reg.ucube.pcubes['2'].header
     UCube.save_para(savename, parcube=parcube, errcube=errcube, cube_header=pcube_header,
                     ncomp=2, npara=4, header_note=notes)
 
-    #del pcube_final
-    #gc.collect()
-
     hdr2D = reg.ucube.make_header2D()
-    paraDir = reg_final.ucube.paraDir
-    paraRoot = reg_final.ucube.paraNameRoot
+    paraDir = reg.ucube.paraDir
+    paraRoot = reg.ucube.paraNameRoot
 
     if save_csv or save_Scatter3D:
         #save structured data (read the saved .fits file first, using ScatterPPV as a quick work around for now)
         sppv = scatter_3D.ScatterPPV(savename, fittype=reg.fittype, meta_model=reg.ucube.meta_model)
 
         if save_csv:
-            savename = "{}_final.csv".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
+            savename = "{}_final.csv".format(os.path.splitext(reg.ucube.paraPaths['2'])[0])
             sppv.dataframe.to_csv(savename, index=False)
 
         if save_Scatter3D:
@@ -1956,7 +1942,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     logger.debug('{} saved.'.format(savename))
 
     # save the SNR map
-    snr_map = get_best_2comp_snr_mod(reg_final)
+    snr_map = get_best_2comp_snr_mod(reg)
     hdr_save = hdr2D.copy()
     hdr_save.set(keyword='NOTES', value='Estimated peak signal-to-noise ratio', comment=None, before='DATE')
     hdr_save.set(keyword='BUNIT', value='unitless', comment=None, before=1)
@@ -1965,10 +1951,10 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     logger.debug('{} saved.'.format(savename))
 
     # create moment0 map
-    modbest = get_best_2comp_model(reg_final)
+    modbest = get_best_2comp_model(reg)
     gc.collect()
-    cube_mod = DaskSpectralCube(data=modbest, wcs=copy(reg_final.ucube.pcubes['2'].wcs),
-                            header=copy(reg_final.ucube.pcubes['2'].header))
+    cube_mod = DaskSpectralCube(data=modbest, wcs=copy(reg.ucube.pcubes['2'].wcs),
+                            header=copy(reg.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
     if reg.ucube.n_cores > 1:
@@ -1977,13 +1963,13 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
-    if isinstance(modbest, da.Array):
-        modbest.persist()
     del cube_mod, mom0_mod
+    if isinstance(modbest, da.Array):
+        modbest = dask_utils.reset_graph(modbest)
     gc.collect()
 
     # created masked mom0 map with model as the mask
-    mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=20, mask=None)
+    mom0 = UCube.get_masked_moment(cube=reg.ucube.cube, model=modbest, order=0, expand=20, mask=None)
     savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
@@ -1991,8 +1977,8 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     gc.collect()
 
     # save reduced chi-squred maps for 1 comp and 2 comp individually
-    chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
-    chiRed_2c = reg_final.ucube.get_reduced_chisq(2)
+    chiRed_1c = reg.ucube.get_reduced_chisq(1)
+    chiRed_2c = reg.ucube.get_reduced_chisq(2)
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
     hdr_save = hdr2D.copy()

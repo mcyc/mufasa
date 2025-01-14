@@ -16,6 +16,33 @@ from .mufasa_log import get_logger
 logger = get_logger(__name__)
 #======================================================================================================================#
 
+def reset_graph(dask_obj):
+    """
+    Resets the computation graph of a Dask object.
+
+    Parameters:
+    ----------
+    dask_obj : dask.array.Array, dask.dataframe.DataFrame, or dask.bag.Bag
+        The Dask object to reset.
+
+    Returns:
+    -------
+    Same type as input
+        A new Dask object with the computation graph reset.
+    """
+    if hasattr(dask_obj, "map_blocks"):
+        # Handle Dask arrays
+        dask_cleaned = dask_obj.map_blocks(lambda block: block, dtype=dask_obj.dtype)
+    elif hasattr(dask_obj, "map_partitions"):
+        # Handle Dask DataFrames or Bags
+        dask_cleaned = dask_obj.map_partitions(lambda partition: partition)
+    else:
+        raise TypeError("Unsupported Dask object type.")
+
+    gc.collect()  # Optional: Trigger garbage collection
+    return dask_cleaned
+
+
 def persist_and_clean(dask_obj, debug=False, visualize_filename=None):
     """
     Persist a Dask collection and optionally visualize its computation graph.
