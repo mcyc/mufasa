@@ -198,7 +198,7 @@ class UltraCube(object):
                 cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
 
         self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-        self.cube.use_dask_scheduler(self.scheduler)
+        #self.cube.use_dask_scheduler(self.scheduler) #default to
 
 
     def load_pcube(self, pcube_ref=None, pyspeckit=False):
