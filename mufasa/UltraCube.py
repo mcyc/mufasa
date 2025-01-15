@@ -111,6 +111,7 @@ class UltraCube(object):
         self.meta_model = None
         self.scheduler = scheduler
 
+        # scheduler: {'threads', 'processes', 'synchronous'}
         dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
 
         if cubefile is not None:
@@ -183,6 +184,7 @@ class UltraCube(object):
                 target_chunk_mem_mb=chunk_memory_size
             )
         # rechunk using MUFASA's chunking scheme (perserves spectral axis)
+        self.chunks_native = cube._data.chunks
         cube = cube.rechunk(self.chunks)
 
         # convert the cube unit
@@ -196,8 +198,7 @@ class UltraCube(object):
                 cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
 
         self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-        if self.n_cores > 1:
-            self.cube.use_dask_scheduler('threads')
+        self.cube.use_dask_scheduler(self.scheduler)
 
 
     def load_pcube(self, pcube_ref=None, pyspeckit=False):
@@ -278,7 +279,11 @@ class UltraCube(object):
         """
         if factor is None:
             factor = self.cnv_factor
-        self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, edgetrim_width=edgetrim_width)
+
+        kwargs = dict(edgetrim_width=edgetrim_width)
+        if hasattr(self, chunks_native):
+            kwargs['rechunk'] = self.chunks_native
+        self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, **kwargs)
 
 
     def get_cnv_cube(self, filename=None):

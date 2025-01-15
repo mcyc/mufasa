@@ -432,7 +432,7 @@ class Region(object):
                 # Clear the timestamp as the task is completed
                 self.timestamp = None
             else:
-                runtime_info = "in progress" if self.timestamp is not None else "N/A"
+                runtime_info = "in progress" if self.timestamp is not None else np.nan
 
         # Initialize progress log if it doesn't exist yet
         if not hasattr(self, 'progress_log'):
@@ -440,15 +440,15 @@ class Region(object):
                        'total runtime (dd:hh:mm:ss)', 'cores used', 'peak memory (GB)']
             self.progress_log = pd.DataFrame(columns=columns)
 
-        cores_info = int(cores) if cores is not None else "N/A"
+        cores_info = int(cores) if cores is not None else np.nan
 
         if process_name in self.progress_log['process'].values:
             # Replace the previous entry if the process has been logged
             mask = self.progress_log['process'] == process_name
             self.progress_log.loc[mask, ['last completed', 'total runtime (dd:hh:mm:ss)']] = [time_info, runtime_info]
 
-            # Update cores used only if the existing value is the default "N/A"
-            if cores is not None or self.progress_log.loc[mask, 'cores used'].values[0] == "N/A":
+            # Update cores used only if the existing value is the default np.nan
+            if cores is not None or self.progress_log.loc[mask, 'cores used'].values[0] == np.nan:
                 self.progress_log.loc[mask, 'cores used'] = cores_info
 
             # Update attempted fits and successful fits if arguments are provided
@@ -464,11 +464,11 @@ class Region(object):
             info = {
                 'process': process_name,
                 'last completed': time_info,
-                'attempted fits (pix)': n_attempted if n_attempted is not None else "None",
-                'successful fits (pix)': n_success if n_success is not None else "None",
+                'attempted fits (pix)': n_attempted if n_attempted is not None else np.nan,
+                'successful fits (pix)': n_success if n_success is not None else np.nan,
                 'total runtime (dd:hh:mm:ss)': runtime_info,
                 'cores used': cores_info,
-                'peak memory (GB)': peak_memory if peak_memory is not None else "None",
+                'peak memory (GB)': peak_memory if peak_memory is not None else np.nan,
             }
 
             if pd.__version__ >= '1.3.0':
@@ -1976,8 +1976,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
                             header=copy(reg.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
-    if reg.ucube.n_cores > 1:
-        cube_mod.use_dask_scheduler('threads')
+    cube_mod.use_dask_scheduler(reg.ucube.scheduler)
     mom0_mod = cube_mod.moment0()
     savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)

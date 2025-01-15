@@ -34,7 +34,8 @@ logger = get_logger(__name__)
 #=======================================================================================================================
 # utility tools for convolve cubes
 
-def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True, **kwargs):
+def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True,
+                          rechunk=None, **kwargs):
     # factor = factor * 1.0 # probably unecessary, better option is factor = float(factor)
 
     if not isinstance(cube, SpectralCube):
@@ -42,7 +43,10 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
 
     # auto rechunk to not overwhelm the convlution process with chunks that are too small
     chunks_og = cube._data.chunks
-    cube = cube.rechunk('auto')
+    if rechunk is None:
+        cube = cube.rechunk('auto')
+    else:
+        cube = cube.rechunk(rechunk)
 
     if edgetrim_width is not None:
         cube = edge_trim(cube, trim_width=edgetrim_width)
