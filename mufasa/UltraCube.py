@@ -112,7 +112,7 @@ class UltraCube(object):
         self.scheduler = scheduler
 
         # scheduler: {'threads', 'processes', 'synchronous'}
-        dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
+        #dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
 
         if cubefile is not None:
             self.cubefile = cubefile
