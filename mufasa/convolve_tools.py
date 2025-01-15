@@ -40,6 +40,10 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
     if not isinstance(cube, SpectralCube):
         cube = SpectralCube.read(cube, use_dask=True)
 
+    # auto rechunk to not overwhelm the convlution process with chunks that are too small
+    chunks_og = cube._data.chunks
+    cube = cube.rechunk('auto')
+
     if edgetrim_width is not None:
         cube = edge_trim(cube, trim_width=edgetrim_width)
 
@@ -70,6 +74,11 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
 
     if not np.isnan(cnv_cube.fill_value):
         cnv_cube = cnv_cube.with_fill_value(np.nan)
+
+    # rechunk back to the original chunking
+    chunks_og = cube._data.chunks
+    cube = cube.rechunk(chunks_og)
+    gc.collect()
 
     if downsample:
         # regrid the convolved cube

@@ -233,3 +233,25 @@ def calculate_target_memory(multicore, use_total=False, max_usable_fraction=0.85
     # Divide usable memory by the number of cores
     target_memory_mb = usable_memory / multicore / (1024 * 1024)  # Convert to MB
     return target_memory_mb
+
+
+def calculate_dask_memory_limit(n_workers):
+    """
+    Mimic Dask's default memory limit setting.
+
+    Parameters:
+    - n_workers (int): Number of workers to divide the memory among.
+
+    Returns:
+    - memory_limit (float): Memory limit per worker in bytes.
+    """
+    if n_workers <= 0:
+        raise ValueError("Number of workers must be greater than 0.")
+
+    # Get total system memory in bytes
+    total_memory = psutil.virtual_memory().total
+
+    # Divide by number of workers
+    memory_limit_per_worker = total_memory / n_workers
+
+    return memory_limit_per_worker

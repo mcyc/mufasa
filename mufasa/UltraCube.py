@@ -28,6 +28,7 @@ import astropy.io.fits as fits
 import scipy.ndimage as nd
 from astropy.stats import mad_std
 
+import dask
 import dask.array as da
 
 from . import aic
@@ -89,7 +90,8 @@ class UltraCube(object):
 
     """
 
-    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
+    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None,
+                 cnv_factor=2, n_cores=True, scheduler='threads'):
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
@@ -107,6 +109,9 @@ class UltraCube(object):
         self.fittype = fittype
         self.plotter = None
         self.meta_model = None
+        self.scheduler = scheduler
+
+        dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -555,8 +560,8 @@ class UltraCube(object):
     def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
         return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
-    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=False, multicore=True):
-        return get_all_lnk_maps(self, ncomp_max=ncomp_max, reset_model_mask=rest_model_mask, multicore=multicore)
+    def get_all_lnk_maps(self, ncomp_max=2, reset_model_mask=False, multicore=True):
+        return get_all_lnk_maps(self, ncomp_max=ncomp_max, reset_model_mask=reset_model_mask, multicore=multicore)
 
     def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5,
                             return_lnks=True, reset_model_mask=False):
@@ -1400,7 +1405,7 @@ def get_all_lnk_maps(ucube, ncomp_max=2, reset_model_mask=False, multicore=True)
 
     - If `ncomp_max` is greater than 2, the function does not compute higher-order
       comparisons and returns the log-likelihood maps for up to 2 components only.
-    - The `rest_model_mask` parameter ensures that the master model mask in `ucube`
+    - The `reset_model_mask` parameter ensures that the master model mask in `ucube`
       is updated to include components being compared, which can be useful for ensuring
       consistent sample sizes.
 
