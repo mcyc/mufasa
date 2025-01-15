@@ -1477,14 +1477,6 @@ def get_all_full_model_stats(ucube, ncomp_max=2, multicore=True):
     combined_mask = dask_utils.reset_graph(combined_mask)
     gc.collect()
 
-    neq_10 = np.sum(ucube.NSamp_maps['1'] != ucube.NSamp_maps['0'])
-    neq_20 = np.sum(ucube.NSamp_maps['2'] != ucube.NSamp_maps['0'])
-    neq_21 = np.sum(ucube.NSamp_maps['2'] != ucube.NSamp_maps['1'])
-
-    print(f"neq_10 pixels {neq_10}")
-    print(f"neq_20 pixels {neq_20}")
-    print(f"neq_21 pixels {neq_21}")
-
 
 def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5,
                         return_lnks=True, include_1c=True, reset_model_mask=False):

@@ -140,8 +140,6 @@ def get_noise_AICc(cube, mask, return_rss=False):
         return AICc
 
 
-
-
 def get_model_stats(cube, model, mask, p=None):
     # return AICc if p is provided
 
@@ -222,7 +220,6 @@ def pad_mask(mask, pad=10, include_nosamp=True, planemask=None):
         def fill_mask(mask, nosamp):
             # operate per block, using the spectral mask sum of hte block
             specmask_fill = np.any(mask, axis=(1, 2))
-            print(f"spec_fill sum: {np.sum(specmask_fill)}")
             mask[:, nosamp] = specmask_fill[:, np.newaxis]
             return mask
 
