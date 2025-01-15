@@ -281,7 +281,7 @@ class UltraCube(object):
             factor = self.cnv_factor
 
         kwargs = dict(edgetrim_width=edgetrim_width)
-        if hasattr(self, chunks_native):
+        if hasattr(self, "chunks_native"):
             kwargs['rechunk'] = self.chunks_native
         self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, **kwargs)
 
