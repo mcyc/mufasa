@@ -91,7 +91,7 @@ class UltraCube(object):
     """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None,
-                 cnv_factor=2, n_cores=True, scheduler='threads'):
+                 cnv_factor=2, n_cores=True, scheduler='processes'):
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
