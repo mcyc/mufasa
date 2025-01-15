@@ -156,8 +156,8 @@ class PCube(Cube):
         else:
             logger.debug("Running in threaded mode.")
             #self._modelcube = dask_utils.lazy_pix_compute_no_batching(self._modelcube, isvalid, compute_pixel)
-            self._modelcube = dask_utils.custom_task_graph(self._modelcube, isvalid, compute_pixel,
-                                                           use_global_xy=True, scheduler=scheduler)
+            self._modelcube = dask_utils.custom_task_graph_pixel(self._modelcube, isvalid, compute_pixel,
+                                                                 use_global_xy=True, scheduler=scheduler)
 
         return self._modelcube
 

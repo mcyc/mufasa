@@ -400,7 +400,7 @@ def compute_chunk_relevant(isvalid):
     return chunk_relevant
 
 
-def custom_task_graph(host_cube, isvalid, compute_pixel, use_global_xy=True, scheduler='threads'):
+def custom_task_graph_pixel(host_cube, isvalid, compute_pixel, use_global_xy=True, scheduler='threads'):
     """
     Construct a custom task graph to process valid pixels in a Dask array.
 
@@ -443,7 +443,7 @@ def custom_task_graph(host_cube, isvalid, compute_pixel, use_global_xy=True, sch
     >>> isvalid = np.random.choice([True, False], size=(100, 100), p=[0.1, 0.9])
     >>> def compute_pixel(x, y):
     ...     return np.ones(10) * (x + y)
-    >>> result = custom_task_graph(host_cube, isvalid, compute_pixel, scheduler='threads')
+    >>> result = custom_task_graph_pixel(host_cube, isvalid, compute_pixel, scheduler='threads')
     >>> result.compute()
     """
     # Ensure `isvalid` is a Dask array with proper chunks
