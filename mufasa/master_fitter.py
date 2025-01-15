@@ -882,7 +882,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
     from astropy.convolution import Gaussian2DKernel, convolve
 
-    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False, multicore=multicore)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, reset_model_mask=False, multicore=multicore)
 
     # where the fits are poor
     mask = np.logical_or(lnk21 < lnk_thresh, lnk20 < 5)
@@ -954,7 +954,7 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
     reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
     ucube = reg.ucube
 
-    lnk_maps = reg.ucube.get_all_lnk_maps(ncomp_max=ncomp, rest_model_mask=False, multicore=multicore)
+    lnk_maps = reg.ucube.get_all_lnk_maps(ncomp_max=ncomp, reset_model_mask=False, multicore=multicore)
     if ncomp == 1:
         lnkmap = lnk_maps #lnk10
         refmap = lnkmap
@@ -1107,7 +1107,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         logger.debug("recovering second component from residual")
         # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
         # a second component that is found in wide separation)
-        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False)
+        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, reset_model_mask=False)
 
         if planemask is None:
             mask10 = lnk10 > 5
@@ -1841,9 +1841,23 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
                 logger.debug("Loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
                 reg.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
 
+    logger.info("getting full model states")
+
+    # get everything calculated ahead of time for efficiency
+    reg.ucube.get_all_full_model_stats(ncomp_max=2, multicore=multicore)
+
+    logger.info("getting best 2comp para")
+
     # make the two-component parameter maps with the best fit model
-    kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True)
+    kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True,
+                  reset_model_mask=False)
     parcube, errcube, lnk10, lnk20, lnk21 = reg.ucube.get_best_2c_parcube(**kwargs)
+
+    gc.collect()
+    logger.info("finished getting best 2comp para")
+
+    # store the lnkmaps in a dictionary
+    lnkmaps = dict(lnk10=lnk10, lnk20=lnk20, lnk21=lnk21)
 
     # use the default file format to save the final results
     nc = 2
@@ -1941,18 +1955,23 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     save_map(lnk20, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
+    #logger.info("getting best 2comp model")
+    modbest = get_best_2comp_model(reg, lnkmaps=lnkmaps)
+    gc.collect()
+    #logger.info("finished getting best 2comp model")
+
     # save the SNR map
-    snr_map = get_best_2comp_snr_mod(reg)
+    snr_map = get_peak_snr(reg, modbest)
     hdr_save = hdr2D.copy()
     hdr_save.set(keyword='NOTES', value='Estimated peak signal-to-noise ratio', comment=None, before='DATE')
     hdr_save.set(keyword='BUNIT', value='unitless', comment=None, before=1)
     savename = make_save_name(paraRoot, paraDir, "SNR")
     save_map(snr_map, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
-
-    # create moment0 map
-    modbest = get_best_2comp_model(reg)
+    del snr_map
     gc.collect()
+
+    # create model moment0 map
     cube_mod = DaskSpectralCube(data=modbest, wcs=copy(reg.ucube.pcubes['2'].wcs),
                             header=copy(reg.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
@@ -1969,7 +1988,8 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     gc.collect()
 
     # created masked mom0 map with model as the mask
-    mom0 = UCube.get_masked_moment(cube=reg.ucube.cube, model=modbest, order=0, expand=20, mask=None)
+    mom0 = UCube.get_masked_moment(cube=reg.ucube.cube, model=modbest,
+                                   order=0, mask=reg.ucube.master_model_mask)
     savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
@@ -1977,8 +1997,8 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     gc.collect()
 
     # save reduced chi-squred maps for 1 comp and 2 comp individually
-    chiRed_1c = reg.ucube.get_reduced_chisq(1)
-    chiRed_2c = reg.ucube.get_reduced_chisq(2)
+    chiRed_1c = reg.ucube.rchisq_maps['1']
+    chiRed_2c = reg.ucube.rchisq_maps['2']
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
     hdr_save = hdr2D.copy()
@@ -2441,14 +2461,15 @@ def get_best_2comp_residual(reg):
     return res_cube
 
 
-def get_best_2comp_snr_mod(reg):
-    """Calculate the signal-to-noise ratio (SNR) map for the best-fit two-
-    component model.
+def get_peak_snr(reg, data):
+    """Calculate the peak signal-to-noise ratio (SNR) map
 
     Parameters
     ----------
     reg : Region
         The Region object containing the original spectral cube and fitted model results.
+    data : numpy.ndarray or dask.array.Array
+        The data to compute the signal strenght, whether it be a model cube or an actual data cube
 
     Returns
     -------
@@ -2463,21 +2484,15 @@ def get_best_2comp_snr_mod(reg):
     - The best-fit model is determined based on a comparison of log-likelihood values for one-component
       and two-component fits.
     - The RMS noise is calculated directly from the residual cube.
-
-    Examples
-    --------
-    >>> from region import Region
-    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
-    >>> snr_map = get_best_2comp_snr_mod(reg)
-    >>> # Returns a 2D array of SNR values for the best-fit model.
     """
-    modbest = get_best_2comp_model(reg)
-    res_cube = get_best_2comp_residual(reg)
-    best_rms = UCube.get_rms(res_cube._data)
-    return np.nanmax(modbest, axis=0) / best_rms
+    # the better model should have lower estimated rms
+    rms2 = reg.ucube.rms_maps['2']
+    rms1 = reg.ucube.rms_maps['1']
+    rms = da.where(rms2 > rms1, rms1, deepcopy(rms2))
+    return da.max(data, axis=0) / rms
 
 
-def get_best_2comp_model(reg):
+def get_best_2comp_model(reg, lnkmaps=None, reset_model_mask=False):
     """
     Retrieve the best-fit model cube for the given Region object.
 
@@ -2518,8 +2533,12 @@ def get_best_2comp_model(reg):
     >>> best_model = get_best_2comp_model(reg)
     >>> # Returns a 3D NumPy array representing the best-fit model cube.
     """
-    # Assuming lnk10, lnk20, lnk21 are already Dask arrays
-    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
+
+    if lnkmaps is None:
+        # Assuming lnk10, lnk20, lnk21 are already Dask arrays
+        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, reset_model_mask=reset_model_mask)
+    else:
+        lnk10, lnk20, lnk21 = lnkmaps['lnk10'], lnkmaps['lnk20'], lnkmaps['lnk21']
 
     mod1 = reg.ucube.pcubes['1'].get_modelcube()  # Ensure this returns a Dask array
     mod2 = reg.ucube.pcubes['2'].get_modelcube()  # Ensure this returns a Dask array
@@ -2527,6 +2546,9 @@ def get_best_2comp_model(reg):
     # Create a copy of mod1 as modbest
     modbest = deepcopy(mod1)
     modbest = modbest * 0  # Reset values to 0.0 in a Dask-compatible way
+
+    # fill in nan values with zero where the cube data exists
+    modbest = da.where(da.isnan(modbest) & reg.ucube.cube_footprint, 0, modbest)
 
     # Mask 1: lnk10 > 5
     mask1 = lnk10 > 5
@@ -2537,7 +2559,9 @@ def get_best_2comp_model(reg):
     modbest = da.where(mask2, mod2, modbest)  # Use where to selectively assign mod2 values
 
     # Compute or persist the result if needed
-    return dask_utils.persist_and_clean(modbest)
+    dask_utils.persist_and_clean(modbest)
+    return dask_utils.reset_graph(modbest)
+
 
 def replace_para(pcube, pcube_ref, mask, **kwargs):
     """

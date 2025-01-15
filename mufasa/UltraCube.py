@@ -372,9 +372,12 @@ class UltraCube(object):
             that have been fitted (i.e., contain non-zero, finite values in the parameter cube for the specified
             model component) and `False` indicates pixels that were not fitted.
         """
-        parcube = self.pcubes[str(ncomp)].parcube
-        mask = np.any(parcube != 0, axis=0)
-        mask = mask & np.any(np.isfinite(parcube), axis=0)
+        if isinstance(self.pcubes[str(ncomp)], PCube.PCube):
+            mask = self.pcubes[str(ncomp)]._has_fit(get=True)
+        else:
+            parcube = self.pcubes[str(ncomp)].parcube
+            mask = np.any(parcube != 0, axis=0)
+            mask = mask & np.any(np.isfinite(parcube), axis=0)
         return mask
 
 
@@ -398,7 +401,7 @@ class UltraCube(object):
             if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
-                mod_mask = dask_utils.persist_and_clean(mod_mask, debug=True, visualize_filename="reset_mod_mask.svg")
+                mod_mask = dask_utils.persist_and_clean(mod_mask)
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -421,6 +424,11 @@ class UltraCube(object):
                 mod_mask = dask_utils.persist_and_clean(mod_mask, debug=True, visualize_filename="mod_mask_at_load.svg")
             gc.collect()
             self.include_model_mask(mod_mask)
+
+    def get_all_full_model_stats(self, ncomp_max=2, multicore=True):
+        # effeciently calculated all the model stats, such as rss and AICc from fresh
+        # best for loading previously fitted results and determining the best fit model
+        get_all_full_model_stats(self, ncomp_max=ncomp_max, multicore=multicore)
 
     def get_residual(self, ncomp, multicore=None):
         """
@@ -547,12 +555,13 @@ class UltraCube(object):
     def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
         return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
-    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True, multicore=True):
-        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask, multicore=multicore)
+    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=False, multicore=True):
+        return get_all_lnk_maps(self, ncomp_max=ncomp_max, reset_model_mask=rest_model_mask, multicore=multicore)
 
-    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True):
+    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5,
+                            return_lnks=True, reset_model_mask=False):
         kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk20_thres=lnk20_thres,
-                      lnk10_thres=lnk10_thres, return_lnks=return_lnks)
+                      lnk10_thres=lnk10_thres, return_lnks=return_lnks, reset_model_mask=reset_model_mask)
         return get_best_2c_parcube(self, **kwargs)
 
     def get_best_residual(self, cubetype=None):
@@ -1349,7 +1358,7 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
         lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)][planemask], ucube.AICc_maps[str(ncomp_B)][planemask])
     return lnk
 
-def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
+def get_all_lnk_maps(ucube, ncomp_max=2, reset_model_mask=False, multicore=True):
     r"""
     Compute log-likelihood ratio maps for model comparisons up to a specified number of components.
 
@@ -1364,9 +1373,9 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
     ncomp_max : int, optional
         Maximum number of components to include in the model comparison.
         Default is `2`.
-    rest_model_mask : bool, optional
+    reset_model_mask : bool, optional
         If `True`, resets and updates the master model mask in `ucube` for components
-        being compared. Default is `True`.
+        being compared. Default is `False`.
     multicore : bool, optional
         Enables parallel processing for calculations if set to `True`. Default is `True`.
 
@@ -1401,7 +1410,7 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
         If `ncomp_max` is less than 1 or if model data for the required number of
         components is missing in `ucube`.
     """
-    if rest_model_mask:
+    if reset_model_mask:
         ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
 
     if ncomp_max <=1:
@@ -1418,7 +1427,67 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
         pass
 
 
-def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True, include_1c=True):
+def get_all_full_model_stats(ucube, ncomp_max=2, multicore=True):
+    # output all the model stats fresh and overwrite the previous values (including rest the model mask)
+
+    footprint = ucube.cube_footprint
+    cube = ucube.cube._data
+    models = {}
+    masks = {}
+    # have a combined mask to ensure all compents are sampled sames
+    combined_mask = np.zeros_like(cube, dtype=bool)
+
+    # for noise model (0) component
+    models['0'] = None
+
+    for nc in range(1, ncomp_max+1):
+        # loop through each componet beyond noise
+        model = ucube.pcubes[str(nc)].get_modelcube(rest_graph=True)
+        models[str(nc)] = model
+        combined_mask = da.logical_or(combined_mask, model > 0)
+
+    # pad the mask spectrally, and extend the mask to pixels where no model exists
+    combined_mask = dask_utils.reset_graph(combined_mask)
+    combined_mask = dask_ops.pad_mask(combined_mask, pad=10, include_nosamp=True, planemask=footprint)
+    combined_mask = dask_utils.reset_graph(combined_mask)
+    ucube.master_model_mask = combined_mask
+
+    gc.collect()
+
+    for nc in range(1, ncomp_max+1):
+        # loop through each componet beyond noise again
+        rss, nsamp, rms, chisq_rd, AICc = dask_ops.get_model_stats(cube, models[str(nc)],
+                                                                   combined_mask, p=4*nc)
+        combined_mask = dask_utils.reset_graph(combined_mask)
+        gc.collect()
+        ucube.rss_maps[str(nc)] = rss
+        ucube.NSamp_maps[str(nc)] = nsamp
+        ucube.rms_maps[str(nc)] = rms
+        ucube.rchisq_maps[str(nc)] = chisq_rd
+        ucube.AICc_maps[str(nc)] = AICc
+
+    # get the stats for the noise model
+    nc = 0
+    ucube.NSamp_maps[str(nc)] = nsamp # since they're all using the same mask
+    # calculate the noise AICc assuming it's just a flat baseline of zero
+    AICc, rss = dask_ops.get_noise_AICc(cube, combined_mask, return_rss=True)
+    ucube.AICc_maps[str(nc)] = AICc
+    ucube.rss_maps[str(nc)] = rss
+
+    combined_mask = dask_utils.reset_graph(combined_mask)
+    gc.collect()
+
+    neq_10 = np.sum(ucube.NSamp_maps['1'] != ucube.NSamp_maps['0'])
+    neq_20 = np.sum(ucube.NSamp_maps['2'] != ucube.NSamp_maps['0'])
+    neq_21 = np.sum(ucube.NSamp_maps['2'] != ucube.NSamp_maps['1'])
+
+    print(f"neq_10 pixels {neq_10}")
+    print(f"neq_20 pixels {neq_20}")
+    print(f"neq_21 pixels {neq_21}")
+
+
+def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5,
+                        return_lnks=True, include_1c=True, reset_model_mask=False):
     """
     Select the best 2-component parameter cube based on AICc likelihood thresholds.
 
@@ -1483,7 +1552,8 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
         If model fits for 1-component or 2-component models are missing in `ucube`.
 
     """
-    lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore)
+    lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore,
+                                           reset_model_mask=reset_model_mask)
 
     parcube = copy(ucube.pcubes['2'].parcube)
     errcube = copy(ucube.pcubes['2'].errcube)

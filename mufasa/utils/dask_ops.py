@@ -121,7 +121,29 @@ def residual(cube, model, mask, fullblock=True):
     return masked_operate(darrays=(cube, model), mask=mask, func=sub, fullbock=fullblock)
 
 
+def get_noise_AICc(cube, mask, return_rss=False):
+
+    p = 0 #no free parameter for noise
+
+    # get sample size
+    nsamp = da.sum(mask, axis=0)
+    def sq(res):
+        return res**2
+    rs = masked_operate(cube, mask, func=sq)
+    rss = da.sum(rs * mask, axis=0)
+    AICc = aic.AICc(rss, p, nsamp)
+    AICc = AICc.compute()
+    if return_rss:
+        rss = rss.compute()
+        return AICc, rss
+    else:
+        return AICc
+
+
+
+
 def get_model_stats(cube, model, mask, p=None):
+    # return AICc if p is provided
 
     # get sample size
     nsamp = da.sum(mask, axis=0)
@@ -154,11 +176,11 @@ def get_model_stats(cube, model, mask, p=None):
 
     if p is None:
         # no AICc calculated
-        return rss, chisq_rd, nsamp, rms
+        return rss, nsamp, rms, chisq_rd, rms
 
     else:
         AICc = aic.AICc(rss, p, nsamp)
-        return rss, chisq_rd, nsamp, rms, AICc
+        return rss, nsamp, rms, chisq_rd, AICc
 
 
 def residual_rms(residual, method='roll'):
@@ -187,8 +209,11 @@ def residual_rms(residual, method='roll'):
 
 
 def padded_model_mask(model, pad=10, include_nosamp=True, planemask=None):
-
     mask = model > 0
+    return pad_mask(mask, pad=pad, include_nosamp=include_nosamp, planemask=planemask)
+
+
+def pad_mask(mask, pad=10, include_nosamp=True, planemask=None):
 
     if include_nosamp:
         # fill nosamp pixels with the sum of the existing spectral mask
@@ -203,13 +228,13 @@ def padded_model_mask(model, pad=10, include_nosamp=True, planemask=None):
 
         if planemask is None:
             # assume the entire cube is good
-            opmask = da.ones_like(model, dtype=bool)
+            opmask = da.ones_like(mask, dtype=bool)
 
         else:
             # Expand the footprint mask to 3D
             if isinstance(planemask, np.ndarray):
                 # Convert planemask to a Dask array with same chunking as the model
-                planemask = da.from_array(planemask, chunks=(model.chunks[1], model.chunks[2]))
+                planemask = da.from_array(planemask, chunks=(mask.chunks[1], mask.chunks[2]))
 
             # expand planemask along the spectral axis
             opmask = planemask[np.newaxis, :, :]

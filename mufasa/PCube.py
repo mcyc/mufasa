@@ -57,7 +57,8 @@ class PCube(Cube):
                 target_chunk_mem_mb=chunk_memory_size
             )
 
-    def get_modelcube(self, update=False, multicore=True, mask=None, target_memory_mb=16, scheduler='threads'):
+    def get_modelcube(self, update=False, multicore=True, mask=None, target_memory_mb=16, scheduler='threads',
+                      rest_graph=False):
         """
         Generate or update the model cube using parallel, memory-efficient processing with Dask.
 
@@ -115,6 +116,9 @@ class PCube(Cube):
         >>> model_cube = cube.get_modelcube(mask=mask, multicore=False)
         """
         if self._modelcube is not None and not update:
+            if rest_graph:
+                # ensure the graph is cleaned before returning it
+                self._modelcube = dask_utils.reset_graph(self._modelcube)
             return self._modelcube
 
         if multicore is False:
