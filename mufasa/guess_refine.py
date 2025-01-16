@@ -15,7 +15,6 @@ from skimage.morphology import remove_small_objects, binary_dilation, disk, remo
 from scipy.ndimage.filters import median_filter
 from scipy.interpolate import CloughTocher2DInterpolator as intp
 from scipy.interpolate import griddata
-#from FITS_tools.hcongrid import get_pixel_mapping
 from .utils.fits_utils import get_pixel_mapping
 from astropy.convolution import Gaussian2DKernel, convolve
 
@@ -144,11 +143,6 @@ def guess_from_cnvpara(data_cnv, header_cnv, header_target, mask=None, tau_thres
 
     newmask = np.any(np.isfinite(data_cnv), axis=0)
     newmask = remove_small_holes(newmask, 25)
-
-    # expand the interpolation a bit, since regridding can often miss some pixels due to aliasing
-    #newmask_l = binary_dilation(newmask, disk(3))
-    #newmask_l = regrid(newmask_l, hdr_conv, hdr_final, dmask=None)
-
 
     # regrid the guesses
     for gss in data_cnv:
@@ -443,4 +437,4 @@ def save_guesses(paracube, header, savename, ncomp=2):
     hdr_new['CRPIX3']= 1
 
     fitcubefile = fits.PrimaryHDU(data=paracube, header=hdr_new)
-    fitcubefile.writeto(savename ,overwrite=True)
+    fitcubefile.writeto(savename, overwrite=True)

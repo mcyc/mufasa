@@ -3,6 +3,10 @@ Utilities for working with .fits files, including functions adapted from
 FITS_tools to reduce dependencies on the aging package.
 """
 
+import numpy as np
+import astropy.wcs as pywcs
+from astropy import coordinates
+from astropy import units as u
 
 def downsample_header(header, factor, axis):
     """
@@ -145,3 +149,83 @@ def get_pixel_mapping(header1, header2):
     grid = np.array([yy1.reshape(outshape), xx1.reshape(outshape)])
 
     return grid
+
+
+def _load_wcs_from_header(header):
+    """
+    Load a WCS object from a FITS header or verify an existing WCS instance.
+
+    This function ensures that a `pywcs.WCS` object is created from the provided
+    FITS header or verifies that the input is already a valid WCS instance.
+    It also adds `naxis1` and `naxis2` attributes to the WCS object if they
+    are not already defined.
+
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header` or `~pywcs.WCS`
+        The FITS header or WCS object to process.
+
+    Returns
+    -------
+    wcs : `~pywcs.WCS`
+        A WCS object with required attributes set.
+
+    Raises
+    ------
+    TypeError
+        If the input is neither a valid FITS header nor a `pywcs.WCS` instance.
+    """
+    if issubclass(pywcs.WCS, header.__class__):
+        wcs = header
+    else:
+        try:
+            wcs = pywcs.WCS(header)
+        except:
+            raise TypeError("header must either be a astropy.io.fits.Header "
+                            " or pywcs.WCS instance")
+
+        if not hasattr(wcs, 'naxis1'):
+            wcs.naxis1 = header['NAXIS1']
+        if not hasattr(wcs, 'naxis2'):
+            wcs.naxis2 = header['NAXIS2']
+
+    return wcs
+
+
+def _ctype_to_csys(wcs):
+    """
+    Convert WCS `CTYPE` information to a coordinate system name.
+
+    This function determines the coordinate system (e.g., `fk5`, `fk4`, or `galactic`)
+    based on the `CTYPE` attribute and the equinox in the provided WCS object.
+
+    Parameters
+    ----------
+    wcs : `~pywcs.WCS`
+        A WCS object containing `CTYPE` and `equinox` information.
+
+    Returns
+    -------
+    csys : str
+        The name of the coordinate system. Possible values are:
+        - `'fk5'` for J2000 equinox.
+        - `'fk4'` for B1950 equinox.
+        - `'galactic'` for Galactic coordinates.
+
+    Raises
+    ------
+    NotImplementedError
+        If the equinox is neither 2000 nor 1950 when `CTYPE` indicates
+        celestial coordinates.
+    """
+    ctype = wcs.ctype[0]
+    if 'RA' in ctype or 'DEC' in ctype:
+        if wcs.equinox == 2000:
+            return 'fk5'
+        elif wcs.equinox == 1950:
+            return 'fk4'
+        else:
+            raise NotImplementedError("Non-fk4/fk5 equinoxes are not allowed")
+    elif 'GLON' in ctype or 'GLAT' in ctype:
+        return 'galactic'
+

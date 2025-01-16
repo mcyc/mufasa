@@ -8,7 +8,6 @@ __author__ = 'mcychen'
 
 import numpy as np
 import astropy.io.fits as fits
-#import FITS_tools
 from astropy import units as u
 from skimage.morphology import remove_small_objects, disk, opening, binary_erosion, dilation, remove_small_holes
 from spectral_cube import SpectralCube
@@ -16,7 +15,6 @@ from radio_beam import Beam
 from astropy.wcs import WCS
 from astropy.stats import mad_std
 from astropy.convolution import Gaussian2DKernel, convolve
-#from FITS_tools.hcongrid import get_pixel_mapping
 from scipy.interpolate import griddata
 import scipy.ndimage as nd
 from spectral_cube.utils import NoBeamError
@@ -75,8 +73,6 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
 
     if downsample:
         # regrid the convolved cube
-        #nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
-        #nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
         nhdr = downsample_header(hdr, factor=factor, axis=1)
         nhdr = downsample_header(nhdr, factor=factor, axis=2)
         nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
@@ -150,8 +146,6 @@ def snr_mask(cube, snr_min=1.0, errmappath=None):
 
     else:
         # make a quick RMS estimate using median absolute deviation (MAD)
-        #mask_gg = np.isfinite(cube._data)
-        #errmap = mad_std(cube._data[mask_gg], axis=0)
         errmap = cube.mad_std(axis=0)#, how='ray')
         logger.info("median rms: {0}".format(np.nanmedian(errmap)))
 
