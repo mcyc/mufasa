@@ -174,6 +174,10 @@ def _load_wcs_from_header(header):
     ------
     TypeError
         If the input is neither a valid FITS header nor a `pywcs.WCS` instance.
+
+    Notes
+    -----
+    - The code here is borrowed from `FITS_tools.downsample`.
     """
     if issubclass(pywcs.WCS, header.__class__):
         wcs = header
@@ -217,6 +221,10 @@ def _ctype_to_csys(wcs):
     NotImplementedError
         If the equinox is neither 2000 nor 1950 when `CTYPE` indicates
         celestial coordinates.
+
+    Notes
+    -----
+    - This code here is borrowed from `FITS_tools.downsample`.
     """
     ctype = wcs.ctype[0]
     if 'RA' in ctype or 'DEC' in ctype:
