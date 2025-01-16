@@ -91,7 +91,7 @@ class UltraCube(object):
     """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None,
-                 cnv_factor=2, n_cores=True, scheduler='processes'):
+                 cnv_factor=2, n_cores=True, scheduler='processes', chunk_memory_size=16):
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
@@ -110,6 +110,11 @@ class UltraCube(object):
         self.plotter = None
         self.meta_model = None
         self.scheduler = scheduler
+        self.chunk_memory_size = chunk_memory_size # the targeted memory size of each dask chunk
+        self.chunks = None # the chunking scheme that UltraCube will use by default
+        self.ray_chunks = None # dask chunking that perserves the spectral axis
+        self.plane_chunks = None # dask chunking that tries to perserve the image plane
+        self.native_chunks = None # the native chunking scheme of the cube data, can be fairly effecient
 
         # scheduler: {'threads', 'processes', 'synchronous'}
         #dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
@@ -155,7 +160,7 @@ class UltraCube(object):
         """
         return mvf.make_header(ndim=2, ref_header=self.cube.header)
 
-    def load_cube(self, fitsfile, chunks=None, chunk_memory_size=16):
+    def load_cube(self, fitsfile, chunks=None, chunk_memory_size=None, scheduler=None):
         """
         Load a spectral cube from a FITS file and convert its units to K and km/s.
 
@@ -172,19 +177,45 @@ class UltraCube(object):
         -------
         None
         """
+        # read the cube
         cube = SpectralCube.read(fitsfile, use_dask=True)
+
+        # record the cube's native chunking scheme
+        self.chunks_native = cube._data.chunks
+
+        if chunk_memory_size is None:
+            chunk_memory_size = self.chunk_memory_size
+        else:
+            self.chunk_memory_size = chunk_memory_size
+
+        # calculate different chunking schemes based on the cube:
+        # plane chunks for keeping the image planes as intact as possible (for convolution and such)
+        self.plane_chunks = dask_utils.chunk_by_slice(
+            cube_shape=cube.shape,
+            dtype=cube._data.dtype,
+            target_chunk_mb=chunk_memory_size
+        )
+
+        # # ray chunks for keeping the spectral axis completely intacted (for working with spectrum)
+        self.ray_chunks = dask_utils.chunk_by_ray(
+            cube_shape=cube.shape,
+            dtype=cube._data.dtype,
+            target_chunk_mb=chunk_memory_size
+        )
 
         # Validate and set chunks
         if dask_utils._is_valid_chunk(chunks) and chunks is not None:
             self.chunks = chunks
+        elif isinstance(chunks, str):
+            if chunks == 'rays':
+                self.chunks = self.ray_chunks
+            if chunks == 'planes':
+                self.chunks = self.plane_chunks
         else:
-            self.chunks = dask_utils.calculate_chunks(
-                cube_shape=cube.shape,
-                dtype=cube._data.dtype,
-                target_chunk_mem_mb=chunk_memory_size
-            )
-        # rechunk using MUFASA's chunking scheme (perserves spectral axis)
-        self.chunks_native = cube._data.chunks
+            # default to rechunking using MUFASA's ray chunking scheme (perserves spectral axis)
+            self.chunks = self.ray_chunks
+
+        # rechunk the cube
         cube = cube.rechunk(self.chunks)
 
         # convert the cube unit
@@ -198,8 +229,14 @@ class UltraCube(object):
                 cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
 
         self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-        #self.cube.use_dask_scheduler(self.scheduler) #default to
 
+        if scheduler:
+            # set the scheduler from dask's default
+            if isinstance(scheduler, str):
+                self.cube.use_dask_scheduler(scheduler)
+            else:
+                # use the UltraCube default
+                self.cube.use_dask_scheduler(self.scheduler)
 
     def load_pcube(self, pcube_ref=None, pyspeckit=False):
         """
@@ -249,7 +286,7 @@ class UltraCube(object):
 
 
 
-    def convolve_cube(self, savename=None, factor=None, edgetrim_width=5):
+    def convolve_cube(self, savename=None, factor=None, edgetrim_width=5, scheduler='threads', **kwargs):
         """
         Convolve the SpectralCube to a lower spatial resolution by a specified factor.
 
@@ -261,6 +298,8 @@ class UltraCube(object):
             Factor by which to spatially convolve the cube. If None, the default `self.cnv_factor` is used.
         edgetrim_width : int, optional
             Number of pixels to trim at the edges after convolution. Default is 5.
+        scheduler : str, optional
+            Dask Scheduler 'threads', 'processes', 'synchronous'
 
         Returns
         -------
@@ -280,9 +319,16 @@ class UltraCube(object):
         if factor is None:
             factor = self.cnv_factor
 
-        kwargs = dict(edgetrim_width=edgetrim_width)
-        if hasattr(self, "chunks_native"):
-            kwargs['rechunk'] = self.chunks_native
+        kwargs['edgetrim_width'] = edgetrim_width
+        kwargs['scheduler'] = scheduler
+
+        if 'rechunk' not in kwargs and hasattr(self, "plane_chunks"):
+            # use the most convolution friendly rechunk by default
+            kwargs['rechunk'] = self.plane_chunks
+            print(f"using plane chunks")
+
+        logger.info(f"user provided rechunk: {kwargs['rechunk']}")
+
         self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, **kwargs)
 
 

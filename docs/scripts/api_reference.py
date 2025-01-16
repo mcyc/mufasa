@@ -302,7 +302,7 @@ API_REFERENCE = {
         'description': '''This module provides general purpose tool and wrappers to handle dask object.''',
         'members': [
             {'name': 'calculate_batch_size', 'type': 'function', 'description': '''Calculate the optimal batch size and adjusted number of workers for processing valid pixels.'''},
-            {'name': 'calculate_chunks', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array with an optimal aspect ratio and target memory usage.'''},
+            {'name': 'chunk_by_ray', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array with an optimal aspect ratio and target memory usage.'''},
             {'name': 'compute_chunk_relevant', 'type': 'function', 'description': '''Determine the relevance of chunks in a 2D Boolean mask.'''},
             {'name': 'compute_global_offsets', 'type': 'function', 'description': '''Calculate global offsets for a chunk's position in a multidimensional array.'''},
             {'name': 'custom_task_graph', 'type': 'function', 'description': '''Construct a custom task graph to process valid pixels in a Dask array.'''},

@@ -51,10 +51,10 @@ class PCube(Cube):
         if _is_valid_chunk(chunks) and chunks is not None:
             self.chunks = chunks
         else:
-            self.chunks = dask_utils.calculate_chunks(
+            self.chunks = dask_utils.chunk_by_ray(
                 cube_shape=self.cube.shape,
                 dtype=self.cube.dtype,
-                target_chunk_mem_mb=chunk_memory_size
+                target_chunk_mb=chunk_memory_size
             )
 
     def get_modelcube(self, update=False, multicore=True, mask=None, target_memory_mb=16, scheduler='threads',
@@ -98,7 +98,7 @@ class PCube(Cube):
         - If `update` is `False` and the model cube already exists, it returns the cached version.
         - For single-core computation, the `lazy_pix_compute_single` function is used.
         - For multi-core computation, the `custom_task_graph` function is used to process the model cube efficiently.
-        - Chunk sizes are dynamically calculated using `calculate_chunks` for optimal memory usage.
+        - Chunk sizes are dynamically calculated using `chunk_by_ray` for optimal memory usage.
         - The `calculate_batch_size` function determines the batch size for multi-core processing.
 
         Examples
@@ -141,8 +141,8 @@ class PCube(Cube):
 
         if self._modelcube is None:
             # Calculate chunks
-            chunks = dask_utils.calculate_chunks(cube_shape=self.cube.shape, dtype=self.cube.dtype,
-                                                 target_chunk_mem_mb=target_memory_mb) #128
+            chunks = dask_utils.chunk_by_ray(cube_shape=self.cube.shape, dtype=self.cube.dtype,
+                                             target_chunk_mb=target_memory_mb) #128
 
             # initializing modelcube
             self._modelcube = da.full(shape=self.cube.shape, fill_value=np.nan, dtype=self.cube.dtype,
