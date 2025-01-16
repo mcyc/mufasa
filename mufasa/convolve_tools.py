@@ -30,7 +30,7 @@ try:
 except ImportError:
     from astropy.units.core import UnitScaleError
 
-from .utils.memory import monitor_peak_memory
+from .utils.memory import monitor_peak_memory, tmp_save_gauge
 from .utils import dask_utils
 
 #=======================================================================================================================
@@ -42,6 +42,7 @@ logger = get_logger(__name__)
 @monitor_peak_memory()
 def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True,
                           rechunk=True, scheduler='synchronous', **kwargs):
+    # scheduler='processes' is not recommended, as it uses excessive memory
 
     kwargs['rechunk'] = rechunk
     kwargs['scheduler'] = scheduler
@@ -81,14 +82,17 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         cnv_cube = cnv_cube.with_fill_value(np.nan)
 
     if downsample:
-        # regrid the convolved cube
-        nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
-        nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
-        nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
-        nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
-        newcube = cnv_cube.reproject(nhdr, order='bilinear')
+        print(f"=============== downsampling cube with \'{scheduler}\' scheduler =====================")
+        with cnv_cube.use_dask_scheduler(scheduler), ProgressBar():
+            # regrid the convolved cube
+            nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
+            nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
+            nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
+            nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
+            newcube = cnv_cube.reproject(nhdr, order='bilinear')
     else:
         newcube = cnv_cube
+    del cnv_cube
     gc.collect()
 
     if savename != None:
@@ -155,20 +159,25 @@ def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0, rec
     return cnv_cube
 
 
-@monitor_peak_memory()
-def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp_dir=False):
+def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp_dir='auto'):
+
+    if save_to_tmp_dir:
+        # dynamically determine if its needed based on data science and free memory
+        if isinstance(save_to_tmp_dir, str) and save_to_tmp_dir == 'auto':
+            save_to_tmp_dir = tmp_save_gauge(cube, factor=20)
+        elif isinstance(save_to_tmp_dir, int) or isinstance(save_to_tmp_dir, float):
+            # if given as a number, use it as the factor
+            save_to_tmp_dir = tmp_save_gauge(cube, factor=save_to_tmp_dir)
+
     # base function to handle convolution
     if isinstance(cube._data, da.Array):
 
         if rechunk:
             cube = _rechunk(cube, rechunk)
 
-        print(f"convolving cube with chunks: {cube._data.chunks}")
         print(f"=============== convolving cube with \'{scheduler}\' scheduler =====================")
 
-        with cube.use_dask_scheduler('threads'):
-            pbar = ProgressBar()
-            pbar.register()
+        with cube.use_dask_scheduler(scheduler), ProgressBar():
             cnv_cube = cube.convolve_to(beam, save_to_tmp_dir=save_to_tmp_dir)
             if not save_to_tmp_dir:
                 # compute the convolution now
@@ -209,10 +218,8 @@ def snr_mask(cube, snr_min=1.0, errmappath=None):
 
     else:
         # make a quick RMS estimate using median absolute deviation (MAD)
-        #mask_gg = np.isfinite(cube._data)
-        #errmap = mad_std(cube._data[mask_gg], axis=0)
-        errmap = cube.mad_std(axis=0)#, how='ray')
-        logger.info("median rms: {0}".format(np.nanmedian(errmap)))
+        errmap = cube.mad_std(axis=0)
+        logger.debug("median rms: {0}".format(np.nanmedian(errmap)))
 
     snr = cube.filled_data[:].value / errmap
     peaksnr = np.nanmax(snr, axis=0)

@@ -322,13 +322,6 @@ class UltraCube(object):
         kwargs['edgetrim_width'] = edgetrim_width
         kwargs['scheduler'] = scheduler
 
-        if 'rechunk' not in kwargs and hasattr(self, "plane_chunks"):
-            # use the most convolution friendly rechunk by default
-            kwargs['rechunk'] = self.plane_chunks
-            print(f"using plane chunks")
-
-        logger.info(f"user provided rechunk: {kwargs['rechunk']}")
-
         self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, **kwargs)
 
 

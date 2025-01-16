@@ -10,6 +10,9 @@ import threading
 import functools
 import time
 
+from spectral_cube import DaskSpectralCube
+from dask.array import Array as daArray
+
 from .mufasa_log import get_logger
 logger = get_logger(__name__)
 
@@ -255,3 +258,35 @@ def calculate_dask_memory_limit(n_workers):
     memory_limit_per_worker = total_memory / n_workers
 
     return memory_limit_per_worker
+
+
+def get_system_free_memory():
+    mem = psutil.virtual_memory()
+    return mem.available / 1e9  # Convert to GB
+
+def get_size_mb(array):
+    # calculate the size of a ndarray in MB
+    size_in_bytes = array.size * array.itemsize
+    return size_in_bytes / (1024 ** 2)
+
+def tmp_save_gauge(cube, factor=20):
+    """
+    Return whether or not it's worth DaskSpectralCube results temporary
+    Based on how much free memory is currenlty left
+
+    Note: when data is chunked properly, mufasa shouldn't need memory larger than 20 times cube size
+
+    """
+
+    if isinstance(cube, DaskSpectralCube):
+        data = cube._data
+    elif isinstance(cube, daArray):
+        data = cube
+    else:
+        raise TypeError(f"cube type {type(cube)} is invalid")
+
+    data_size = get_size_mb(data) # in MB
+    mem_free = get_system_free_memory()*1e3 # in MB
+
+    # advice to save results temporary if
+    return data_size * factor > mem_free
