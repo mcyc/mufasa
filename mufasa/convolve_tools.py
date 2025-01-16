@@ -169,6 +169,10 @@ def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp
             # if given as a number, use it as the factor
             save_to_tmp_dir = tmp_save_gauge(cube, factor=save_to_tmp_dir)
 
+    # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
+    if cube.size > 1e8:
+        logger.warning("cube is large ({} pixels)".format(cube.size))
+        cube.allow_huge_operations = True
     # base function to handle convolution
     if isinstance(cube._data, da.Array):
 
@@ -183,12 +187,9 @@ def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp
                 # compute the convolution now
                 cnv_cube._data = dask_utils.persist_and_clean(cnv_cube._data)
     else:
-        # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
-        if cube.size > 1e8:
-            logger.warning("cube is large ({} pixels)".format(cube.size))
-        cube.allow_huge_operations = True
         cnv_cube = cube.convolve_to(beam)
-        cube.allow_huge_operations = False
+
+    cube.allow_huge_operations = False
 
     return cnv_cube
 
