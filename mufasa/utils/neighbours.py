@@ -1,7 +1,6 @@
 
 import numpy as np
-from skimage.morphology import disk, square
-
+from skimage.morphology import disk, footprint_rectangle
 
 def maxref_neighbor_coords(mask, ref, fill_coord=(0, 0), structure=None, centre=None):
     # find pixel of a neighbour with the highest reference value
@@ -69,7 +68,8 @@ def disk_neighbour(r, return_centre=False):
 
 def square_neighbour(r, return_centre=False):
     # r is the degree of seperation from
-    struct = square(r*2+1, dtype='bool')
+    width = r*2+1
+    struct = footprint_rectangle((width, width), dtype='bool')
     struct[r, r] = False
     if return_centre:
         return struct, (r,r)

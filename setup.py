@@ -28,7 +28,7 @@ if __name__ == "__main__":
         url=metadata["github_url"],  # GitHub URL
         packages=find_packages(),
         install_requires=[
-            "numpy>=1.19.2",
+            "numpy>=1.24.4,<2",
             "astropy",
             "matplotlib",
             "scipy>=1.7.3",
