@@ -81,7 +81,62 @@ def persist_and_clean(dask_obj, debug=False, visualize_filename=None):
     return persisted_result
 
 
-def calculate_chunks(cube_shape, dtype, target_chunk_mem_mb=128):
+def chunk_by_slice(cube_shape, dtype, target_chunk_mb=128):
+    """
+    Calculate Dask chunking into 3D image slices, keeping planes as intact as possible
+
+    By not breaking up the image should make image plane convolution more effecient
+
+    Parameters
+    ----------
+    cube_shape : tuple of int
+        The shape of the data cube in the form (spectral_axis, y, x).
+    dtype : numpy.dtype
+        The data type of the data cube (e.g., `numpy.float32`, `numpy.float64`).
+    target_chunk_mb : int, optional, default=128
+        The target memory size per chunk, in megabytes.
+
+    Returns
+    -------
+    tuple of int
+        Optimal chunk sizes for the Dask
+    """
+    z, y, x = cube_shape
+
+    # Convert target MB to bytes
+    target_bytes = target_chunk_mb * 1024**2
+
+    # Size of one element in bytes
+    element_size = np.dtype(dtype).itemsize
+
+    # Initial guess for chunk sizes in y and x
+    chunk_y = y
+    chunk_x = x
+
+    # Determine the largest chunks for y and x within the target size
+    while chunk_y * chunk_x * element_size > target_bytes:
+        if chunk_y >= chunk_x:
+            chunk_y //= 2
+        else:
+            chunk_x //= 2
+
+    # Calculate the remaining chunk size for z (i.e., the spectral dimension)
+    max_elements_per_chunk = target_bytes // (chunk_y * chunk_x * element_size)
+    chunk_z = max(1, min(z, max_elements_per_chunk))
+
+    # Ensure y and x are evenly divisible by chunk sizes
+    chunk_y = min(y, (y // chunk_y) * chunk_y)
+    chunk_x = min(x, (x // chunk_x) * chunk_x)
+
+    # Finalize the chunking scheme
+    chunks = (chunk_z, chunk_y, chunk_x)
+    return chunks
+
+# Example usage:
+
+
+
+def chunk_by_ray(cube_shape, dtype, target_chunk_mb=128):
     """
     Calculate chunk sizes for a Dask array with an optimal aspect ratio and target memory usage.
 
@@ -94,7 +149,7 @@ def calculate_chunks(cube_shape, dtype, target_chunk_mem_mb=128):
         The shape of the data cube in the form (spectral_axis, y, x).
     dtype : numpy.dtype
         The data type of the data cube (e.g., `numpy.float32`, `numpy.float64`).
-    target_chunk_mem_mb : int, optional, default=128
+    target_chunk_mb : int, optional, default=128
         The target memory size per chunk, in megabytes.
 
     Returns
@@ -114,19 +169,19 @@ def calculate_chunks(cube_shape, dtype, target_chunk_mem_mb=128):
     Calculate chunks for a data cube with a shape of (100, 1000, 1000)
     and a `float32` data type:
 
-    >>> calculate_chunks((100, 1000, 1000), np.float32, target_chunk_mem_mb=64)
+    >>> chunk_by_ray((100, 1000, 1000), np.float32, target_chunk_mb=64)
     (100, 250, 250)
 
     Calculate chunks with a higher memory limit:
 
-    >>> calculate_chunks((100, 1000, 1000), np.float32, target_chunk_mem_mb=512)
+    >>> chunk_by_ray((100, 1000, 1000), np.float32, target_chunk_mb=512)
     (100, 500, 500)
     """
     spectral_axis, y_dim, x_dim = cube_shape
     dtype_size = np.dtype(dtype).itemsize  # Size of one element in bytes
 
     # Convert target memory from MB to bytes
-    target_chunk_mem_bytes = target_chunk_mem_mb * 1024 * 1024
+    target_chunk_mem_bytes = target_chunk_mb * 1024 * 1024
 
     # Total memory per pixel across the spectral axis
     memory_per_pixel = spectral_axis * dtype_size
