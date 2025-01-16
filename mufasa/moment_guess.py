@@ -750,7 +750,7 @@ def adaptive_moment_maps(maskcube, seeds, window_hwidth, weights=None, signal_ma
     for i in range(n_labs):
         mask = labels == i + 1
 
-        new_cube_mask = maskcube.get_mask_array()#maskcube.mask.view()
+        new_cube_mask = maskcube.get_mask_array()
         new_cube_mask = new_cube_mask * mask
 
         moms = window_moments(maskcube.with_mask(new_cube_mask), window_hwidth, signal_mask=signal_mask*mask)
