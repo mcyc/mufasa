@@ -15,7 +15,8 @@ from skimage.morphology import remove_small_objects, binary_dilation, disk, remo
 from scipy.ndimage.filters import median_filter
 from scipy.interpolate import CloughTocher2DInterpolator as intp
 from scipy.interpolate import griddata
-from FITS_tools.hcongrid import get_pixel_mapping
+#from FITS_tools.hcongrid import get_pixel_mapping
+from .utils.fits_utils import get_pixel_mapping
 from astropy.convolution import Gaussian2DKernel, convolve
 
 from scipy.spatial.qhull import QhullError
