@@ -2,6 +2,7 @@ import numpy as np
 from astropy.io import fits
 from plotly.subplots import make_subplots
 import plotly.offline as pyo
+import dask.dataframe as dask_df
 
 from ..utils import dataframe as dframe
 from ..moment_guess import peakT as quickPeakT
@@ -217,7 +218,12 @@ class ScatterPPV(object):
         kwargs['label_key'] = label_key
 
         # get the velocity range to plot
-        vmin, vmax = np.nanpercentile(self.dataframe['vlsr'], [1, 99])
+
+        if isinstance(self.dataframe['vlsr'], dask_df.Series):
+            vmin, vmax = self.dataframe['vlsr'].quantile([0.01, 0.99]).compute()
+        else:
+            vmin, vmax = np.nanpercentile(self.dataframe['vlsr'], [1, 99])
+
         vpad = (vmax - vmin)/10
         if vpad > 0.5:
             vmax += vpad

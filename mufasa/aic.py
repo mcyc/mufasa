@@ -152,9 +152,7 @@ def AIC(rss, p, N):
         AIC values.
     """
     # avoid invalid math values
-    N[N==0] = np.nan
     aic = N * np.log(rss/N) + 2*p
-    #return np.nan_to_num(aic)
     return aic
 
 

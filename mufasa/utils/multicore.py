@@ -1,4 +1,5 @@
-from multiprocessing import cpu_count
+#from multiprocessing import cpu_count
+from os import cpu_count
 
 from .mufasa_log import get_logger
 
