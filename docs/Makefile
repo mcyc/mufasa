@@ -13,17 +13,12 @@ GENERATEDDIR  = source/api/generated
 .PHONY: all check-deps apidocs html view-html clean distclean confirm-distclean help
 
 # Build all (API docs + HTML)
-all: clean api-ref apidocs html
+all: apidocs html
 
 # Check dependencies
 check-deps:
 	@command -v python3 > /dev/null || { echo "Python3 not found. Aborting."; exit 1; }
 	@python3 -c "import sphinx" 2>/dev/null || { echo "Sphinx not installed. Aborting."; exit 1; }
-
-# Generate api_reference.py files for API documentation index
-api-ref: check-deps
-	@echo "Generating api_reference.py files for API documentation index..."
-	python $(SCRIPTSDIR)/generate_api_reference.py
 
 # Generate .rst files for API documentation
 apidocs: check-deps

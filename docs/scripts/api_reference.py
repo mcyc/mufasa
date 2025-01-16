@@ -1,33 +1,26 @@
 # This file is auto-generated. Edit descriptions and structure as needed.
 
 API_REFERENCE = {
-    'mufasa.PCube': {
-        'module': 'mufasa.PCube',
-        'description': '''The `mufasa.''',
-        'members': [
-            {'name': 'PCube', 'type': 'class', 'description': '''A specialized subclass of :class:`Cube` tailored for Mufasa-specific workflows.'''}
-        ]
-    },
     'mufasa.UltraCube': {
         'module': 'mufasa.UltraCube',
-        'description': '''The `mufasa.''',
+        'description': '''UltraCube module.''',
         'members': [
             {'name': 'UCubePlus', 'type': 'class', 'description': '''A subclass of UltraCube that includes directory management for parameter maps and model fits.'''},
-            {'name': 'UltraCube', 'type': 'class', 'description': '''A framework for multi-component spectral cube analysis and model fitting.'''},
-            {'name': 'calc_AICc', 'type': 'function', 'description': '''Calculate the corrected Akaike Information Criterion (AICc) for a spectral cube model.'''},
-            {'name': 'calc_AICc_likelihood', 'type': 'function', 'description': '''Calculate the relative likelihood of two models based on their AICc values.'''},
-            {'name': 'calc_chisq', 'type': 'function', 'description': '''Calculate the chi-squared (χ²) or reduced chi-squared value for a spectral cube model fit.'''},
-            {'name': 'calc_rss', 'type': 'function', 'description': '''Calculate the residual sum of squares (RSS) for a spectral cube model fit.'''},
-            {'name': 'convolve_sky_byfactor', 'type': 'function', 'description': '''Convolve the spatial dimensions of a spectral cube by a specified factor.'''},
-            {'name': 'expand_mask', 'type': 'function', 'description': '''Expand a 3D mask along the spectral axis by a specified buffer size.'''},
+            {'name': 'UltraCube', 'type': 'class', 'description': '''A framework to manage and fit multi-component spectral models for spectral cubes.'''},
+            {'name': 'calc_AICc', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'calc_AICc_likelihood', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'calc_chisq', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'calc_rss', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'convolve_sky_byfactor', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'expand_mask', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'fit_cube', 'type': 'function', 'description': '''Fit the spectral cube using the specified fitting type.'''},
             {'name': 'get_Tpeak', 'type': 'function', 'description': '''Calculate the peak value of a model cube at each spatial pixel.'''},
-            {'name': 'get_all_lnk_maps', 'type': 'function', 'description': '''Compute log-likelihood ratio maps for model comparisons up to a specified number of components.'''},
-            {'name': 'get_best_2c_parcube', 'type': 'function', 'description': '''Select the best 2-component parameter cube based on AICc likelihood thresholds.'''},
+            {'name': 'get_all_lnk_maps', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'get_best_2c_parcube', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'get_chisq', 'type': 'function', 'description': '''Calculate the chi-squared or reduced chi-squared value for a spectral cube.'''},
             {'name': 'get_masked_moment', 'type': 'function', 'description': '''Calculate a masked moment of a spectral cube.'''},
             {'name': 'get_residual', 'type': 'function', 'description': '''Calculate the residual between the data cube and the model cube.'''},
-            {'name': 'get_rms', 'type': 'function', 'description': '''Compute a robust estimate of the root mean square (RMS) from the fit residuals.'''},
+            {'name': 'get_rms', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'get_rss', 'type': 'function', 'description': '''Calculate the residual sum of squares (RSS) for a spectral cube model fit.'''},
             {'name': 'is_K', 'type': 'function', 'description': '''Check if a given unit is equivalent to Kelvin (K).'''},
             {'name': 'load_model_fit', 'type': 'function', 'description': '''Load the spectral fit results from a.'''},
@@ -37,7 +30,7 @@ API_REFERENCE = {
     },
     'mufasa.aic': {
         'module': 'mufasa.aic',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'AIC', 'type': 'function', 'description': '''Calculate the Akaike Information Criterion (AIC).'''},
             {'name': 'AICc', 'type': 'function', 'description': '''Calculate the corrected Akaike Information Criterion (AICc).'''},
@@ -49,7 +42,7 @@ API_REFERENCE = {
     },
     'mufasa.clean_fits': {
         'module': 'mufasa.clean_fits',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'fit_results', 'type': 'class', 'description': '''Undocumented'''},
             {'name': 'above_ErrV_Thresh', 'type': 'function', 'description': '''Undocumented'''},
@@ -61,7 +54,7 @@ API_REFERENCE = {
     },
     'mufasa.convolve_tools': {
         'module': 'mufasa.convolve_tools',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'convolve_sky', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'convolve_sky_byfactor', 'type': 'function', 'description': '''Undocumented'''},
@@ -74,14 +67,14 @@ API_REFERENCE = {
     },
     'mufasa.deblend_cube': {
         'module': 'mufasa.deblend_cube',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'deblend', 'type': 'function', 'description': '''Deblend hyperfine structures in a cube based on fitted models.'''}
         ]
     },
     'mufasa.exceptions': {
         'module': 'mufasa.exceptions',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'FitTypeError', 'type': 'class', 'description': '''Fitttype provided is not valid.'''},
             {'name': 'SNRMaskError', 'type': 'class', 'description': '''SNR Mask has no valid pixel.'''},
@@ -90,7 +83,7 @@ API_REFERENCE = {
     },
     'mufasa.guess_refine': {
         'module': 'mufasa.guess_refine',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'get_celestial_hdr', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'guess_from_cnvpara', 'type': 'function', 'description': '''Undocumented'''},
@@ -109,7 +102,7 @@ API_REFERENCE = {
     },
     'mufasa.master_fitter': {
         'module': 'mufasa.master_fitter',
-        'description': '''The `mufasa.''',
+        'description': '''master_fitter.''',
         'members': [
             {'name': 'Region', 'type': 'class', 'description': '''A class to represent the observed spectral cube to perform the model fits.'''},
             {'name': 'expand_fits', 'type': 'function', 'description': '''Expand fits in a region by incrementally fitting pixels beyond a defined.'''},
@@ -135,8 +128,7 @@ API_REFERENCE = {
             {'name': 'refit_marginal', 'type': 'function', 'description': '''Refit pixels with fits that appears marginally okay, as deterined by the.'''},
             {'name': 'refit_swap_2comp', 'type': 'function', 'description': '''Refit the cube by using the previous fit result as guesses, but with the.'''},
             {'name': 'replace_bad_pix', 'type': 'function', 'description': '''Refit pixels marked by the mask as "bad" and adopt the new model if it.'''},
-            {'name': 'replace_para', 'type': 'function', 'description': '''Replace parameter values in a parameter cube using a reference cube for specific pixels (Deprecated).'''},
-            {'name': 'replace_para_n_mod', 'type': 'function', 'description': '''Replace parameter values in a parameter cube with those from a reference cube for specific pixels and update its model accordingly.'''},
+            {'name': 'replace_para', 'type': 'function', 'description': '''Replace parameter values in a parameter cube with those from a reference.'''},
             {'name': 'replace_rss', 'type': 'function', 'description': '''Replace RSS-related maps in a `UltraCube` object for specific.'''},
             {'name': 'save_best_2comp_fit', 'type': 'function', 'description': '''Save the best two-component fit results for the specified region.'''},
             {'name': 'save_map', 'type': 'function', 'description': '''Save a 2D map as a FITS file.'''},
@@ -146,7 +138,7 @@ API_REFERENCE = {
     },
     'mufasa.moment_guess': {
         'module': 'mufasa.moment_guess',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'LineSetup', 'type': 'class', 'description': '''Undocumented'''},
             {'name': 'adaptive_moment_maps', 'type': 'function', 'description': '''Undocumented'''},
@@ -168,16 +160,16 @@ API_REFERENCE = {
     },
     'mufasa.multi_v_fit': {
         'module': 'mufasa.multi_v_fit',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
-            {'name': 'cubefit_gen', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'cubefit_gen', 'type': 'function', 'description': '''Perform n velocity component fit on the GAS ammonia 1-1 data.'''},
             {'name': 'cubefit_simp', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'default_masking', 'type': 'function', 'description': '''Undocumented'''},
-            {'name': 'get_chisq', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'get_chisq', 'type': 'function', 'description': '''cube : SpectralCube.'''},
             {'name': 'get_start_point', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'get_vstats', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'handle_snr', 'type': 'function', 'description': '''Undocumented'''},
-            {'name': 'make_header', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'make_header', 'type': 'function', 'description': '''Create a new header while retaining.'''},
             {'name': 'match_pcube_mask', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'register_pcube', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'retry_fit', 'type': 'function', 'description': '''Undocumented'''},
@@ -189,7 +181,7 @@ API_REFERENCE = {
     },
     'mufasa.signals': {
         'module': 'mufasa.signals',
-        'description': '''The `mufasa.''',
+        'description': '''Module Name: signals.''',
         'members': [
             {'name': 'estimate_mode', 'type': 'function', 'description': '''Estimate the mode of the data using a histogram.'''},
             {'name': 'get_moments', 'type': 'function', 'description': '''Calculate moments of the signals in a cube.'''},
@@ -207,7 +199,7 @@ API_REFERENCE = {
     },
     'mufasa.slab_sort': {
         'module': 'mufasa.slab_sort',
-        'description': '''The `mufasa.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'distance_metric', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'mask_swap_2comp', 'type': 'function', 'description': '''Undocumented'''},
@@ -218,7 +210,7 @@ API_REFERENCE = {
     },
     'mufasa.spec_models': {
         'module': 'mufasa.spec_models',
-        'description': '''This sub-package hosts the codes for sepctral models.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'mufasa.spec_models.ammonia_multiv', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.spec_models.meta_model', 'type': 'module', 'description': '''No description available.'''},
@@ -276,41 +268,14 @@ API_REFERENCE = {
     },
     'mufasa.utils': {
         'module': 'mufasa.utils',
-        'description': '''This sub-package provides utility functions and tools for data processing,.''',
+        'description': '''Undocumented''',
         'members': [
-            {'name': 'mufasa.utils.dask_ops', 'type': 'module', 'description': '''No description available.'''},
-            {'name': 'mufasa.utils.dask_utils', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.dataframe', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.interpolate', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.map_divide', 'type': 'module', 'description': '''No description available.'''},
-            {'name': 'mufasa.utils.memory', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.mufasa_log', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.multicore', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.neighbours', 'type': 'module', 'description': '''No description available.'''}
-        ]
-    },
-    'mufasa.utils.dask_ops': {
-        'module': 'mufasa.utils.dask_ops',
-        'description': '''This module provides tools and wrappers to perform dask operations.''',
-        'members': [
-            {'name': 'apply_planemask', 'type': 'function', 'description': '''Apply a 2D Boolean mask to a 3D cube, extracting pixel values within the mask.'''},
-            {'name': 'dask_binary_dilation', 'type': 'function', 'description': '''Perform binary dilation on a Dask array using a specified structuring element.'''}
-        ]
-    },
-    'mufasa.utils.dask_utils': {
-        'module': 'mufasa.utils.dask_utils',
-        'description': '''This module provides general purpose tool and wrappers to handle dask object.''',
-        'members': [
-            {'name': 'calculate_batch_size', 'type': 'function', 'description': '''Calculate the optimal batch size and adjusted number of workers for processing valid pixels.'''},
-            {'name': 'chunk_by_ray', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array with an optimal aspect ratio and target memory usage.'''},
-            {'name': 'compute_chunk_relevant', 'type': 'function', 'description': '''Determine the relevance of chunks in a 2D Boolean mask.'''},
-            {'name': 'compute_global_offsets', 'type': 'function', 'description': '''Calculate global offsets for a chunk's position in a multidimensional array.'''},
-            {'name': 'custom_task_graph', 'type': 'function', 'description': '''Construct a custom task graph to process valid pixels in a Dask array.'''},
-            {'name': 'lazy_pix_compute', 'type': 'function', 'description': '''Lazily compute spectral values for valid pixels in a data cube.'''},
-            {'name': 'lazy_pix_compute_dynamic', 'type': 'function', 'description': '''Compute valid pixels in a 3D data cube adaptively with dynamic batching and scheduling.'''},
-            {'name': 'lazy_pix_compute_no_batching', 'type': 'function', 'description': '''Compute valid pixels in a Dask array by processing only relevant chunks.'''},
-            {'name': 'lazy_pix_compute_single', 'type': 'function', 'description': '''Lazily compute spectral values for valid pixels in a data cube.'''},
-            {'name': 'persist_and_clean', 'type': 'function', 'description': '''Persist a Dask collection and optionally visualize its computation graph.'''}
         ]
     },
     'mufasa.utils.dataframe': {
@@ -338,15 +303,6 @@ API_REFERENCE = {
             {'name': 'watershed_divide', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
-    'mufasa.utils.memory': {
-        'module': 'mufasa.utils.memory',
-        'description': '''This module provides tools to monitor memory usage and.''',
-        'members': [
-            {'name': 'calculate_target_memory', 'type': 'function', 'description': '''Calculate target memory per core for chunked computations.'''},
-            {'name': 'monitor_peak_memory', 'type': 'function', 'description': '''Decorator to monitor and record the peak memory usage of a function.'''},
-            {'name': 'peak_memory', 'type': 'function', 'description': '''Decorator to monitor and display the peak memory usage of a function,.'''}
-        ]
-    },
     'mufasa.utils.mufasa_log': {
         'module': 'mufasa.utils.mufasa_log',
         'description': '''Undocumented''',
@@ -355,8 +311,7 @@ API_REFERENCE = {
             {'name': 'WarningContextFilter', 'type': 'class', 'description': '''Filter instances are used to perform arbitrary filtering of LogRecords.'''},
             {'name': 'get_logger', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'init_logging', 'type': 'function', 'description': ''':param logfile: file to save to (default mufasa.'''},
-            {'name': 'reset_logger', 'type': 'function', 'description': '''Undocumented'''},
-            {'name': 'timing_decorator', 'type': 'function', 'description': '''A decorator that measures the execution time of a function.'''}
+            {'name': 'reset_logger', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
     'mufasa.utils.multicore': {
@@ -379,7 +334,7 @@ API_REFERENCE = {
     },
     'mufasa.visualization': {
         'module': 'mufasa.visualization',
-        'description': '''This sub-package provides tools for visualizing spectral cubes,.''',
+        'description': '''Undocumented''',
         'members': [
             {'name': 'mufasa.visualization.scatter_3D', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.visualization.spec_viz', 'type': 'module', 'description': '''No description available.'''}

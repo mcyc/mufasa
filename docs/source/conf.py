@@ -72,7 +72,6 @@ intersphinx_mapping = {
     'matplotlib': ('https://matplotlib.org/stable/', None),
     'joblib': ('https://joblib.readthedocs.io/en/latest/', None),
     'spectral_cube': ('https://spectral-cube.readthedocs.io/en/latest/', None),
-    'pyspeckit': ('https://pyspeckit.readthedocs.io/en/latest/', None),
 }
 
 templates_path = ['_templates']
