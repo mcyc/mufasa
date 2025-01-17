@@ -1976,8 +1976,8 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
                             header=copy(reg.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
-    cube_mod.use_dask_scheduler(reg.ucube.scheduler)
-    mom0_mod = cube_mod.moment0()
+    with cube_mod.use_dask_scheduler(scheduler):
+        mom0_mod = cube_mod.moment0()
     savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
@@ -1988,7 +1988,7 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
 
     # created masked mom0 map with model as the mask
     mom0 = UCube.get_masked_moment(cube=reg.ucube.cube, model=modbest,
-                                   order=0, mask=reg.ucube.master_model_mask)
+                                   order=0, mask=reg.ucube.master_model_mask, scheduler=scheduler)
     savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
@@ -2001,17 +2001,15 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
     hdr_save = hdr2D.copy()
-    hdr_save.set(keyword='NOTES', value='reduced chi-squared values of the 1-comp model',
+    hdr_save.set(keyword='NOTES', value='reduced chi-sq. values of the 1-comp model',
                  comment=None, before='DATE')
-    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
     save_map(chiRed_1c, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_2c")
     hdr_save = hdr2D.copy()
-    hdr_save.set(keyword='NOTES', value='reduced chi-squared values of the 2-comp model',
+    hdr_save.set(keyword='NOTES', value='reduced chi-sq. values of the 2-comp model',
                  comment=None, before='DATE')
-    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
     save_map(chiRed_2c, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 

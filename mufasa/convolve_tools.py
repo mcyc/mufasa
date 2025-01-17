@@ -32,6 +32,7 @@ except ImportError:
 
 from .utils.memory import monitor_peak_memory, tmp_save_gauge
 from .utils import dask_utils
+from .utils.dask_utils import profile_and_visualize
 
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
@@ -82,14 +83,17 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         cnv_cube = cnv_cube.with_fill_value(np.nan)
 
     if downsample:
-        print(f"=============== downsampling cube with \'{scheduler}\' scheduler =====================")
-        with cnv_cube.use_dask_scheduler(scheduler), ProgressBar():
-            # regrid the convolved cube
-            nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
-            nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
-            nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
-            nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
-            newcube = cnv_cube.reproject(nhdr, order='bilinear')
+        # regrid the convolved cube
+        nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
+        nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
+        nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
+        nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
+        # clean the graph before downsampling
+        cnv_cube._data = dask_utils.persist_and_clean(cnv_cube._data)
+        # spectral-cube reproject currently doesn't support chunking, newcube will have a singel chunk
+        cnv_cube.use_dask_scheduler('synchronous') # to avoid unecessary overheads for reproject
+        newcube = cnv_cube.reproject(nhdr, order='bilinear', use_memmap=False)
+        newcube._data = dask_utils.persist_and_clean(newcube._data)
     else:
         newcube = cnv_cube
     del cnv_cube
@@ -158,7 +162,7 @@ def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0, rec
 
     return cnv_cube
 
-
+#@profile_and_visualize(save=True, filename="convole_to.html")
 def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp_dir='auto'):
 
     if save_to_tmp_dir:
@@ -180,8 +184,8 @@ def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp
             cube = _rechunk(cube, rechunk)
 
         print(f"=============== convolving cube with \'{scheduler}\' scheduler =====================")
-
         with cube.use_dask_scheduler(scheduler), ProgressBar():
+            cube._data = dask_utils.persist_and_clean(cube._data) # clean up the graph before convolution
             cnv_cube = cube.convolve_to(beam, save_to_tmp_dir=save_to_tmp_dir)
             if not save_to_tmp_dir:
                 # compute the convolution now

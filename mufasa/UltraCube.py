@@ -231,12 +231,8 @@ class UltraCube(object):
         self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
         if scheduler:
-            # set the scheduler from dask's default
-            if isinstance(scheduler, str):
-                self.cube.use_dask_scheduler(scheduler)
-            else:
-                # use the UltraCube default
-                self.cube.use_dask_scheduler(self.scheduler)
+            # overwrite UltraCube's previous scheduler
+            self.scheduler = scheduler
 
     def load_pcube(self, pcube_ref=None, pyspeckit=False):
         """
@@ -1894,7 +1890,7 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
             return chisq, np.nansum(mask, axis=0)
 
 
-def get_masked_moment(cube, model, order=0, expand=10, mask=None):
+def get_masked_moment(cube, model, order=0, expand=10, mask=None, scheduler=None):
     """
     Calculate a masked moment of a spectral cube.
 
@@ -1961,7 +1957,11 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     # Apply the mask to the cube and return the moment
     maskcube = cube.with_mask(mask.compute().astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-    mom = maskcube.moment(order=order)
+    if scheduler is not None and isinstance(maskcube._data, da.Array):
+        with maskcube.use_dask_scheduler(scheduler):
+            mom = maskcube.moment(order=order)
+    else:
+        mom = maskcube.moment(order=order)
     return mom
 
 
