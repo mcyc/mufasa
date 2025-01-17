@@ -21,11 +21,11 @@ metadata = get_metadata()
 # Define the setup configuration
 if __name__ == "__main__":
     setup(
-        name=metadata["project"],  # e.g., mufasa
-        version=metadata["version"],  # e.g., 1.4.0
+        name=metadata["project"],
+        version=metadata["version"],
         description="MUlti-component Fitter for Astrophysical Spectral Applications",
-        author=metadata["author"],  # Michael Chun-Yuan Chen
-        url=metadata["github_url"],  # GitHub URL
+        author=metadata["author"],
+        url=metadata["github_url"], 
         packages=find_packages(),
         install_requires=[
             "numpy>=1.24.4,<2",
@@ -40,8 +40,7 @@ if __name__ == "__main__":
             "plotly",
             "nbformat",
             "reproject>=0.7.1",
-            "pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit",
-            "FITS_tools @ git+https://github.com/keflavich/FITS_tools.git@b1fe5166ccf8a43105efe8201e37ab5993e880be#egg=FITS_tools",
+            "pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@2d19ddfb965a99b1fdf094517d8c905c6527b3b1#egg=pyspeckit",
         ],
         extras_require={
             "docs": [
