@@ -4,7 +4,7 @@ Installation
 
    **Recommended Install**
     MUFASA is undergoing rapid developments at the moment,
-    install from the source (see Option 2) to stay up-to-date with the latest version.
+    install from the source (see Option 1) to stay up-to-date with the latest version.
 
 System Requirements
 --------------------
@@ -15,21 +15,23 @@ MUFASA is compatible with the following environments:
 Instructions
 -------------
 
-1. **Installing from PyPI**
-   The easiest way to install MUFASA is through PyPI. Run the following command in your terminal:
+1. **Installing from Source**:
+   to install the latest developing version, clone the MUFASA GitHub repository:
 
    .. code-block:: bash
 
-       pip install mufasa
+        git clone https://github.com/mcyc/mufasa.git
+        cd mufasa
+        pip install -e .
 
-2. **Installing from Source**
-   To use the latest development version, clone the MUFASA GitHub repository:
+
+   To use a specific version using a tag, for example, v1.4.2, run the following after
+   the initial install:
 
    .. code-block:: bash
 
-       git clone https://github.com/mcyc/mufasa.git
-       cd mufasa
-       pip install -e .
+        git checkout v1.4.2
+        git pull
 
    .. note::
        If you encounter issues with pre-existing versions of dependencies or want to ensure
@@ -41,12 +43,26 @@ Instructions
 
        This command ensures that all dependencies are freshly installed, replacing any older or conflicting versions.
 
-3. **Dependencies**
+2. **Dependencies**:
    MUFASA will automatically install its dependencies during installation. If any issues occur, install them manually:
 
    .. code-block:: bash
 
        pip install numpy astropy spectral-cube pyspeckit
+
+3. **Installing from PyPI**:
+
+   .. warning::
+
+        The PyPI version of MUFASA is currently out of date. It will be updated once PyPI
+        dependencies issues has been resolved.
+
+
+   The easiest way to install MUFASA is through PyPI. Run the following command in your terminal:
+
+   .. code-block:: bash
+
+       pip install mufasa
 
 Verification
 ~~~~~~~~~~~~~

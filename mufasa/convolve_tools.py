@@ -8,7 +8,6 @@ __author__ = 'mcychen'
 
 import numpy as np
 import astropy.io.fits as fits
-import FITS_tools
 from astropy import units as u
 from skimage.morphology import remove_small_objects, disk, opening, binary_erosion, dilation, remove_small_holes
 from spectral_cube import SpectralCube
@@ -16,10 +15,9 @@ from radio_beam import Beam
 from astropy.wcs import WCS
 from astropy.stats import mad_std
 from astropy.convolution import Gaussian2DKernel, convolve
-from FITS_tools.hcongrid import get_pixel_mapping
 from scipy.interpolate import griddata
 import scipy.ndimage as nd
-from spectral_cube.utils import NoBeamError # imoprt NoBeamError, since cube most likely wasn't able to read the beam either
+from spectral_cube.utils import NoBeamError
 import gc
 
 # for Astropy 6.1.4 forward compatibility
@@ -27,6 +25,8 @@ try:
     from astropy.units import UnitScaleError
 except ImportError:
     from astropy.units.core import UnitScaleError
+
+from .utils.fits_utils import downsample_header, get_pixel_mapping
 
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
@@ -73,8 +73,8 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
 
     if downsample:
         # regrid the convolved cube
-        nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
-        nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
+        nhdr = downsample_header(hdr, factor=factor, axis=1)
+        nhdr = downsample_header(nhdr, factor=factor, axis=2)
         nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
         nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
         newcube = cnv_cube.reproject(nhdr, order='bilinear')
@@ -146,8 +146,6 @@ def snr_mask(cube, snr_min=1.0, errmappath=None):
 
     else:
         # make a quick RMS estimate using median absolute deviation (MAD)
-        #mask_gg = np.isfinite(cube._data)
-        #errmap = mad_std(cube._data[mask_gg], axis=0)
         errmap = cube.mad_std(axis=0)#, how='ray')
         logger.info("median rms: {0}".format(np.nanmedian(errmap)))
 

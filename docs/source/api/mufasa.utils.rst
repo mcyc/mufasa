@@ -13,6 +13,7 @@ mufasa.utils
    :toctree:
 
    dataframe
+   fits_utils
    interpolate
    map_divide
    mufasa_log

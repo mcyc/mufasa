@@ -30,7 +30,7 @@ pip install -e .
 
 ```MUFASA``` runs on ```python > v3.8```. For more details on the installation and dependencies, please see the [Install](https://mufasa.readthedocs.io/en/latest/installation.html) page on RTD.
 
-If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` and  ```FITS_tools``` directly from their respective GitHub repository. The `setup.py` for `MUFASA >= v1.4.0` takes care of such a dependency automatically with `pip` installs.
+If you are running a later version of Python, for example, ```Python 3.11```, you likely will have to install the latest versions of ```pyspeckit``` directly from their respective GitHub repository. The `setup.py` for `MUFASA >= v1.4.0` takes care of such a dependency automatically with `pip` installs.
 
 ## Getting Started
 
