@@ -36,7 +36,7 @@ from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
 from .spec_models import meta_model
 from .utils.multicore import validate_n_cores
-from .utils import dask_utils, dask_ops
+from .utils import dask_utils, dask_ops, memory
 from .visualization.spec_viz import Plotter
 from . import PCube
 
@@ -91,7 +91,7 @@ class UltraCube(object):
     """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None,
-                 cnv_factor=2, n_cores=True, scheduler='processes', chunk_memory_size=16):
+                 cnv_factor=2, n_cores=True, scheduler='threads', chunk_memory_size=16):
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
@@ -115,6 +115,7 @@ class UltraCube(object):
         self.ray_chunks = None # dask chunking that perserves the spectral axis
         self.plane_chunks = None # dask chunking that tries to perserve the image plane
         self.native_chunks = None # the native chunking scheme of the cube data, can be fairly effecient
+        self.cube_size_mb = None
 
         # scheduler: {'threads', 'processes', 'synchronous'}
         #dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
@@ -173,50 +174,44 @@ class UltraCube(object):
         fitsfile : str
             Path to the FITS cube file.
 
+        chunks :
+            the chunking scheme
+
+        chunk_memory_size : int
+            the target memory size of the chunks in MB
+
+        scheduler : str
+            the dask scheduler to use
+
         Returns
         -------
         None
+
+        Notes
+        -----
+        - rechunking is not adviced since many of DaskSpectralCube's functions rechunks the data internally
+          and rechunking can be memory intensive if the blocks are very different
+
         """
         # read the cube
         cube = SpectralCube.read(fitsfile, use_dask=True)
 
+        if scheduler:
+            # overwrite UltraCube's previous scheduler
+            self.scheduler = scheduler
+
+        self.cube_size_mb = memory.get_size_mb(cube._data)
+
         # record the cube's native chunking scheme
         self.chunks_native = cube._data.chunks
 
-        if chunk_memory_size is None:
-            chunk_memory_size = self.chunk_memory_size
-        else:
-            self.chunk_memory_size = chunk_memory_size
-
-        # calculate different chunking schemes based on the cube:
-        # plane chunks for keeping the image planes as intact as possible (for convolution and such)
-        self.plane_chunks = dask_utils.chunk_by_slice(
-            cube_shape=cube.shape,
-            dtype=cube._data.dtype,
-            target_chunk_mb=chunk_memory_size
-        )
-
-        # # ray chunks for keeping the spectral axis completely intacted (for working with spectrum)
-        self.ray_chunks = dask_utils.chunk_by_ray(
-            cube_shape=cube.shape,
-            dtype=cube._data.dtype,
-            target_chunk_mb=chunk_memory_size
-        )
-
-        # Validate and set chunks
-        if dask_utils._is_valid_chunk(chunks) and chunks is not None:
-            self.chunks = chunks
-        elif isinstance(chunks, str):
-            if chunks == 'rays':
-                self.chunks = self.ray_chunks
-            if chunks == 'planes':
-                self.chunks = self.plane_chunks
-        else:
-            # default to rechunking using MUFASA's ray chunking scheme (perserves spectral axis)
-            self.chunks = self.ray_chunks
-
-        # rechunk the cube
-        cube = cube.rechunk(self.chunks)
+        if chunk_memory_size is not None:
+            if chunks:
+                msg = ("Initial rechunking is not adviced, since the data will likely"
+                       "be rechunked again at somepoint by DaskSpectralCube")
+                logger.warning(msg)
+            # set UltraCube object's chunk info accordingly
+            self._set_chunks(chunk_memory_size, chunks)
 
         # convert the cube unit
         cube = to_K(cube)
@@ -228,11 +223,29 @@ class UltraCube(object):
                                "The rest frequency of the spectral model will be used instead")
                 cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
 
-        self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+        cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
-        if scheduler:
-            # overwrite UltraCube's previous scheduler
-            self.scheduler = scheduler
+        if chunks:
+            # rechunk the cube
+            if self.cube_size_mb > 256:
+                # temporary save to the directory during rechunking if the cube is larger than 256 mb
+                save_to_tmp_dir = True
+            else:
+                save_to_tmp_dir = False
+            cube = cube.rechunk(self.chunks, save_to_tmp_dir=True)
+
+        else:
+            total_chunks, mem_size = dask_utils.dask_array_stats(cube._data)
+            avg_chunk_mb = np.round(mem_size/total_chunks, 1)
+            logger.info(f"A cube with a size of {np.round(mem_size/1e3, 2)} GB loaded into a dask array.")
+            logger.info(f"Total number of chunks: {total_chunks}, average chunk size: {avg_chunk_mb} MB")
+
+            if avg_chunk_mb > 128 or total_chunks > 1000:
+                msg = (f"{total_chunks} number of chunks with an average size of {avg_chunk_mb} MB is not optimal"
+                       f"\'auto\' rechunk will be performed")
+                logger.warning(msg)
+
+        self.cube = cube
 
     def load_pcube(self, pcube_ref=None, pyspeckit=False):
         """
@@ -749,6 +762,42 @@ class UltraCube(object):
         self.get_plotter()
         self.plotter.plot_fits_grid(x, y, ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
                                     figsize=figsize, origin=origin, mod_all=mod_all, savename=savename, **kwargs)
+
+
+    def _set_chunks(self, chunk_memory_size, chunks):
+        # estimate different chunking schemes for the object
+        if chunk_memory_size is None:
+            chunk_memory_size = self.chunk_memory_size
+        else:
+            self.chunk_memory_size = chunk_memory_size
+
+        # calculate different chunking schemes based on the cube:
+        # plane chunks for keeping the image planes as intact as possible (for convolution and such)
+        self.plane_chunks = dask_utils.chunk_by_slice(
+            cube_shape=cube.shape,
+            dtype=cube._data.dtype,
+            target_chunk_mb=chunk_memory_size
+        )
+
+        # # ray chunks for keeping the spectral axis completely intacted (for working with spectrum)
+        self.ray_chunks = dask_utils.chunk_by_ray(
+            cube_shape=cube.shape,
+            dtype=cube._data.dtype,
+            target_chunk_mb=chunk_memory_size
+        )
+
+        # Validate and set chunks
+        if dask_utils._is_valid_chunk(chunks) and chunks is not None:
+            self.chunks = chunks
+        elif isinstance(chunks, str):
+            if chunks == 'rays':
+                self.chunks = self.ray_chunks
+            if chunks == 'planes':
+                self.chunks = self.plane_chunks
+        else:
+            # default to rechunking using MUFASA's ray chunking scheme (perserves spectral axis)
+            self.chunks = self.ray_chunks
+
 
 
 class UCubePlus(UltraCube):
@@ -1476,11 +1525,10 @@ def get_all_full_model_stats(ucube, ncomp_max=2, multicore=True):
     # output all the model stats fresh and overwrite the previous values (including rest the model mask)
 
     footprint = ucube.cube_footprint
-    cube = ucube.cube._data
     models = {}
     masks = {}
     # have a combined mask to ensure all compents are sampled sames
-    combined_mask = np.zeros_like(cube, dtype=bool)
+    combined_mask = np.zeros_like(ucube.cube, dtype=bool)
 
     # for noise model (0) component
     models['0'] = None
@@ -1490,6 +1538,14 @@ def get_all_full_model_stats(ucube, ncomp_max=2, multicore=True):
         model = ucube.pcubes[str(nc)].get_modelcube(rest_graph=True)
         models[str(nc)] = model
         combined_mask = da.logical_or(combined_mask, model > 0)
+
+    # rechunk cube if it doesn't match with the model
+    if ucube.cube._data.chunks != models['1'].chunks:
+        logger.info("Rechunking the cube to match the model")
+        ucube.cube = ucube.cube.rechunk(models['1'].chunks, save_to_tmp_dir=True)
+
+    cube = ucube.cube._data # get the dask array
+
 
     # pad the mask spectrally, and extend the mask to pixels where no model exists
     combined_mask = dask_utils.reset_graph(combined_mask)

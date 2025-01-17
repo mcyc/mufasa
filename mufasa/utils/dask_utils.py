@@ -66,6 +66,37 @@ def profile_and_visualize(**visualize_kwargs):
 #======================================================================================================================#
 
 
+import numpy as np
+
+
+def dask_array_stats(array):
+    """
+    Quickly analyze a Dask array's chunk structure and memory requirements.
+
+    Parameters
+    ----------
+    array : dask.array.Array
+        The Dask array to analyze.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the number of chunks in each dimension,
+        the total number of chunks, and an estimate of total memory.
+    """
+    # Number of chunks in each dimension
+    chunks_per_dimension = [len(dim) for dim in array.chunks]
+
+    # Total number of chunks (product of chunks along dimensions)
+    total_chunks = np.prod(chunks_per_dimension)
+
+    # Estimate total memory
+    total_memory = array.nbytes  # Total bytes in the array (dtype * size of array)
+
+    return total_chunks, total_memory / 1e6,  # Convert to MB
+
+
+
 def reset_graph(dask_obj):
     """
     Resets the computation graph of a Dask object.
