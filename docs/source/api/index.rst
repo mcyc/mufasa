@@ -1527,6 +1527,27 @@ you can also search with the search bar located on the top right corner of the w
 
              :mod:`mufasa.utils.dataframe`
    
+   * - :obj:`~mufasa.utils.fits_utils.downsample_header`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.fits_utils
+
+          .. autoshortsummary:: mufasa.utils.fits_utils.downsample_header
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.fits_utils`
+   * - :obj:`~mufasa.utils.fits_utils.get_pixel_mapping`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.fits_utils
+
+          .. autoshortsummary:: mufasa.utils.fits_utils.get_pixel_mapping
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.fits_utils`
+   
    * - :obj:`~mufasa.utils.interpolate.expand_interpolate`
      - .. container:: sk-apisearch-desc
 
