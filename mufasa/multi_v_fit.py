@@ -586,9 +586,9 @@ def make_header(ndim, ref_header):
         if (key in hdr_new) and (hdr_new[key] != ndim):
             hdr_new.set(keyword=key, value=ndim, comment=comment)
 
-    hdr_new.add_history("====================================================================")
+    hdr_new.add_history("==================================================")
     hdr_new.add_history(f"Written by MUFASA v{__version__} on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    hdr_new.add_comment("====================================================================")
+    hdr_new.add_comment("==================================================")
     hdr_new.add_comment("MUFASA citation: Chen et al. (2020), DOI: 10.3847/1538-4357/ab7378")
     hdr_new.add_comment("MUFASA is available on GitHub at: https://github.com/mcyc/mufasa")
 
