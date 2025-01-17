@@ -16,6 +16,56 @@ from .mufasa_log import get_logger
 logger = get_logger(__name__)
 #======================================================================================================================#
 
+# for monitoring
+
+from dask.diagnostics import Profiler, ResourceProfiler, CacheProfiler, visualize
+from functools import wraps
+
+def profile_and_visualize(**visualize_kwargs):
+    """
+    A decorator to profile the execution of a function using Dask's profiling tools
+    and visualize the results.
+
+    The decorator uses `Profiler`, `ResourceProfiler`, and `CacheProfiler` from
+    Dask to collect performance metrics during the function execution. After
+    the function completes, the collected data is visualized using the
+    `visualize` function.
+
+    Parameters
+    ----------
+    **visualize_kwargs : dict
+        Additional keyword arguments to be passed to the `visualize` function.
+        These can include options such as `color`, `filename`, or other
+        visualization settings.
+
+    Returns
+    -------
+    function
+        The wrapped function with profiling and visualization enabled.
+
+    Examples
+    --------
+    >>> @profile_and_visualize(color="blue", save="profile.html")
+    ... def convolve():
+    ...     # Perform computationally intensive operations
+    ...     pass
+    ...
+    >>> convolve()
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            with Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
+                result = func(*args, **kwargs)  # Call the original function
+            visualize([prof, rprof, cprof], **visualize_kwargs)  # Visualize the profiling data
+            return result  # Return the result of the original function
+        return wrapper
+    return decorator
+
+
+#======================================================================================================================#
+
+
 def reset_graph(dask_obj):
     """
     Resets the computation graph of a Dask object.
