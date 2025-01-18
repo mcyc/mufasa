@@ -33,13 +33,13 @@ if __name__ == "__main__":
             "matplotlib",
             "scipy>=1.7.3",
             "scikit-image>=0.17.2",
-            "spectral-cube>=0.6.0",
+            "spectral-cube>=0.11", #using reproject
             "radio-beam",
             "pvextractor",
             "pandas", #if enforcing 2.0, use Python > 3.11.2, Numpy > 1.24.2, Astropy > 5.2.1
             "plotly",
             "nbformat",
-            "reproject>=0.7.1",
+            "reproject>=0.14.1",
             "dask[complete]>2024.0",  # no longer pinned to <2024.0"
             "graphviz",
             "pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit",

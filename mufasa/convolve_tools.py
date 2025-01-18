@@ -83,20 +83,11 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         cnv_cube = cnv_cube.with_fill_value(np.nan)
 
     if downsample:
-        # regrid the convolved cube
-        nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
-        nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
-        nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
-        nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
-        # clean the graph before downsampling
-        cnv_cube._data = dask_utils.persist_and_clean(cnv_cube._data)
-        # spectral-cube reproject currently doesn't support chunking, newcube will have a singel chunk
-        cnv_cube.use_dask_scheduler('synchronous') # to avoid unecessary overheads for reproject
-        newcube = cnv_cube.reproject(nhdr, order='bilinear', use_memmap=False)
-        newcube._data = dask_utils.persist_and_clean(newcube._data)
+        # downsample and regrid the convolved cube
+        newcube = _downsample(cnv_cube, hdr, factor, scheduler=scheduler)
     else:
         newcube = cnv_cube
-    del cnv_cube
+
     gc.collect()
 
     if savename != None:
@@ -213,6 +204,38 @@ def _rechunk(cube, rechunk):
         cube = cube.rechunk('auto')
 
     return cube
+
+@monitor_peak_memory()
+def _downsample(cnv_cube, hdr, factor, scheduler=None):
+    """
+    downsamples and reproject
+    """
+
+    nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
+    nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
+    nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1'] / factor))
+    nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2'] / factor))
+
+    # clean the graph before downsampling
+    cnv_cube._data = dask_utils.persist_and_clean(cnv_cube._data)
+
+    # use existing chunking to set the blocksize and avoid rechunking
+    chunks = cnv_cube._data.chunks
+    block_size = tuple(chunk[0] for chunk in chunks) # use the shape of the first block
+
+    # spectral-cube reproject currently doesn't support chunking, newcube will have a singel chunk
+    with cnv_cube.use_dask_scheduler(scheduler):  # note: reproject currently overrides it it with 'threads'
+        if scheduler and (scheduler == 'synchronous' or scheduler =='threads'):
+            newcube = cnv_cube.reproject(
+                nhdr, order='bilinear', use_memmap=False, parallel='current-scheduler', return_type='dask',
+                block_size=block_size
+            )  # parallel and return_type are reproject.return_type arguments #no need for spectral cube's save_to_tmp_dir?
+        else:
+            msg = f"{scheduler} may not be the safest to run with reproject at the moment, defaulting to non-dask operation"
+            logger.warning(msg)
+            newcube = cnv_cube.reproject(nhdr, order='bilinear')
+    newcube._data = dask_utils.persist_and_clean(newcube._data)
+    return newcube
 
 
 def snr_mask(cube, snr_min=1.0, errmappath=None):
