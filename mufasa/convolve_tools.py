@@ -23,6 +23,8 @@ from spectral_cube.utils import NoBeamError # imoprt NoBeamError, since cube mos
 import gc
 import dask.array as da
 from dask.diagnostics import ProgressBar
+import dask
+from dask.distributed import LocalCluster, Client
 
 # for Astropy 6.1.4 forward compatibility
 try:
@@ -32,7 +34,7 @@ except ImportError:
 
 from .utils.memory import monitor_peak_memory, tmp_save_gauge
 from .utils import dask_utils
-from .utils.dask_utils import profile_and_visualize
+from .utils.dask_utils import profile_and_visualize, ensure_dask_client
 
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
@@ -41,6 +43,7 @@ logger = get_logger(__name__)
 # utility tools for convolve cubes
 
 @monitor_peak_memory()
+@ensure_dask_client
 def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True,
                           rechunk=True, scheduler='synchronous', **kwargs):
     # scheduler='processes' is not recommended, as it uses excessive memory
@@ -79,8 +82,12 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         cube = cube.with_beam(beam)
         cnv_cube = convolve_sky(cube, beam,  **kwargs)
 
+    gc.collect()
+
     if not np.isnan(cnv_cube.fill_value):
         cnv_cube = cnv_cube.with_fill_value(np.nan)
+
+    gc.collect()
 
     if downsample:
         # downsample and regrid the convolved cube
@@ -94,6 +101,7 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         newcube.write(savename, overwrite=True)
 
     return newcube
+
 
 @monitor_peak_memory()
 def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0, rechunk=True, scheduler='synchronous'):
@@ -164,6 +172,8 @@ def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp
             # if given as a number, use it as the factor
             save_to_tmp_dir = tmp_save_gauge(cube, factor=save_to_tmp_dir)
 
+    logger.info(f"convolve_to save_to_tmp_dir: {save_to_tmp_dir}")
+
     # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
     if cube.size > 1e8:
         logger.warning("cube is large ({} pixels)".format(cube.size))
@@ -175,7 +185,8 @@ def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp
             cube = _rechunk(cube, rechunk)
 
         print(f"=============== convolving cube with \'{scheduler}\' scheduler =====================")
-        with cube.use_dask_scheduler(scheduler), ProgressBar():
+        #with cube.use_dask_scheduler(scheduler), ProgressBar():
+        with ProgressBar():
             cube._data = dask_utils.persist_and_clean(cube._data) # clean up the graph before convolution
             cnv_cube = cube.convolve_to(beam, save_to_tmp_dir=save_to_tmp_dir)
             if not save_to_tmp_dir:
@@ -224,16 +235,16 @@ def _downsample(cnv_cube, hdr, factor, scheduler=None):
     block_size = tuple(chunk[0] for chunk in chunks) # use the shape of the first block
 
     # spectral-cube reproject currently doesn't support chunking, newcube will have a singel chunk
-    with cnv_cube.use_dask_scheduler(scheduler):  # note: reproject currently overrides it it with 'threads'
-        if scheduler and (scheduler == 'synchronous' or scheduler =='threads'):
-            newcube = cnv_cube.reproject(
-                nhdr, order='bilinear', use_memmap=False, parallel='current-scheduler', return_type='dask',
-                block_size=block_size
-            )  # parallel and return_type are reproject.return_type arguments #no need for spectral cube's save_to_tmp_dir?
-        else:
-            msg = f"{scheduler} may not be the safest to run with reproject at the moment, defaulting to non-dask operation"
-            logger.warning(msg)
-            newcube = cnv_cube.reproject(nhdr, order='bilinear')
+    if scheduler and (scheduler == 'synchronous' or scheduler =='threads'):
+        newcube = cnv_cube.reproject(
+            nhdr, order='bilinear', use_memmap=False, parallel='current-scheduler', return_type='dask',
+            block_size=block_size
+        )  # parallel and return_type are reproject.return_type arguments #no need for spectral cube's save_to_tmp_dir?
+    else:
+        msg = f"{scheduler} may not be the safest to run with reproject at the moment, defaulting to non-dask operation"
+        logger.warning(msg)
+        newcube = cnv_cube.reproject(nhdr, order='bilinear')
+
     newcube._data = dask_utils.persist_and_clean(newcube._data)
     return newcube
 

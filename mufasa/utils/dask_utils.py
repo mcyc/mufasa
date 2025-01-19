@@ -3,12 +3,12 @@ This module provides general purpose tool and wrappers to handle dask object.
 Some of the key methods support parallel computing with effecient memory usage.
 """
 import gc
-
-import dask.array as da
 import numpy as np
+import dask.array as da
 import psutil
+import functools
 from dask import delayed, config
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster, get_client, TimeoutError
 
 # ======================================================================================================================#
 from .mufasa_log import get_logger
@@ -63,10 +63,67 @@ def profile_and_visualize(**visualize_kwargs):
     return decorator
 
 
+def ensure_dask_client(func):
+    """
+    Decorator to ensure a Dask Client is available when the wrapped function is called,
+    but only if the `local_cluster_kwargs` keyword argument is provided.
+
+    Ensures a Dask client is running. If no client exists, it creates one using LocalCluster.
+    Returns a client instance and a boolean indicating whether the client was created locally.
+
+    the for LocalCluster can be found at https://docs.dask.org/en/latest/deploying-python.html
+    name=None, n_workers=None, threads_per_worker=None, processes=None, loop=None,
+    start=None, host=None, ip=None, scheduler_port=0, silence_logs=30, dashboard_address=':8787',
+    worker_dashboard_address=None, diagnostics_port=None, services=None, worker_services=None,
+    service_kwargs=None, asynchronous=False, security=None, protocol=None, blocked_handlers=None,
+    interface=None, worker_class=None, scheduler_kwargs=None, scheduler_sync_interval=1, **worker_kwargs
+
+
+
+    Parameters
+    ----------
+    func : callable
+        The function to be decorated.
+
+    Returns
+    -------
+    callable
+        The wrapped function with Dask client handling.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # Extract the `local_cluster_kwargs` from the kwargs, if present
+
+        local_cluster_kwargs = kwargs.pop('local_cluster_kwargs', None)
+        client = None
+
+        try:
+            client = get_client()  # Check for an existing client
+            created_locally = False
+        except (ValueError, TimeoutError):
+            # No client found, so create a local cluster and client
+
+            if local_cluster_kwargs is not None:
+                # Create a LocalCluster and Client only if `local_cluster_kwargs` is specified
+                if isinstance(local_cluster_kwargs, dict):
+                    cluster = LocalCluster(**local_cluster_kwargs)
+                else:
+                    cluster = LocalCluster()
+                client = Client(cluster)
+                created_locally = True
+
+        try:
+            # Call the wrapped function
+            return func(*args, **kwargs)
+        finally:
+            # If we created the client locally, clean it up
+            if created_locally and client is not None:
+                client.close()
+
+    return wrapper
+
 #======================================================================================================================#
-
-
-import numpy as np
 
 
 def dask_array_stats(array):

@@ -91,7 +91,8 @@ class UltraCube(object):
     """
 
     def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None,
-                 cnv_factor=2, n_cores=True, scheduler='threads', chunk_memory_size=16):
+                 cnv_factor=2, n_cores=True, scheduler='threads', chunk_memory_size=16,
+                 worker_memory_limit = None):
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
@@ -116,6 +117,19 @@ class UltraCube(object):
         self.plane_chunks = None # dask chunking that tries to perserve the image plane
         self.native_chunks = None # the native chunking scheme of the cube data, can be fairly effecient
         self.cube_size_mb = None
+
+        # pre-configure dask.config
+        self.dask_config_kwargs = {
+            'distributed.worker.memory.limit': '0.5GB',            # A safer limit. Dask default is 4GB
+            'distributed.worker.memory.target': 0.6,               # dask default
+            'distributed.worker.memory.spill': 0.7,                # dask default
+            'distributed.worker.memory.pause': 0.8,                # dask default
+            'distributed.worker.memory.compression': True          # dask default
+        }
+
+        if worker_memory_limit is not None:
+            self.dask_config_kwargs['distributed.worker.memory.limit'] = worker_memory_limit
+            #'distributed.worker.local-dir': '/tmp/dask-local-dir'} # dask default
 
         # scheduler: {'threads', 'processes', 'synchronous'}
         #dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
@@ -194,7 +208,11 @@ class UltraCube(object):
 
         """
         # read the cube
-        cube = SpectralCube.read(fitsfile, use_dask=True)
+        use_dask = True # may make this a user option in the future
+        cube = SpectralCube.read(fitsfile, use_dask=use_dask)
+        if use_dask:
+            # this should propagate with new cube results
+            cube._scheduler_kwargs = self.dask_config_kwargs
 
         if scheduler:
             # overwrite UltraCube's previous scheduler

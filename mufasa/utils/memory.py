@@ -269,7 +269,7 @@ def get_size_mb(array):
     size_in_bytes = array.size * array.itemsize
     return size_in_bytes / (1024 ** 2)
 
-def tmp_save_gauge(cube, factor=20):
+def tmp_save_gauge(cube, factor=20, max_mem_gb=1.0):
     """
     Return whether or not it's worth DaskSpectralCube results temporary
     Based on how much free memory is currenlty left
@@ -289,4 +289,4 @@ def tmp_save_gauge(cube, factor=20):
     mem_free = get_system_free_memory()*1e3 # in MB
 
     # advice to save results temporary if
-    return data_size * factor > mem_free
+    return data_size*1e3 > max_mem_gb or (data_size * factor > mem_free)
