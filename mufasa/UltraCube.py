@@ -19,6 +19,7 @@ from spectral_cube.utils import SpectralCubeWarning
 from spectral_cube.dask_spectral_cube import DaskSpectralCube
 warnings.filterwarnings(action='ignore', category=SpectralCubeWarning, append=True)
 from copy import copy
+import shutil
 
 import pyspeckit
 import gc
@@ -210,6 +211,18 @@ class UltraCube(object):
         # read the cube
         use_dask = True # may make this a user option in the future
         cube = SpectralCube.read(fitsfile, use_dask=use_dask)
+        #cube = MDaskCube.read(fitsfile, use_dask=use_dask) #, memmap=False
+
+        # save the data to zarr and load it to enable lazy loading
+        if False:
+            zarr_tmp = "tmp.zarr"
+            try:
+                shutil.rmtree(zarr_tmp)
+            except FileNotFoundError:
+                pass
+            cube._data.to_zarr(zarr_tmp, overwrite=True)
+            cube._data = da.from_zarr(zarr_tmp)
+
         if use_dask:
             # this should propagate with new cube results
             cube._scheduler_kwargs = self.dask_config_kwargs
@@ -260,7 +273,7 @@ class UltraCube(object):
 
             if avg_chunk_mb > 128 or total_chunks > 1000:
                 msg = (f"{total_chunks} number of chunks with an average size of {avg_chunk_mb} MB is not optimal"
-                       f"\'auto\' rechunk will be performed")
+                       f"\'auto\' rechunk is recommended")
                 logger.warning(msg)
 
         self.cube = cube
@@ -2338,4 +2351,196 @@ def to_K(cube):
         return cube
 
     return convert_to_kelvin(cube)
+
+
+
+
+
+
+#=============================================================================
+
+from spectral_cube.dask_spectral_cube import DaskSpectralCube, add_save_to_tmp_dir_option
+from spectral_cube import cube_utils
+from astropy import convolution
+from astropy.wcs.utils import proj_plane_pixel_area
+class MDaskCube(DaskSpectralCube):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _new_cube_with(self, *args, **kwargs):
+        # Call the parent method to get the base cube data and metadata
+        parent_cube = super()._new_cube_with(*args, **kwargs)
+
+        # Ensure the returned cube is of the subclass type
+        return type(self)(parent_cube._data, parent_cube._wcs, meta=parent_cube.meta, mask=parent_cube._mask)
+
+    @classmethod
+    def read(cls, *args, **kwargs):
+        # Ensure `use_dask` defaults to True if not explicitly provided
+        if kwargs.get('use_dask') is None:
+            kwargs['use_dask'] = True
+
+        # Use the parent class's `read` method to get the initial data
+        parent_instance = super().read(*args, **kwargs)
+
+        # Ensure the returned instance is of the subclass type
+        return cls(parent_instance._data, parent_instance._wcs, meta=parent_instance.meta, mask=parent_instance._mask)
+
+    @add_save_to_tmp_dir_option
+    def convolve_to(self, beam, convolve=convolution.convolve, **kwargs):
+        """
+        Convolve each channel in the cube to a specified beam
+
+        Parameters
+        ----------
+        beam : `radio_beam.Beam`
+            The beam to convolve to
+        convolve : function
+            The astropy convolution function to use, either
+            `astropy.convolution.convolve` or
+            `astropy.convolution.convolve_fft`
+        save_to_tmp_dir : bool
+            If `True`, the computation will be carried out straight away and
+            saved to a temporary directory. This can improve performance,
+            especially if carrying out several operations sequentially. If
+            `False`, the computation is only carried out when accessing
+            specific parts of the data or writing to disk.
+        kwargs : dict
+            Keyword arguments to pass to the convolution function
+
+        Returns
+        -------
+        cube : `SpectralCube`
+            A SpectralCube with a single ``beam``
+        """
+
+        # Check if the beams are the same.
+        if beam == self.beam:
+            warnings.warn("The given beam is identical to the current beam. "
+                          "Skipping convolution.")
+            return self
+
+        pixscale = proj_plane_pixel_area(self.wcs.celestial) ** 0.5 * u.deg
+
+        convolution_kernel = beam.deconvolve(self.beam).as_kernel(pixscale)
+        kernel = convolution_kernel.array.reshape((1,) + convolution_kernel.array.shape)
+
+        if self.unit.is_equivalent(u.Jy / u.beam):
+            beam_ratio_factor = (beam.sr / self.beam.sr).value
+        else:
+            beam_ratio_factor = 1.
+
+        # See #631: kwargs get passed within self.apply_function_parallel_spatial
+        def convfunc(img, **kwargs):
+            return convolve(img, kernel, normalize_kernel=True, **kwargs).reshape(img.shape) * beam_ratio_factor
+
+        if convolve is convolution.convolve_fft and 'allow_huge' not in kwargs:
+            kwargs['allow_huge'] = self.allow_huge_operations
+
+        return self.apply_function_parallel_spatial(convfunc,
+                                                    accepts_chunks=True,
+                                                    **kwargs).with_beam(beam, raise_error_jybm=False)
+
+    @add_save_to_tmp_dir_option
+    def apply_function_parallel_spatial(self,
+                                        function,
+                                        accepts_chunks=False,
+                                        **kwargs):
+        """
+        Apply a function in parallel along the spatial dimension.  The
+        function will be performed on data with masked values replaced with the
+        cube's fill value.
+
+        Parameters
+        ----------
+        function : function
+            The function to apply in the spatial dimension.  It must take
+            two arguments: an array representing an image and a boolean array
+            representing the mask.  It may also accept ``**kwargs``.  The
+            function must return an object with the same shape as the input
+            image.
+        accepts_chunks : bool
+            Whether the function can take chunks with shape (ns, ny, nx) where
+            ``ns`` is the number of spectral channels in the cube and ``nx``
+            and ``ny`` may be greater than one.
+        save_to_tmp_dir : bool
+            If `True`, the computation will be carried out straight away and
+            saved to a temporary directory. This can improve performance,
+            especially if carrying out several operations sequentially. If
+            `False`, the computation is only carried out when accessing
+            specific parts of the data or writing to disk.
+        kwargs : dict
+            Passed to ``function``
+        """
+
+        if accepts_chunks:
+            def wrapper(data_slices, **kwargs):
+                if data_slices.size > 0:
+                    return function(data_slices, **kwargs)
+                else:
+                    return data_slices
+        else:
+            def wrapper(data_slices, **kwargs):
+                if data_slices.size > 0:
+                    out = np.zeros_like(data_slices)
+                    for index in range(data_slices.shape[0]):
+                        out[index] = function(data_slices[index], **kwargs)
+                    return out
+                else:
+                    return data_slices
+
+        # Rechunk so that there is only one chunk in the image plane
+        #rechunk = ('auto', -1, -1),
+        return self._map_blocks_to_cube(wrapper,
+                                        rechunk=('auto', -1, -1),
+                                        fill=self._fill_value, **kwargs)
+
+
+    def _map_blocks_to_cube(self, function, additional_arrays=None, fill=np.nan, rechunk=None,
+                            return_new_cube=True,
+                            **kwargs):
+        """
+        Call dask's map_blocks, returning a new spectral cube.
+        """
+
+        data = self._get_filled_data(fill=fill)
+
+        if rechunk is not None:
+            data = data.rechunk(rechunk)
+
+        if additional_arrays is None:
+            newdata = da.map_blocks(function, data, dtype=data.dtype, **kwargs)
+        else:
+            additional_arrays = [array.rechunk(data.chunksize) for array in additional_arrays]
+            newdata = da.map_blocks(function, data, *additional_arrays, dtype=data.dtype, **kwargs)
+
+
+        if True:
+            # not saving the result itermediately seems to cause issue down the line with LocalCluster
+            zarr_tmp = "tmp.zarr"
+            try:
+                shutil.rmtree(zarr_tmp)
+            except FileNotFoundError:
+                pass
+            newdata.to_zarr(zarr_tmp, overwrite=True, compute=True)
+            newdata = da.from_zarr(zarr_tmp)
+
+        # Create final output cube
+        if return_new_cube:
+            newcube = self._new_cube_with(data=newdata,
+                                          wcs=self.wcs,
+                                          mask=self.mask,
+                                          meta=self.meta,
+                                          fill_value=self.fill_value)
+
+            return newcube
+        else:
+            return newdata
+
+    # NOTE: the following three methods could also be implemented spaxel by
+    # spaxel using apply_function_parallel_spectral but then take longer (but
+    # less memory)
+
+
+
 
