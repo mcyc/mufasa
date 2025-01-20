@@ -78,8 +78,6 @@ def ensure_dask_client(func):
     service_kwargs=None, asynchronous=False, security=None, protocol=None, blocked_handlers=None,
     interface=None, worker_class=None, scheduler_kwargs=None, scheduler_sync_interval=1, **worker_kwargs
 
-
-
     Parameters
     ----------
     func : callable
@@ -97,10 +95,10 @@ def ensure_dask_client(func):
 
         local_cluster_kwargs = kwargs.pop('local_cluster_kwargs', None)
         client = None
+        created_locally = False
 
         try:
             client = get_client()  # Check for an existing client
-            created_locally = False
         except (ValueError, TimeoutError):
             # No client found, so create a local cluster and client
 
