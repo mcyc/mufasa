@@ -91,36 +91,13 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
     if not np.isnan(cnv_cube.fill_value):
         cnv_cube = cnv_cube.with_fill_value(np.nan)
 
-    if True:
-        # needed to conserver memory for now
-        # compute it onto a disk temporary and retrive it
-        zarr_tmp = "tmp.zarr"
-        try:
-            shutil.rmtree(zarr_tmp)
-        except FileNotFoundError:
-            pass
-        cnv_cube._data.to_zarr(zarr_tmp, overwrite=True, compute=True)
-        cnv_cube._data = da.from_zarr(zarr_tmp)
-
     if downsample:
         # downsample and regrid the convolved cube
-        newcube = _downsample(cnv_cube, hdr, factor, scheduler=scheduler)
+        newcube = _downsample(cnv_cube, hdr, factor, scheduler=scheduler, savename=savename)
     else:
         newcube = cnv_cube
-
-    gc.collect()
-
-    if savename != None:
-        newcube.write(savename, overwrite=True)
-    else:
-        # compute it onto a disk temporary and retrive it
-        zarr_tmp = "tmp.zarr"
-        try:
-            shutil.rmtree(zarr_tmp)
-        except FileNotFoundError:
-            pass
-        newcube._data.to_zarr(zarr_tmp, overwrite=True, compute=True)
-        newcube._data = da.from_zarr(zarr_tmp)
+        if savename != None:
+            newcube.write(savename, overwrite=True)
 
     gc.collect()
 
@@ -191,15 +168,23 @@ def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0, rec
 #@profile_and_visualize(save=True, filename="convole_to.html")
 def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp_dir='auto'):
 
+    savename = None
+
     if save_to_tmp_dir:
         # dynamically determine if its needed based on data science and free memory
-        if isinstance(save_to_tmp_dir, str) and save_to_tmp_dir == 'auto':
-            save_to_tmp_dir = tmp_save_gauge(cube, factor=20)
+        if isinstance(save_to_tmp_dir, str):
+            if save_to_tmp_dir == 'auto':
+                # decide whether or not to save temporory based on data size and memory availability
+                save_to_tmp_dir = tmp_save_gauge(cube, factor=20)
+            else:
+                # assume the save_to_tmp_dir is a filename and use this function rather than downstreams
+                savename = save_to_tmp_dir
+                save_to_tmp_dir = False
         elif isinstance(save_to_tmp_dir, int) or isinstance(save_to_tmp_dir, float):
             # if given as a number, use it as the factor
             save_to_tmp_dir = tmp_save_gauge(cube, factor=save_to_tmp_dir)
 
-    logger.info(f"convolve_to save_to_tmp_dir: {save_to_tmp_dir}")
+    print(f"convolve_to save_to_tmp_dir: {save_to_tmp_dir}")
 
     # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
     if cube.size > 1e8:
@@ -211,22 +196,24 @@ def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp
         if rechunk:
             cube = _rechunk(cube, rechunk)
 
-        save_to_tmp_dir = False
         print(f"=============== convolving cube with \'{scheduler}\' scheduler =====================")
         #with cube.use_dask_scheduler(scheduler), ProgressBar():
         with ProgressBar():
             cube._data = dask_utils.persist_and_clean(cube._data) # clean up the graph before convolution
-            cnv_cube = cube.convolve_to(beam,
-                                        save_to_tmp_dir=save_to_tmp_dir
-                                        )
+            cnv_cube = cube.convolve_to(beam, save_to_tmp_dir=save_to_tmp_dir)
             if not save_to_tmp_dir:
-                # compute the convolution now
+                if savename:
+                    # alternative to using cube.convovle_to's native zarr save, "cube_cnv_tmp.zarr"
+                    cnv_cube._data = dask_utils.store_to_zarr(cnv_cube._data,
+                                                              savename, readback=True, delete_old=True)
+            else:
                 #cnv_cube._data = dask_utils.persist_and_clean(cnv_cube._data)
-                pass
+                cnv_cube._data.persist()
     else:
         cnv_cube = cube.convolve_to(beam)
 
     cube.allow_huge_operations = False
+
     return cnv_cube
 
 
@@ -247,34 +234,43 @@ def _rechunk(cube, rechunk):
     return cube
 
 @monitor_peak_memory()
-def _downsample(cnv_cube, hdr, factor, scheduler=None):
+def _downsample(cnv_cube, hdr, factor, scheduler='synchronous', savename=None, save_to_tmp_dir=None):
     """
     downsamples and reproject
     """
+
+    if save_to_tmp_dir is None:
+        save_to_tmp_dir = True
 
     nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
     nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
     nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1'] / factor))
     nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2'] / factor))
 
-    # clean the graph before downsampling
-    #cnv_cube._data = dask_utils.persist_and_clean(cnv_cube._data)
-
     # use existing chunking to set the blocksize and avoid rechunking
     chunks = cnv_cube._data.chunks
     block_size = tuple(chunk[0] for chunk in chunks) # use the shape of the first block
-    print("start reprojeciting!")
+
     # spectral-cube reproject currently doesn't support chunking, newcube will have a singel chunk
-    if scheduler and (scheduler == 'synchronous' or scheduler =='threads'):
-        newcube = cnv_cube.reproject(
-            nhdr, order='bilinear', use_memmap=False, parallel='current-scheduler', return_type='dask',
-            block_size=block_size
-        )  # parallel and return_type are reproject.return_type arguments #no need for spectral cube's save_to_tmp_dir?
+    if scheduler == 'synchronous' or scheduler =='threads':
+        print(f"============ downsample reprojecting with \'{scheduler}\' scheduler ===========")
+        with ProgressBar():
+            newcube = cnv_cube.reproject(
+                nhdr, order='bilinear', use_memmap=False, parallel='current-scheduler',
+                return_type='dask', block_size=block_size
+            )  # parallel and return_type are reproject.return_type arguments #no need for spectral cube's save_to_tmp_dir?
+
+            if savename:
+                newcube.write(savename, overwrite=True)
+            elif save_to_tmp_dir:
+                newcube._data = dask_utils.store_to_zarr(newcube._data, "cube_cnv.zarr", readback=True, delete_old=True)
+            else:
+                newcube._data.persist()
+
     else:
         msg = f"{scheduler} may not be the safest to run with reproject at the moment, defaulting to non-dask operation"
         logger.warning(msg)
         newcube = cnv_cube.reproject(nhdr, order='bilinear')
-    #newcube._data = dask_utils.persist_and_clean(newcube._data)
 
     return newcube
 

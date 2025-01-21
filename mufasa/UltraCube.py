@@ -215,13 +215,7 @@ class UltraCube(object):
 
         # save the data to zarr and load it to enable lazy loading
         if False:
-            zarr_tmp = "tmp.zarr"
-            try:
-                shutil.rmtree(zarr_tmp)
-            except FileNotFoundError:
-                pass
-            cube._data.to_zarr(zarr_tmp, overwrite=True)
-            cube._data = da.from_zarr(zarr_tmp)
+            cube._data = store_to_zarr(cube._data, "cube.zarr", readback=True, delete_old=True)
 
         if use_dask:
             # this should propagate with new cube results

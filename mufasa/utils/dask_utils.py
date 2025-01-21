@@ -6,8 +6,9 @@ import gc
 import numpy as np
 import dask.array as da
 import psutil
+import shutil
 import functools
-from dask import delayed, config
+from dask import delayed, config, base
 from dask.distributed import Client, LocalCluster, get_client, TimeoutError
 
 # ======================================================================================================================#
@@ -88,7 +89,6 @@ def ensure_dask_client(func):
     callable
         The wrapped function with Dask client handling.
     """
-
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         # Extract the `local_cluster_kwargs` from the kwargs, if present
@@ -121,8 +121,50 @@ def ensure_dask_client(func):
 
     return wrapper
 
+def set_dask_config(func):
+    """
+    Set dask.config.scheduler (global) for the function and return it to the previous state
+    When the function returns. Currently only take scheduler
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # Extract the `local_cluster_kwargs` from the kwargs, if present
+
+        if 'scheduler' in kwargs:
+            scheduler = kwargs['scheduler']
+        else:
+            scheduler = None
+
+        try:
+            scheduler_og = config.get('scheduler')
+        except KeyError:
+            scheduler_og = base.get_scheduler()
+
+        if scheduler:
+            config.set(scheduler=scheduler)
+
+        try:
+            # Call the wrapped function
+            return func(*args, **kwargs)
+        finally:
+            config.set(scheduler=scheduler_og)
+
+    return wrapper
+
 #======================================================================================================================#
 
+
+def store_to_zarr(darray, filename, readback=False, delete_old=True):
+    # compute it onto a disk temporary and retrive it
+    if delete_old:
+        try:
+            shutil.rmtree(filename)
+        except FileNotFoundError:
+            pass
+    darray.to_zarr(filename, overwrite=True, compute=True)
+
+    if readback:
+        return da.from_zarr(filename)
 
 def dask_array_stats(array):
     """
