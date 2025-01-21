@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mufasa"
+dynamic = ["version"]
+description = "MUlti-component Fitter for Astrophysical Spectral Applications"
+authors = [{name = "Mike Chen"}]
+urls = {homepage = "https://github.com/mcyc/mufasa"}
+dependencies = [
+    "numpy>=1.24.4,<2",
+    "astropy",
+    "matplotlib",
+    "scipy>=1.7.3",
+    "scikit-image>=0.17.2",
+    "spectral-cube>=0.6.0",
+    "radio-beam",
+    "pandas",
+    "plotly",
+    "reproject>=0.7.1",
+    "pyspeckit>=1.0.4"
+]
+requires-python = ">=3.8"  # Properly defined here
+
+[project.optional-dependencies]
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0,<2.0",
+    "sphinx-autodoc-typehints",
+    "nbsphinx",
+    "sphinx-astropy>=1.8",
+    "sphinx-copybutton>=0.5.0",
+    "pydata-sphinx-theme>=0.13.0",
+    "numpydoc>=1.1.0,<2.0",
+    "sphinx-issues>=2.0",
+    "sphinxext-opengraph>=0.4.0"
+]
+dev = [
+    "pytest",
+    "flake8"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "mufasa._metadata.__version__"}
+
