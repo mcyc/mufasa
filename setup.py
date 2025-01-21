@@ -35,10 +35,8 @@ if __name__ == "__main__":
             "scikit-image>=0.17.2",
             "spectral-cube>=0.6.0",
             "radio-beam",
-            "pvextractor",
             "pandas",
             "plotly",
-            "nbformat",
             "reproject>=0.7.1",
             "pyspeckit>=1.0.4"
         ],

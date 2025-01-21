@@ -29,21 +29,6 @@ For detailed information on all available modules, classes, and methods, refer t
 
 - :doc:`API Reference <api/index>`: A complete reference for the **MUFASA** API.
 
-Contributing to MUFASA
-----------------------
-Interested in contributing to **MUFASA**? Here are some ways to get involved:
-
-- Visit the `GitHub repository <https://github.com/mcyc/mufasa>`_ for the latest updates.
-- Submit suggestions, bug reports, or pull requests directly on GitHub.
-- Share your use cases and workflows to help improve the documentation.
-
-Feedback and Support
---------------------
-We value your feedback! If you encounter any issues or have suggestions, feel free to:
-
-- File an issue on our `GitHub repository <https://github.com/mcyc/mufasa>`_.
-- Contact us through the **MUFASA** community forums (coming soon).
-
 Next Steps
 ----------
 Ready to dive in? Choose a guide from the navigation bar or start with the :doc:`Quick Start <quick_start>` guide.
