@@ -40,7 +40,7 @@ if __name__ == "__main__":
             "plotly",
             "nbformat",
             "reproject>=0.7.1",
-            "pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@2d19ddfb965a99b1fdf094517d8c905c6527b3b1#egg=pyspeckit",
+            "pyspeckit>=1.0.4"
         ],
         extras_require={
             "docs": [
