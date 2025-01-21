@@ -29,12 +29,12 @@ docs = [
     "sphinx-rtd-theme>=1.0,<2.0",
     "sphinx-autodoc-typehints",
     "nbsphinx",
-    "sphinx-astropy>=1.8",
-    "sphinx-copybutton>=0.5.0",
-    "pydata-sphinx-theme>=0.13.0",
+    "sphinx-astropy",
+    "sphinx-copybutton",
+    "pydata-sphinx-theme",
     "numpydoc>=1.1.0,<2.0",
     "sphinx-issues>=2.0",
-    "sphinxext-opengraph>=0.4.0"
+    "sphinxext-opengraph"
 ]
 dev = [
     "pytest",
