@@ -6,7 +6,7 @@ import sys
 from mufasa._metadata import __title__, __version__, __author__, __copyright__, __github_url__
 
 # -- Path setup ---------------------------------------------------------------
-sys.path.insert(0, os.path.abspath('../mufasa'))
+sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('../../mufasa'))
 sys.path.insert(0, os.path.abspath('../sphinxext'))
 

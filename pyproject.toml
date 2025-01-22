@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=64", "wheel", "build"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -21,20 +21,20 @@ dependencies = [
     "reproject>=0.7.1",
     "pyspeckit>=1.0.4"
 ]
-requires-python = ">=3.8"  # Properly defined here
+requires-python = ">=3.8"
 
 [project.optional-dependencies]
 docs = [
-    "sphinx>=4.0",
+    "sphinx>=4.0,<8.0",
     "sphinx-rtd-theme>=1.0,<2.0",
-    "sphinx-autodoc-typehints",
-    "nbsphinx",
-    "sphinx-astropy",
-    "sphinx-copybutton",
-    "pydata-sphinx-theme",
+    "sphinx-autodoc-typehints>=1.0,<4.0",
+    "nbsphinx>=0.9.6",
+    "sphinx-astropy>=1.0,<2.0",
+    "sphinx-copybutton>=0.5",
+    "pydata-sphinx-theme>=0.15,<0.17",
     "numpydoc>=1.1.0,<2.0",
-    "sphinx-issues>=2.0",
-    "sphinxext-opengraph"
+    "sphinx-issues>=2.0,<6.0",
+    "sphinxext-opengraph>=0.9.1"
 ]
 dev = [
     "pytest",
@@ -44,3 +44,5 @@ dev = [
 [tool.setuptools.dynamic]
 version = {attr = "mufasa._metadata.__version__"}
 
+[tool.setuptools.packages.find]
+include = ["mufasa*", "mufasa.*"]
