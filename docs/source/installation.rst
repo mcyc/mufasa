@@ -3,8 +3,8 @@ Installation
 .. note::
 
    **Recommended Install**
-    MUFASA is undergoing rapid developments at the moment,
-    install from the source (see Option 1) to stay up-to-date with the latest version.
+    MUFASA is currently undergoing rapid developments,
+    install from the source (see Option 3) to stay up-to-date with the latest version.
 
 System Requirements
 --------------------
@@ -15,7 +15,15 @@ MUFASA is compatible with the following environments:
 Instructions
 -------------
 
-1. **Installing from Source**:
+1. **Install from PyPI**:
+
+   The easiest way to install MUFASA is through PyPI. Run the following command in your terminal:
+
+   .. code-block:: bash
+
+       pip install mufasa
+
+2. **Install from Source**:
    to install the latest developing version, clone the MUFASA GitHub repository:
 
    .. code-block:: bash
@@ -43,26 +51,13 @@ Instructions
 
        This command ensures that all dependencies are freshly installed, replacing any older or conflicting versions.
 
-2. **Dependencies**:
+3. **Dependencies**:
    MUFASA will automatically install its dependencies during installation. If any issues occur, install them manually:
 
    .. code-block:: bash
 
        pip install numpy astropy spectral-cube pyspeckit
 
-3. **Installing from PyPI**:
-
-   .. warning::
-
-        The PyPI version of MUFASA is currently out of date. It will be updated once PyPI
-        dependencies issues has been resolved.
-
-
-   The easiest way to install MUFASA is through PyPI. Run the following command in your terminal:
-
-   .. code-block:: bash
-
-       pip install mufasa
 
 Verification
 ~~~~~~~~~~~~~
@@ -73,4 +68,4 @@ To verify the installation, open a Python interpreter and import MUFASA:
     import mufasa
     print(mufasa.__version__)
 
-If no errors occur, MUFASA is installed correctly!
+If no errors occur, MUFASA is installed correctly.

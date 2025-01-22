@@ -1,72 +1,45 @@
-from setuptools import setup, find_packages
+from setuptools import setup
+import tomli
 import os
 import re
 
-# Dynamically locate the metadata file in the same directory
-metadata_file = os.path.join(os.path.dirname(__file__), "mufasa/_metadata.py")
+# Paths
+METADATA_FILE = os.path.join(os.path.dirname(__file__), "mufasa/_metadata.py")
+PYPROJECT_FILE = os.path.join(os.path.dirname(__file__), "pyproject.toml")
 
 def get_metadata():
+    """Read metadata from _metadata.py."""
     metadata = {}
-    with open(metadata_file, "r") as f:
+    with open(METADATA_FILE, "r") as f:
         for line in f:
-            match = re.match(r"__([a-z_]+)__\s*=\s*[\"'](.+?)[\"']", line)
+            match = re.match(r"^__(\w+)__\s*=\s*[\"'](.+?)[\"']", line)
             if match:
                 key, value = match.groups()
                 metadata[key] = value
     return metadata
 
-# Load metadata
-metadata = get_metadata()
+def get_dependencies():
+    """Load dependencies and optional dependencies from pyproject.toml."""
+    with open(PYPROJECT_FILE, "rb") as f:
+        pyproject_data = tomli.load(f)
+    project = pyproject_data.get("project", {})
+    dependencies = project.get("dependencies", [])
+    optional_dependencies = project.get("optional-dependencies", {})
+    return dependencies, optional_dependencies
 
-# Define the setup configuration
+# Load metadata and dependencies
+metadata = get_metadata()
+dependencies, optional_dependencies = get_dependencies()
+
 if __name__ == "__main__":
     setup(
-        name=metadata["project"],  # e.g., mufasa
-        version=metadata["version"],  # e.g., 1.4.0
+        name=metadata.get("project"),
+        version=metadata.get("version"),
         description="MUlti-component Fitter for Astrophysical Spectral Applications",
-        author=metadata["author"],  # Michael Chun-Yuan Chen
-        url=metadata["github_url"],  # GitHub URL
-        packages=find_packages(),
-        install_requires=[
-            "numpy>=1.24.4,<2",
-            "astropy",
-            "matplotlib",
-            "scipy>=1.7.3",
-            "scikit-image>=0.17.2",
-            "spectral-cube>=0.6.0",
-            "radio-beam",
-            "pvextractor",
-            "pandas",
-            "plotly",
-            "nbformat",
-            "reproject>=0.7.1",
-            "pyspeckit @ git+https://github.com/pyspeckit/pyspeckit.git@342713015af8cbe55c31494d6f2c446ed75521a2#egg=pyspeckit",
-        ],
-        extras_require={
-            "docs": [
-                "sphinx>=4.0",
-                "sphinx-rtd-theme>=1.0,<2.0",
-                "sphinx-autodoc-typehints",
-                "nbsphinx",
-                "sphinx-astropy>=1.8",
-                "sphinx-copybutton>=0.5.0",
-                "pydata-sphinx-theme>=0.13.0",
-                "numpydoc>=1.1.0,<2.0",
-                "sphinx-issues>=2.0",
-                "sphinxext-opengraph>=0.4.0",
-            ],
-            "dev": ["pytest", "flake8"],
-        },
-        classifiers=[
-            "Development Status :: 5 - Production/Stable",
-            "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.8",
-            "Programming Language :: Python :: 3.9",
-            "Programming Language :: Python :: 3.10",
-            "Programming Language :: Python :: 3.11",
-            "Programming Language :: Python :: 3.12",
-            "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-            "Operating System :: OS Independent",
-        ],
+        author=metadata.get("author"),
+        url=metadata.get("github_url"),
+        packages=["mufasa"],
+        install_requires=dependencies,
+        extras_require=optional_dependencies,
         python_requires=">=3.8",
     )
