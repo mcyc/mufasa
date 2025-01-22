@@ -13,8 +13,3 @@ python:
     - method: pip
       path: .
       extra_requirements: [docs]
-
-commands:
-  - ls -R .
-  - python -m pip list
-  - python -m pip show mufasa
