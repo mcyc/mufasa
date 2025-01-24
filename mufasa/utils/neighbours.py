@@ -1,6 +1,18 @@
 
 import numpy as np
-from skimage.morphology import disk, footprint_rectangle
+import warnings
+from skimage.morphology import disk
+
+try:
+    from skimage.morphology import footprint_rectangle
+except ImportError:
+    warnings.warn(
+        "footprint_rectangle is not available in this version of scikit-image. "
+        "Using a fallback implementation.",
+        ImportWarning
+    )
+    def footprint_rectangle(height, width):
+        return np.ones((height, width), dtype=bool)
 
 def maxref_neighbor_coords(mask, ref, fill_coord=(0, 0), structure=None, centre=None):
     # find pixel of a neighbour with the highest reference value
