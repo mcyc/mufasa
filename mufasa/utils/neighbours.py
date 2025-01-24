@@ -11,8 +11,8 @@ except ImportError:
         "Using a fallback implementation.",
         ImportWarning
     )
-    def footprint_rectangle(height, width):
-        return np.ones((height, width), dtype=bool)
+    def footprint_rectangle(shape, dtype=bool):
+        return np.ones(shape, dtype=dtype)
 
 def maxref_neighbor_coords(mask, ref, fill_coord=(0, 0), structure=None, centre=None):
     # find pixel of a neighbour with the highest reference value
