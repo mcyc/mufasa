@@ -4,7 +4,7 @@ mufasa.utils.mufasa_log
 =======================
 
 .. automodule:: mufasa.utils.mufasa_log
-   :exclude-members: _hidden_member, OriginContextFilter, WarningContextFilter, get_logger, init_logging, reset_logger, timing_decorator
+   :exclude-members: _hidden_member, OriginContextFilter, WarningContextFilter, get_logger, init_logging, reset_logger
    
 .. rubric:: Classes
 
@@ -24,5 +24,4 @@ mufasa.utils.mufasa_log
    get_logger
    init_logging
    reset_logger
-   timing_decorator
    

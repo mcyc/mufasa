@@ -6,7 +6,7 @@ import sys
 from mufasa._metadata import __title__, __version__, __author__, __copyright__, __github_url__
 
 # -- Path setup ---------------------------------------------------------------
-sys.path.insert(0, os.path.abspath('../mufasa'))
+sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.abspath('../../mufasa'))
 sys.path.insert(0, os.path.abspath('../sphinxext'))
 
@@ -72,7 +72,6 @@ intersphinx_mapping = {
     'matplotlib': ('https://matplotlib.org/stable/', None),
     'joblib': ('https://joblib.readthedocs.io/en/latest/', None),
     'spectral_cube': ('https://spectral-cube.readthedocs.io/en/latest/', None),
-    'pyspeckit': ('https://pyspeckit.readthedocs.io/en/latest/', None),
 }
 
 templates_path = ['_templates']

@@ -3,8 +3,8 @@ Installation
 .. note::
 
    **Recommended Install**
-    MUFASA is undergoing rapid developments at the moment,
-    install from the source (see Option 2) to stay up-to-date with the latest version.
+    MUFASA is currently undergoing rapid developments,
+    install from the source (see Option 3) to stay up-to-date with the latest version.
 
 System Requirements
 --------------------
@@ -15,21 +15,31 @@ MUFASA is compatible with the following environments:
 Instructions
 -------------
 
-1. **Installing from PyPI**
+1. **Install from PyPI**:
+
    The easiest way to install MUFASA is through PyPI. Run the following command in your terminal:
 
    .. code-block:: bash
 
        pip install mufasa
 
-2. **Installing from Source**
-   To use the latest development version, clone the MUFASA GitHub repository:
+2. **Install from Source**:
+   to install the latest developing version, clone the MUFASA GitHub repository:
 
    .. code-block:: bash
 
-       git clone https://github.com/mcyc/mufasa.git
-       cd mufasa
-       pip install -e .
+        git clone https://github.com/mcyc/mufasa.git
+        cd mufasa
+        pip install -e .
+
+
+   To use a specific version using a tag, for example, v1.4.2, run the following after
+   the initial install:
+
+   .. code-block:: bash
+
+        git checkout v1.4.2
+        git pull
 
    .. note::
        If you encounter issues with pre-existing versions of dependencies or want to ensure
@@ -41,12 +51,13 @@ Instructions
 
        This command ensures that all dependencies are freshly installed, replacing any older or conflicting versions.
 
-3. **Dependencies**
+3. **Dependencies**:
    MUFASA will automatically install its dependencies during installation. If any issues occur, install them manually:
 
    .. code-block:: bash
 
        pip install numpy astropy spectral-cube pyspeckit
+
 
 Verification
 ~~~~~~~~~~~~~
@@ -57,4 +68,4 @@ To verify the installation, open a Python interpreter and import MUFASA:
     import mufasa
     print(mufasa.__version__)
 
-If no errors occur, MUFASA is installed correctly!
+If no errors occur, MUFASA is installed correctly.

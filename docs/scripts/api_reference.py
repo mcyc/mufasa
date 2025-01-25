@@ -1,13 +1,6 @@
 # This file is auto-generated. Edit descriptions and structure as needed.
 
 API_REFERENCE = {
-    'mufasa.PCube': {
-        'module': 'mufasa.PCube',
-        'description': '''The `mufasa.''',
-        'members': [
-            {'name': 'PCube', 'type': 'class', 'description': '''A specialized subclass of :class:`Cube` tailored for Mufasa-specific workflows.'''}
-        ]
-    },
     'mufasa.UltraCube': {
         'module': 'mufasa.UltraCube',
         'description': '''The `mufasa.''',
@@ -135,8 +128,7 @@ API_REFERENCE = {
             {'name': 'refit_marginal', 'type': 'function', 'description': '''Refit pixels with fits that appears marginally okay, as deterined by the.'''},
             {'name': 'refit_swap_2comp', 'type': 'function', 'description': '''Refit the cube by using the previous fit result as guesses, but with the.'''},
             {'name': 'replace_bad_pix', 'type': 'function', 'description': '''Refit pixels marked by the mask as "bad" and adopt the new model if it.'''},
-            {'name': 'replace_para', 'type': 'function', 'description': '''Replace parameter values in a parameter cube using a reference cube for specific pixels (Deprecated).'''},
-            {'name': 'replace_para_n_mod', 'type': 'function', 'description': '''Replace parameter values in a parameter cube with those from a reference cube for specific pixels and update its model accordingly.'''},
+            {'name': 'replace_para', 'type': 'function', 'description': '''Replace parameter values in a parameter cube with those from a reference.'''},
             {'name': 'replace_rss', 'type': 'function', 'description': '''Replace RSS-related maps in a `UltraCube` object for specific.'''},
             {'name': 'save_best_2comp_fit', 'type': 'function', 'description': '''Save the best two-component fit results for the specified region.'''},
             {'name': 'save_map', 'type': 'function', 'description': '''Save a 2D map as a FITS file.'''},
@@ -278,39 +270,13 @@ API_REFERENCE = {
         'module': 'mufasa.utils',
         'description': '''This sub-package provides utility functions and tools for data processing,.''',
         'members': [
-            {'name': 'mufasa.utils.dask_ops', 'type': 'module', 'description': '''No description available.'''},
-            {'name': 'mufasa.utils.dask_utils', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.dataframe', 'type': 'module', 'description': '''No description available.'''},
+            {'name': 'mufasa.utils.fits_utils', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.interpolate', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.map_divide', 'type': 'module', 'description': '''No description available.'''},
-            {'name': 'mufasa.utils.memory', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.mufasa_log', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.multicore', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.neighbours', 'type': 'module', 'description': '''No description available.'''}
-        ]
-    },
-    'mufasa.utils.dask_ops': {
-        'module': 'mufasa.utils.dask_ops',
-        'description': '''This module provides tools and wrappers to perform dask operations.''',
-        'members': [
-            {'name': 'apply_planemask', 'type': 'function', 'description': '''Apply a 2D Boolean mask to a 3D cube, extracting pixel values within the mask.'''},
-            {'name': 'dask_binary_dilation', 'type': 'function', 'description': '''Perform binary dilation on a Dask array using a specified structuring element.'''}
-        ]
-    },
-    'mufasa.utils.dask_utils': {
-        'module': 'mufasa.utils.dask_utils',
-        'description': '''This module provides general purpose tool and wrappers to handle dask object.''',
-        'members': [
-            {'name': 'calculate_batch_size', 'type': 'function', 'description': '''Calculate the optimal batch size and adjusted number of workers for processing valid pixels.'''},
-            {'name': 'chunk_by_ray', 'type': 'function', 'description': '''Calculate chunk sizes for a Dask array with an optimal aspect ratio and target memory usage.'''},
-            {'name': 'compute_chunk_relevant', 'type': 'function', 'description': '''Determine the relevance of chunks in a 2D Boolean mask.'''},
-            {'name': 'compute_global_offsets', 'type': 'function', 'description': '''Calculate global offsets for a chunk's position in a multidimensional array.'''},
-            {'name': 'custom_task_graph', 'type': 'function', 'description': '''Construct a custom task graph to process valid pixels in a Dask array.'''},
-            {'name': 'lazy_pix_compute', 'type': 'function', 'description': '''Lazily compute spectral values for valid pixels in a data cube.'''},
-            {'name': 'lazy_pix_compute_dynamic', 'type': 'function', 'description': '''Compute valid pixels in a 3D data cube adaptively with dynamic batching and scheduling.'''},
-            {'name': 'lazy_pix_compute_no_batching', 'type': 'function', 'description': '''Compute valid pixels in a Dask array by processing only relevant chunks.'''},
-            {'name': 'lazy_pix_compute_single', 'type': 'function', 'description': '''Lazily compute spectral values for valid pixels in a data cube.'''},
-            {'name': 'persist_and_clean', 'type': 'function', 'description': '''Persist a Dask collection and optionally visualize its computation graph.'''}
         ]
     },
     'mufasa.utils.dataframe': {
@@ -320,6 +286,14 @@ API_REFERENCE = {
             {'name': 'assign_to_dataframe', 'type': 'function', 'description': '''Assign values from a new data array to an existing DataFrame based on spatial coordinates and component index.'''},
             {'name': 'make_dataframe', 'type': 'function', 'description': '''Create a DataFrame from a 3D parameter array, applying optional velocity and error thresholds.'''},
             {'name': 'read', 'type': 'function', 'description': '''Read a FITS file and convert the data to a pandas DataFrame, optionally including the header.'''}
+        ]
+    },
+    'mufasa.utils.fits_utils': {
+        'module': 'mufasa.utils.fits_utils',
+        'description': '''Utilities for working with.''',
+        'members': [
+            {'name': 'downsample_header', 'type': 'function', 'description': '''Downsample a FITS header along a specified axis.'''},
+            {'name': 'get_pixel_mapping', 'type': 'function', 'description': '''Compute the pixel mapping between two FITS headers or WCS objects.'''}
         ]
     },
     'mufasa.utils.interpolate': {
@@ -338,15 +312,6 @@ API_REFERENCE = {
             {'name': 'watershed_divide', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
-    'mufasa.utils.memory': {
-        'module': 'mufasa.utils.memory',
-        'description': '''This module provides tools to monitor memory usage and.''',
-        'members': [
-            {'name': 'calculate_target_memory', 'type': 'function', 'description': '''Calculate target memory per core for chunked computations.'''},
-            {'name': 'monitor_peak_memory', 'type': 'function', 'description': '''Decorator to monitor and record the peak memory usage of a function.'''},
-            {'name': 'peak_memory', 'type': 'function', 'description': '''Decorator to monitor and display the peak memory usage of a function,.'''}
-        ]
-    },
     'mufasa.utils.mufasa_log': {
         'module': 'mufasa.utils.mufasa_log',
         'description': '''Undocumented''',
@@ -355,8 +320,7 @@ API_REFERENCE = {
             {'name': 'WarningContextFilter', 'type': 'class', 'description': '''Filter instances are used to perform arbitrary filtering of LogRecords.'''},
             {'name': 'get_logger', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'init_logging', 'type': 'function', 'description': ''':param logfile: file to save to (default mufasa.'''},
-            {'name': 'reset_logger', 'type': 'function', 'description': '''Undocumented'''},
-            {'name': 'timing_decorator', 'type': 'function', 'description': '''A decorator that measures the execution time of a function.'''}
+            {'name': 'reset_logger', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
     'mufasa.utils.multicore': {

@@ -12,7 +12,6 @@ mufasa
 .. autosummary::
    :toctree:
 
-   PCube
    UltraCube
    aic
    clean_fits
