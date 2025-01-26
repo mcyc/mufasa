@@ -4,14 +4,24 @@ Provides functionality to generate mock spectral cubes using mufasa's spectral m
 
 import numpy as np
 from scipy.fftpack import fftn, ifftn, fftshift
+from scipy.stats import skewnorm, norm
+import random
 from astropy.convolution import convolve_fft, Gaussian2DKernel
 
 
 class MockCloud(object):
+    """
+    A class designed to generate synthetic spectral based on empirically motivated physical parameters
+
+    Randomly generate mock parameters for molecular cloud structures using the same seed so the physical
+    parameters generated are spatially correlated similar to observations of real clouds
+    """
 
     def __init__(self, box_size=256, pixel_size=0.01):
 
-        self.seed = 42 #default
+        self.seed = None
+        self.seed2 = None
+        self.set_seed(42)  # set default seed 1 & 2
 
         self.box_size = box_size
         self.pixel_size = pixel_size
@@ -24,18 +34,34 @@ class MockCloud(object):
             std=0.3  # Standard deviation of the log-normal distribution
         )
 
+        # Note - for VLOS's beta:
+        # empirical beta ~2.8-3.2 (Elmegreen & Scalo 2004)
+        # simulation beta ~ 2.7 (Padoan et al. 2003)
+
         self.vlos_kw = dict(
             alpha=0.5,  # Larson's relation index
-            velocity_scale=0.75,  # km/s at the largest scale
+            beta=2 * 0.5 + 2,  # Comforms to Larson's relation and Burgers' turbulence
+            coherent_scale=0.5,  # pc, the scale for which velocity has roughly the same structure as the column density
+            std=0.75  # km/s, the standard deviation to normalize the velocity field standard deviation
         )
 
-        self.field=None
-        self.field_log_normal=None
-        self.vlos_field=None
+        # these default values mimic GAS & KEYSTONE NH3 results
+        self.sigv_kw = dict(
+            field_sign=-1, # (-1 or 1) Default of -1 means linewidth anti-correlates with column density
+            mean_log=0.45,  # Mean of the log-normal (arbitrary units)
+            std_log=0.6  # Standard deviation of the log-normal distribution
+        )
+
+        self.field = None
+        self.field_log_normal = None
+        self.field_vlos = None
+        self.field_sigv = None
 
     def set_seed(self, seed):
         if seed is not None:
             self.seed = seed
+            random.seed(seed)
+            self.seed2 = random.randint(1, 42000)  # pick a random integer in that range
 
     def isnewseed(self, seed):
 
@@ -45,7 +71,6 @@ class MockCloud(object):
             new = seed != self.seed
 
         return new
-
 
     def get_powerlaw_field(self, seed=None):
 
@@ -81,52 +106,82 @@ class MockCloud(object):
 
         return self.field_log_normal
 
-    def get_velocity_field(self, seed=None):
+    def get_kinetic_powerlaw_field(self, seed=None, seed2=None):
 
-        print(f"{seed} is a new seed: {self.isnewseed(seed)}")
+        if seed2 is True:
+            seed2 = self.seed2
 
-        if self.isnewseed(seed) or self.vlos_field is None:
+        if seed is not None:
+            self.set_seed(seed)
 
-            field = self.get_powerlaw_field(seed)
+        kwargs = dict(
+            box_size=self.box_size,
+            pixel_size=self.pixel_size,
+            beta=self.vlos_kw['beta'],  # specific for velocity
+            random_seed=self.seed,
+            random_seed_2=seed2,
+            length_scale=self.vlos_kw['coherent_scale'] / self.pixel_size,  # coherent_scale in pixel unit
+        )
+        return generate_powerlaw_field_pixel_based(**kwargs)
 
-            # Standard deviation of the generated field
-            field_std = np.std(field)
-            velocity_scale = self.vlos_kw['velocity_scale']
 
-            # Calculate the expected velocity dispersion at the largest scale
-            expected_sigma_v = velocity_scale
+    def get_velocity_field(self, seed=None, seed2=True, skewness=None):
 
-            # Scaling factor based on Larson's relation
-            scaling_factor = expected_sigma_v / field_std
+        field_vlos = self.get_kinetic_powerlaw_field(seed=seed, seed2=seed2)
 
-            # Scale the field
-            self.velocity_field = field * scaling_factor
+        def standardize(field_vlos):
+            # ensure normalization
+            field_vlos -= np.mean(field_vlos)
+            field_vlos /= np.std(field_vlos)
+            return field_vlos
 
-            # Optionally verify the scaling follows Larson's relation
-            # Compute the physical scale of the simulation box
-            simulation_box_size = field.shape[0] * self.pixel_size
+        field_vlos = standardize(field_vlos)
 
-            # Check the velocity dispersion at intermediate scales if needed (not implemented here)
+        if skewness is not None and skewness != 0:
+            # ensure normalization
+            # transform into a skewed Gaussian
+            a = -skewness
+            norm_cdf = norm.cdf(field_vlos)
+            field_vlos = skewnorm.ppf(norm_cdf, a)
+            # recenter
+            field_vlos = standardize(field_vlos)
 
-        return self.velocity_field
+        # re-normalize the standard deviation of the vlos distribution
+        scaling_factor = self.vlos_kw['std'] / np.std(field_vlos)
+        self.field_vlos = field_vlos * scaling_factor
 
-    def get_sigma_v(self):
-        pass
+        if self.field_vlos is not None:
+            return self.field_vlos
+
+
+    def get_sigma_v(self, seed=None):
+        field_pl = self.get_kinetic_powerlaw_field(seed=seed)
+        field_pl *= self.sigv_kw['field_sign']  # correlate or anti-correlate with column density
+
+        # Scale and exponentiate to create log-normal distribution for sigma_v
+        mean = self.sigv_kw['mean_log']
+        std = self.sigv_kw['std_log']
+        field_scaled = np.log(mean) - 0.5 * (std ** 2) + std * field_pl
+        self.field_sigv = np.exp(field_scaled)
+        return self.field_sigv
+
 
     def get_column_density(self):
         pass
 
     def get_tau(self):
+        # scales with log-normal power spectrum, normalized tp 0.1 - 8?
         pass
 
     def get_tex(self):
+        # uniform box function like distribution in [4-8] K?
         pass
 
 
-
-def generate_powerlaw_field_pixel_based(box_size, pixel_size, beta, random_seed=None):
+def generate_powerlaw_field_pixel_based(box_size, pixel_size, beta, random_seed=None, random_seed_2=None,
+                                        length_scale=None):
     """
-    Generate a 2D random field with a power-law power spectrum.
+    Generate a 2D random field with a power-law power spectrum. Optionally, modify the phase of larger scale structures.
 
     Parameters
     ----------
@@ -138,6 +193,10 @@ def generate_powerlaw_field_pixel_based(box_size, pixel_size, beta, random_seed=
         Power-law index of the spectrum (e.g., 2.7 for turbulence).
     random_seed : int, optional
         Random seed for reproducibility.
+    random_seed_2 : int, optional
+        Second random seed to modify the phase of large-scale structures.
+    length_scale : float, optional
+        Length scale (in pixel units) to separate small and large structures. If None, no phase modification occurs.
 
     Returns
     -------
@@ -168,6 +227,21 @@ def generate_powerlaw_field_pixel_based(box_size, pixel_size, beta, random_seed=
     # Apply the power spectrum
     correlated_noise = fftn(random_noise) * np.sqrt(power_spectrum)
 
+    # Optionally modify the phase of large-scale structures
+    if random_seed_2 is not None and length_scale is not None:
+        # Length scale in frequency space
+        k_threshold = 1.0 / (length_scale * pixel_size)
+
+        # Mask for large scales (k < k_threshold)
+        large_scale_mask = np.sqrt(k_squared) < k_threshold
+
+        # Generate new random noise for large scales
+        np.random.seed(random_seed_2)
+
+        rn2 = np.random.normal(size=(box_size, box_size)) + 1j * np.random.normal(size=(box_size, box_size))
+
+        correlated_noise[large_scale_mask] = fftn(rn2)[large_scale_mask] * (power_spectrum ** 0.25)[large_scale_mask]
+
     # Transform back to real space
     field = np.real(ifftn(correlated_noise))
 
@@ -178,7 +252,7 @@ def generate_powerlaw_field_pixel_based(box_size, pixel_size, beta, random_seed=
     return field
 
 
-#======================================================================================================================================
+# ======================================================================================================================================
 
 def generate_powerlaw_field_3d(box_size, pixel_size, beta, random_seed=None):
     """
@@ -212,7 +286,7 @@ def generate_powerlaw_field_3d(box_size, pixel_size, beta, random_seed=None):
     ky = np.fft.fftfreq(box_size, d=pixel_size)
     kz = np.fft.fftfreq(box_size, d=pixel_size)
     kx, ky, kz = np.meshgrid(kx, ky, kz, indexing="ij")
-    k_squared = kx**2 + ky**2 + kz**2
+    k_squared = kx ** 2 + ky ** 2 + kz ** 2
 
     # Avoid division by zero at k = 0
     k_squared[k_squared == 0] = 1e-10
@@ -235,7 +309,6 @@ def generate_powerlaw_field_3d(box_size, pixel_size, beta, random_seed=None):
     field /= np.std(field)
 
     return field
-
 
 
 def normalize_to_lognormal_density_field(density_field, mean_density=1.0, density_std=1.0):
@@ -269,7 +342,6 @@ def normalize_to_lognormal_density_field(density_field, mean_density=1.0, densit
     return lognormal_field
 
 
-
 def density_weighted_mean_and_std_axis(quantity, density, axis=0):
     """
     Calculate the density-weighted mean and standard deviation along a specified axis.
@@ -295,9 +367,8 @@ def density_weighted_mean_and_std_axis(quantity, density, axis=0):
 
     # Calculate the weighted standard deviation along the specified axis
     weighted_std = np.sqrt(
-        np.sum(density * (quantity - np.expand_dims(weighted_mean, axis=axis))**2, axis=axis)
+        np.sum(density * (quantity - np.expand_dims(weighted_mean, axis=axis)) ** 2, axis=axis)
         / np.sum(density, axis=axis)
     )
 
     return weighted_mean, weighted_std
-
