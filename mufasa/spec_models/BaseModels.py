@@ -1,15 +1,7 @@
 from __future__ import print_function
 import numpy as np
 from pyspeckit.spectrum.models import model
-from astropy import constants
-from astropy import units as u
-#from pyspeckit.spectrum.models.ammonia import (ckms, h, kb)
-
-TCMB = 2.7315  # Cosmic Microwave Background temperature in K
-ckms = constants.c.to(u.km / u.s).value  # Speed of light in km/s
-ccms = constants.c.to(u.cm / u.s).value  # Planck constant
-h = constants.h.cgs.value
-kb = constants.k_B.cgs.value  # Boltzmann constant
+from pyspeckit.spectrum.models.ammonia import (ckms, h, kb)
 
 class BaseModel:
     """
@@ -29,11 +21,10 @@ class BaseModel:
     line_names = None
 
     # Universal constants
-    TCMB = TCMB  # Cosmic Microwave Background temperature in K
-    ckms = ckms
-    ccms = ccms
-    h = h
-    kb = kb
+    TCMB = 2.7315  # Cosmic Microwave Background temperature in K
+    ckms = ckms  # Speed of light in km/s
+    h = h        # Planck constant
+    kb = kb      # Boltzmann constant
 
     def __init__(self, molecular_constants, line_names=None):
         """
@@ -50,7 +41,6 @@ class BaseModel:
             raise ValueError("Molecular constants (freq_dict, voff_lines_dict, tau_wts_dict) must be provided.")
         self.molecular_constants = molecular_constants
         self.line_names = line_names or ['default_line']
-
 
     @classmethod
     def multi_v_model_generator(cls, n_comp):
@@ -92,7 +82,6 @@ class BaseModel:
         )
         return mod
 
-
     @classmethod
     def multi_v_spectrum(cls, xarr, *args):
         """
@@ -113,6 +102,11 @@ class BaseModel:
         if xarr.unit.to_string() != 'GHz':
             xarr = xarr.as_unit('GHz')
 
+        molecular_constants = cls.molecular_constants
+        freq_dict = molecular_constants['freq_dict']
+        voff_lines_dict = molecular_constants['voff_lines_dict']
+        tau_wts_dict = molecular_constants['tau_wts_dict']
+
         background_ta = cls.T_antenna(cls.TCMB, xarr.value)
         tau_dict = {}
 
@@ -128,7 +122,6 @@ class BaseModel:
             background_ta = model_spectrum
 
         return model_spectrum - cls.T_antenna(cls.TCMB, xarr.value)
-
 
     @classmethod
     def _single_spectrum(cls, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
@@ -180,7 +173,6 @@ class BaseModel:
                          background_ta * np.exp(-tauprof)))
 
         return runspec
-
 
     @staticmethod
     def T_antenna(Tbright, nu):
