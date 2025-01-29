@@ -42,6 +42,7 @@ class BaseModel:
         self.molecular_constants = molecular_constants
         self.line_names = line_names or ['default_line']
 
+
     @classmethod
     def multi_v_model_generator(cls, n_comp):
         """
@@ -82,6 +83,7 @@ class BaseModel:
         )
         return mod
 
+
     @classmethod
     def multi_v_spectrum(cls, xarr, *args):
         """
@@ -103,9 +105,6 @@ class BaseModel:
             xarr = xarr.as_unit('GHz')
 
         molecular_constants = cls.molecular_constants
-        freq_dict = molecular_constants['freq_dict']
-        voff_lines_dict = molecular_constants['voff_lines_dict']
-        tau_wts_dict = molecular_constants['tau_wts_dict']
 
         background_ta = cls.T_antenna(cls.TCMB, xarr.value)
         tau_dict = {}
@@ -122,6 +121,7 @@ class BaseModel:
             background_ta = model_spectrum
 
         return model_spectrum - cls.T_antenna(cls.TCMB, xarr.value)
+
 
     @classmethod
     def _single_spectrum(cls, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
@@ -173,6 +173,7 @@ class BaseModel:
                          background_ta * np.exp(-tauprof)))
 
         return runspec
+
 
     @staticmethod
     def T_antenna(Tbright, nu):
