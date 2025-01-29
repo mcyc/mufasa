@@ -12,7 +12,7 @@ __author__ = 'mcychen'
 import os
 import numpy as np
 import multiprocessing
-from spectral_cube import SpectralCube
+from spectral_cube import SpectralCube, DaskSpectralCube
 from astropy import units as u
 from skimage.morphology import binary_dilation, remove_small_holes, remove_small_objects, square, disk
 from skimage.filters import threshold_local
@@ -24,7 +24,6 @@ from time import ctime
 from datetime import timezone, datetime
 import warnings
 import pandas as pd
-
 import dask.array as da
 
 try:
@@ -34,13 +33,15 @@ except ImportError:
     pass
 
 from . import UltraCube as UCube
+from .PCube import PCube
 from . import moment_guess as mmg
 from . import convolve_tools as cnvtool
 from . import guess_refine as gss_rf
 from .exceptions import SNRMaskError, FitTypeError, StartFitError
 from .utils.multicore import validate_n_cores
-from .utils import neighbours
+from .utils import neighbours, dask_utils
 from .utils import dataframe as dframe
+from .utils.memory import monitor_peak_memory
 from .visualization import scatter_3D
 # =======================================================================================================================
 from .utils.mufasa_log import init_logging, get_logger
@@ -63,7 +64,7 @@ class Region(object):
     """
 
     def __init__(self, cubePath, paraNameRoot, paraDir=None, cnv_factor=2, fittype=None, initialize_logging=True,
-                 multicore=True, **kwargs):
+                 multicore=True, new_progress_log=False, **kwargs):
         """Initialize the Region object for spectral cube analysis.
 
         Parameters
@@ -83,6 +84,8 @@ class Region(object):
         multicore : bool or int, optional
             Number of CPU cores to use for parallel processing. Defaults to True, which uses all available CPUs minus 1.
             If an integer is provided, it specifies the number of cores to use.
+        new_progress_log : bool optional
+            If True, start an new csv log and write over the old one if it exists
         **kwargs : dict, optional
             Additional keyword arguments for logging initialization.
 
@@ -100,6 +103,9 @@ class Region(object):
         self.paraNameRoot = paraNameRoot
         self.paraDir = paraDir
 
+        # a dictory to store memory monitoring
+        self.memory_log = {}
+
         if fittype is None:
             fittype = 'nh3_multi_v'
             message = "[WARNING] The optionality of the fittype argment for the Region class will be deprecated in the future. " \
@@ -115,15 +121,14 @@ class Region(object):
         self.progress_log_name = "{}/{}_progress_log.csv".format(self.ucube.paraDir, self.ucube.paraNameRoot)
 
         self.timestemp = None
-        try:
-            from pandas import read_csv
-            self.progress_log = read_csv(self.progress_log_name)
-            # could use a checking mechanism to ensure the logfile is the right format
-        except FileNotFoundError:
-            columns = ['process', 'last completed', 'attempted fits (pix)', 'successful fits (pix)',
-                       'total runtime (dd:hh:mm:ss)', 'cores used']
-            self.progress_log = pd.DataFrame(columns=columns)
 
+        if not new_progress_log:
+            try:
+                from pandas import read_csv
+                self.progress_log = read_csv(self.progress_log_name)
+                # could use a checking mechanism to ensure the logfile is the right format
+            except FileNotFoundError:
+                logger.warning("no previous progress log found, new one will be created")
 
     def get_convolved_cube(self, update=True, cnv_cubePath=None, edgetrim_width=5, paraNameRoot=None, paraDir=None,
                            multicore=True):
@@ -211,7 +216,7 @@ class Region(object):
         """
         get_fits(self, ncomp, update=False)
 
-    def master_2comp_fit(self, snr_min=0.0, **kwargs):
+    def master_2comp_fit(self, snr_min=3.0, **kwargs):
         """
         Perform a comprehensive two-component fitting process on the spectral cube.
 
@@ -224,7 +229,8 @@ class Region(object):
         Parameters
         ----------
         snr_min : float, optional
-            Minimum signal-to-noise ratio required for fitting. Default is 0.0.
+            Minimum signal-to-noise ratio required for fitting. Default is 3.0.
+            If set to 0.0, attempts to fit all pixels using guesses from pre-existing fits.
         **kwargs : dict, optional
             Additional keyword arguments controlling the fitting process:
 
@@ -255,7 +261,27 @@ class Region(object):
         """
         master_2comp_fit(self, snr_min=snr_min, **kwargs)
 
+    @monitor_peak_memory(output_attr='memory_log', key='iter_2comp')
+    def iter_2comp_fit(self, **kwargs):
+        iter_2comp_fit(self, **kwargs)
 
+    @monitor_peak_memory(output_attr='memory_log', key='refit_bad_2comp')
+    def refit_bad_2comp(self, **kwargs):
+        refit_bad_2comp(self, **kwargs)
+
+    @monitor_peak_memory(output_attr='memory_log', key='refit_2comp_wide')
+    def refit_2comp_wide(self, **kwargs):
+        refit_2comp_wide(self, **kwargs)
+
+    @monitor_peak_memory(output_attr='memory_log', key='refit_marginal_nc')
+    def refit_marginal(self, **kwargs):
+        refit_marginal(self, **kwargs)
+
+    @monitor_peak_memory(output_attr='memory_log', key='save_best_2comp')
+    def save_best_2comp_fit(self, **kwargs):
+        save_best_2comp_fit(self, **kwargs)
+
+    @monitor_peak_memory(output_attr='memory_log', key='standard_2comp_fit')
     def standard_2comp_fit(self, planemask=None):
         """Perform a two-component fit on the spectral cube using default moment-based guesses.
 
@@ -339,7 +365,7 @@ class Region(object):
 
 
     def log_progress(self, process_name, mark_start=False, save=True, timespec='seconds', n_attempted=None,
-                     n_success=None, finished=False, cores=None):
+                     n_success=None, finished=False, cores=None, peak_memory=None):
         """Log the progress of a process, including start/completion times, and
         attempt/success counts.
 
@@ -361,6 +387,8 @@ class Region(object):
             If True, marks the process as completed and calculates total runtime. Defaults to False.
         cores : int, optional
             Number of cores used for the process. Defaults to None.
+        peak_memory : float
+            The peak memory usage of a process in GB
 
         Returns
         -------
@@ -405,23 +433,23 @@ class Region(object):
                 # Clear the timestamp as the task is completed
                 self.timestamp = None
             else:
-                runtime_info = "in progress" if self.timestamp is not None else "N/A"
+                runtime_info = "in progress" if self.timestamp is not None else np.nan
 
         # Initialize progress log if it doesn't exist yet
         if not hasattr(self, 'progress_log'):
             columns = ['process', 'last completed', 'attempted fits (pix)', 'successful fits (pix)',
-                       'total runtime (dd:hh:mm:ss)', 'cores used']
+                       'total runtime (dd:hh:mm:ss)', 'cores used', 'peak memory (GB)']
             self.progress_log = pd.DataFrame(columns=columns)
 
-        cores_info = int(cores) if cores is not None else "N/A"
+        cores_info = int(cores) if cores is not None else np.nan
 
         if process_name in self.progress_log['process'].values:
             # Replace the previous entry if the process has been logged
             mask = self.progress_log['process'] == process_name
             self.progress_log.loc[mask, ['last completed', 'total runtime (dd:hh:mm:ss)']] = [time_info, runtime_info]
 
-            # Update cores used only if the existing value is the default "N/A"
-            if cores is not None or self.progress_log.loc[mask, 'cores used'].values[0] == "N/A":
+            # Update cores used only if the existing value is the default np.nan
+            if cores is not None or self.progress_log.loc[mask, 'cores used'].values[0] == np.nan:
                 self.progress_log.loc[mask, 'cores used'] = cores_info
 
             # Update attempted fits and successful fits if arguments are provided
@@ -429,16 +457,19 @@ class Region(object):
                 self.progress_log.loc[mask, 'attempted fits (pix)'] = n_attempted
             if n_success is not None:
                 self.progress_log.loc[mask, 'successful fits (pix)'] = n_success
+            if peak_memory is not None:
+                self.progress_log.loc[mask, 'peak memory (GB)'] = np.round(peak_memory, 1)
         else:
             # Add a new entry otherwise
             # Fill the additional columns with default values (e.g., "None" for unspecified fields)
             info = {
                 'process': process_name,
                 'last completed': time_info,
-                'attempted fits (pix)': n_attempted if n_attempted is not None else "None",
-                'successful fits (pix)': n_success if n_success is not None else "None",
+                'attempted fits (pix)': n_attempted if n_attempted is not None else np.nan,
+                'successful fits (pix)': n_success if n_success is not None else np.nan,
                 'total runtime (dd:hh:mm:ss)': runtime_info,
-                'cores used': cores_info
+                'cores used': cores_info,
+                'peak memory (GB)': peak_memory if peak_memory is not None else np.nan,
             }
 
             if pd.__version__ >= '1.3.0':
@@ -449,10 +480,28 @@ class Region(object):
                 self.progress_log = self.progress_log.append(info, ignore_index=True)
 
         if save:
-            # Reorder the rows by 'last completed' in chronological order
-            self.progress_log = self.progress_log.sort_values(by='last completed', ascending=True)
-            # Write the log as a CSV file
-            self.progress_log.to_csv(self.progress_log_name, index=False)
+            self.save_log_csv()
+
+    def log_memory(self, process_name, peak_memory, save=True, timespec='seconds'):
+        # enter the peak memory usage into the progress log
+        if process_name in self.progress_log['process'].values:
+            mask = self.progress_log['process'] == process_name
+            # Update the memory of the entry
+            self.progress_log.loc[mask, 'peak memory (GB)'] = np.round(peak_memory, 1)
+        else:
+            # create a new entry if no matching entry exists
+            logger.warning(f'process_name {process_name} does not exist; no memory logged.')
+            time_info = datetime.now().isoformat(timespec=timespec)
+            new_row = {'process':process_name, 'peak memory (GB)':peak_memory, 'last completed':time_info}
+            self.progress_log = pd.concat([self.progress_log, pd.DataFrame([new_row])], ignore_index=True)
+        if save:
+            self.save_log_csv()
+
+    def save_log_csv(self):
+        # Reorder the rows by 'last completed' in chronological order
+        self.progress_log = self.progress_log.sort_values(by='last completed', ascending=True)
+        # Write the log as a CSV file
+        self.progress_log.to_csv(self.progress_log_name, index=False)
 
 
 # =======================================================================================================================
@@ -580,7 +629,7 @@ def get_fits(reg, ncomp, **kwargs):
 # functions specific to 2-component fits
 
 
-def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
+def master_2comp_fit(reg, snr_min=3, recover_wide=True, planemask=None, updateCnvFits=True, refit_bad_pix=True,
                      refit_marg=True, max_expand_iter=None, multicore=True):
     """
     Perform a two-component fit on the data cube within a Region object.
@@ -595,7 +644,7 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
         A Region object containing the data cube to be fitted.
     snr_min : float, optional
         Minimum peak signal-to-noise ratio required for fitting. Only regions with a peak SNR above this threshold
-        are considered for fitting. Default is 0.0.
+        are considered for fitting. Default is 3.
         If set to 0.0, attempts to fit all pixels using guesses from pre-existing fits.
     recover_wide : bool, optional
         If True, attempts to recover spectral components with large velocity separation. Default is True.
@@ -644,7 +693,10 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
     >>> updated_reg = master_2comp_fit(region, snr_min=3.0, recover_wide=False, max_expand_iter=5, multicore=4)
     >>> # Fits the region with a minimum SNR of 3.0, disables wide recovery, and expands fits for 5 iterations.
     """
-    iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+
+    #iter_2comp_fit(reg, snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+    reg.iter_2comp_fit(snr_min=snr_min, updateCnvFits=updateCnvFits, planemask=planemask, multicore=multicore)
+    reg.log_memory(process_name='iter fits all', peak_memory=reg.memory_log['iter_2comp'])
 
     # assumes the user wants to recover a second component that is fainter than the primary
     recover_snr_min = 3.0
@@ -652,16 +704,29 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
         recover_snr_min = snr_min/3.0
 
     if refit_bad_pix:
-        refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
+        #refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
+        reg.refit_bad_2comp(snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
+        reg.log_memory(process_name='refit_bad_2comp', peak_memory=reg.memory_log['refit_bad_2comp'])
 
     if recover_wide:
-        refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
+        #refit_2comp_wide(reg, snr_min=recover_snr_min, multicore=multicore)
+        reg.refit_2comp_wide(snr_min=recover_snr_min, multicore=multicore)
+        reg.log_memory(process_name='refit_2comp_wide', peak_memory=reg.memory_log['refit_2comp_wide'])
 
     if refit_marg:
+        '''
         refit_marginal(reg, ncomp=1, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
         refit_marginal(reg, ncomp=2, lnk_thresh=10, holes_only=False, multicore=multicore,
                        method='best_neighbour')
+        '''
+        reg.refit_marginal(ncomp=1, lnk_thresh=10, holes_only=False, multicore=multicore,
+                       method='best_neighbour')
+        reg.log_memory(process_name='refit_marginal_1_comp', peak_memory=reg.memory_log['refit_marginal_nc'])
+
+        reg.refit_marginal(ncomp=2, lnk_thresh=10, holes_only=False, multicore=multicore,
+                       method='best_neighbour')
+        reg.log_memory(process_name='refit_marginal_2_comp', peak_memory=reg.memory_log['refit_marginal_nc'])
 
     if max_expand_iter != False:
         if max_expand_iter == True:
@@ -673,10 +738,10 @@ def master_2comp_fit(reg, snr_min=0.0, recover_wide=True, planemask=None, update
             # have another pass of quality assurance
             refit_bad_2comp(reg, snr_min=recover_snr_min, lnk_thresh=-5, multicore=multicore)
 
-    save_best_2comp_fit(reg, multicore=multicore, lnk21_thres=5, lnk10_thres=5)
+    reg.save_best_2comp_fit(multicore=multicore, lnk21_thres=5, lnk10_thres=5)
+    reg.log_memory(process_name='save_best_2comp', peak_memory=reg.memory_log['save_best_2comp'])
 
     return reg
-
 
 
 def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multicore=True, use_cnv_lnk=True,
@@ -761,6 +826,15 @@ def iter_2comp_fit(reg, snr_min=3.0, updateCnvFits=True, planemask=None, multico
             kwargs['maskmap'] = planemask
             n_pix = np.sum(np.all(np.isfinite(guesses), axis=0) & planemask)
 
+        # conserve memory
+        if not use_cnv_lnk:
+            del reg.ucube_cnv.pcubes[str(nc)]
+            gc.collect()
+
+        if nc == 2:
+            del reg.ucube_cnv
+            gc.collect()
+
         reg.log_progress(process_name=proc_name, mark_start=False, n_attempted=n_pix, n_success='N/A')
 
         reg.ucube.get_model_fit([nc], **kwargs)
@@ -809,7 +883,7 @@ def refit_bad_2comp(reg, snr_min=3, lnk_thresh=-5, multicore=True, save_para=Tru
 
     from astropy.convolution import Gaussian2DKernel, convolve
 
-    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False, multicore=multicore)
+    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, reset_model_mask=False, multicore=multicore)
 
     # where the fits are poor
     mask = np.logical_or(lnk21 < lnk_thresh, lnk20 < 5)
@@ -881,7 +955,7 @@ def refit_marginal(reg, ncomp, lnk_thresh=5, holes_only=False, multicore=True, s
     reg.log_progress(process_name=proc_name, mark_start=True, cores=multicore)
     ucube = reg.ucube
 
-    lnk_maps = reg.ucube.get_all_lnk_maps(ncomp_max=ncomp, rest_model_mask=False, multicore=multicore)
+    lnk_maps = reg.ucube.get_all_lnk_maps(ncomp_max=ncomp, reset_model_mask=False, multicore=multicore)
     if ncomp == 1:
         lnkmap = lnk_maps #lnk10
         refmap = lnkmap
@@ -972,7 +1046,10 @@ def refit_swap_2comp(reg, snr_min=3):
     # adopt the better fit parameters into the final map
     good_mask = lnk_NvsO > 0
     # replace the values
-    replace_para(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
+    if isinstance(reg.ucube.pcubes['2'], PCube):
+        reg.ucube.pcubes['2'].replace_para_n_mod(ucube_new.pcubes['2'], good_mask)
+    else:
+        replace_para_n_mod(reg.ucube.pcubes['2'], ucube_new.pcubes['2'], good_mask)
 
     # re-fit and save the updated model
     save_updated_paramaps(reg.ucube, ncomps=[2, 1])
@@ -1031,7 +1108,7 @@ def refit_2comp_wide(reg, snr_min=3, method='residual', planemask=None, multicor
         logger.debug("recovering second component from residual")
         # fit over where one-component was a better fit in the last iteration (since we are only interested in recovering
         # a second component that is found in wide separation)
-        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=False)
+        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, reset_model_mask=False)
 
         if planemask is None:
             mask10 = lnk10 > 5
@@ -1454,7 +1531,10 @@ def replace_bad_pix(ucube, mask, snr_min, guesses, ncomp=2, lnk21=None, simpfit=
 
         logger.info("Replacing {} bad pixels with better fits".format(good_mask.sum()))
         # replace the values
-        replace_para(ucube.pcubes[str(ncomp)], ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
+        if isinstance(ucube.pcubes[str(ncomp)], PCube):
+            ucube.pcubes[str(ncomp)].replace_para_n_mod(ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
+        else:
+            replace_para_n_mod(ucube.pcubes[str(ncomp)], ucube_new.pcubes[str(ncomp)], good_mask, multicore=multicore)
         replace_rss(ucube, ucube_new, ncomp=ncomp, mask=good_mask)
     else:
         logger.debug("not enough pixels to refit, no-refit is done")
@@ -1754,47 +1834,55 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     save_updated_paramaps(reg.ucube, ncomps=ncomps)
 
     if from_saved_para:
-        # create a new Region object to start fresh
-        reg_final = Region(reg.cubePath, reg.paraNameRoot, reg.paraDir, fittype=reg.fittype, initialize_logging=False)
-
         # load files using paths from reg if they exist
         for nc in ncomps:
             if not str(nc) in reg.ucube.pcubes:
-                reg_final.load_fits(ncomp=[nc])
+                reg.load_fits(ncomp=[nc])
             else:
                 logger.debug("Loading model from: {}".format(reg.ucube.paraPaths[str(nc)]))
-                reg_final.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
-    else:
-        reg_final = reg
+                reg.ucube.load_model_fit(filename=reg.ucube.paraPaths[str(nc)], ncomp=nc, multicore=multicore)
+
+    logger.info("getting full model states")
+
+    # get everything calculated ahead of time for efficiency
+    reg.ucube.get_all_full_model_stats(ncomp_max=2, multicore=multicore)
+
+    logger.info("getting best 2comp para")
 
     # make the two-component parameter maps with the best fit model
-    pcube_final = reg_final.ucube.pcubes['2']
-    kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True)
-    parcube, errcube, lnk10, lnk20, lnk21 = reg_final.ucube.get_best_2c_parcube(**kwargs)
-    pcube_final.parcube = parcube
-    pcube_final.errcube = errcube
+    kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk10_thres=lnk10_thres, return_lnks=True,
+                  reset_model_mask=False)
+    parcube, errcube, lnk10, lnk20, lnk21 = reg.ucube.get_best_2c_parcube(**kwargs)
+
+    gc.collect()
+    logger.info("finished getting best 2comp para")
+
+    # store the lnkmaps in a dictionary
+    lnkmaps = dict(lnk10=lnk10, lnk20=lnk20, lnk21=lnk21)
 
     # use the default file format to save the final results
     nc = 2
-    if not str(nc) in reg_final.ucube.paraPaths:
-        reg_final.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(
-            reg_final.ucube.paraDir, reg_final.ucube.paraNameRoot, nc
+    if not str(nc) in reg.ucube.paraPaths:
+        reg.ucube.paraPaths[str(nc)] = '{}/{}_{}vcomp.fits'.format(
+            reg.ucube.paraDir, reg.ucube.paraNameRoot, nc
         )
 
-    savename = "{}_final.fits".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
+    savename = "{}_final.fits".format(os.path.splitext(reg.ucube.paraPaths['2'])[0])
     notes = 'Model-selected best 1- or 2-comp fits parameters, based on lnk21'
-    UCube.save_fit(pcube_final, savename=savename, ncomp=2, header_note=notes)
+    pcube_header = reg.ucube.pcubes['2'].header
+    UCube.save_para(savename, parcube=parcube, errcube=errcube, cube_header=pcube_header,
+                    ncomp=2, npara=4, header_note=notes)
 
     hdr2D = reg.ucube.make_header2D()
-    paraDir = reg_final.ucube.paraDir
-    paraRoot = reg_final.ucube.paraNameRoot
+    paraDir = reg.ucube.paraDir
+    paraRoot = reg.ucube.paraNameRoot
 
     if save_csv or save_Scatter3D:
         #save structured data (read the saved .fits file first, using ScatterPPV as a quick work around for now)
         sppv = scatter_3D.ScatterPPV(savename, fittype=reg.fittype, meta_model=reg.ucube.meta_model)
 
         if save_csv:
-            savename = "{}_final.csv".format(os.path.splitext(reg_final.ucube.paraPaths['2'])[0])
+            savename = "{}_final.csv".format(os.path.splitext(reg.ucube.paraPaths['2'])[0])
             sppv.dataframe.to_csv(savename, index=False)
 
         if save_Scatter3D:
@@ -1868,63 +1956,61 @@ def save_best_2comp_fit(reg, multicore=True, from_saved_para=False, lnk21_thres=
     save_map(lnk20, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
+    #logger.info("getting best 2comp model")
+    modbest = get_best_2comp_model(reg, lnkmaps=lnkmaps)
+    gc.collect()
+    #logger.info("finished getting best 2comp model")
+
     # save the SNR map
-    snr_map = get_best_2comp_snr_mod(reg_final)
+    snr_map = get_peak_snr(reg, modbest)
     hdr_save = hdr2D.copy()
     hdr_save.set(keyword='NOTES', value='Estimated peak signal-to-noise ratio', comment=None, before='DATE')
     hdr_save.set(keyword='BUNIT', value='unitless', comment=None, before=1)
     savename = make_save_name(paraRoot, paraDir, "SNR")
     save_map(snr_map, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
+    del snr_map
+    gc.collect()
 
-    # create moment0 map
-    modbest = get_best_2comp_model(reg_final)
-    cube_mod = SpectralCube(data=modbest, wcs=copy(reg_final.ucube.pcubes['2'].wcs),
-                            header=copy(reg_final.ucube.pcubes['2'].header))
+    # create model moment0 map
+    cube_mod = DaskSpectralCube(data=modbest, wcs=copy(reg.ucube.pcubes['2'].wcs),
+                            header=copy(reg.ucube.pcubes['2'].header))
     # make sure the spectral unit is in km/s before making moment maps
     cube_mod = cube_mod.with_spectral_unit('km/s', velocity_convention='radio')
-    mom0_mod = cube_mod.moment0()
+    with cube_mod.use_dask_scheduler(reg.ucube.scheduler):
+        mom0_mod = cube_mod.moment0()
     savename = make_save_name(paraRoot, paraDir, "model_mom0")
     mom0_mod.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
+    del cube_mod, mom0_mod
+    if isinstance(modbest, da.Array):
+        modbest = dask_utils.reset_graph(modbest)
+    gc.collect()
 
     # created masked mom0 map with model as the mask
-    mom0 = UCube.get_masked_moment(cube=reg_final.ucube.cube, model=modbest, order=0, expand=20, mask=None)
+    mom0 = UCube.get_masked_moment(cube=reg.ucube.cube, model=modbest,
+                                   order=0, mask=reg.ucube.master_model_mask, scheduler=reg.ucube.scheduler)
     savename = make_save_name(paraRoot, paraDir, "mom0")
     mom0.write(savename, overwrite=True)
     logger.debug('{} saved.'.format(savename))
-
-    # save reduced chi-squred maps
-    # would be useful to check if 3rd component is needed
-    '''
-    savename = make_save_name(paraRoot, paraDir, "chi2red_final")
-    chi_map = UCube.get_chisq(cube=reg_final.ucube.cube, model=modbest, expand=20, reduced=True, usemask=True,
-                              mask=None)
-    hdr_save = hdr2D.copy()
-    hdr_save.set(keyword='NOTES', value='chi-squared values of the best 1- or 2-comp fit model',
-                 comment=None, before='DATE')
-    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
-    save_map(chi_map, hdr_save, savename)
-    logger.debug('{} saved.'.format(savename))
-    '''
+    del mom0, modbest
+    gc.collect()
 
     # save reduced chi-squred maps for 1 comp and 2 comp individually
-    chiRed_1c = reg_final.ucube.get_reduced_chisq(1)
-    chiRed_2c = reg_final.ucube.get_reduced_chisq(2)
+    chiRed_1c = reg.ucube.rchisq_maps['1']
+    chiRed_2c = reg.ucube.rchisq_maps['2']
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_1c")
     hdr_save = hdr2D.copy()
-    hdr_save.set(keyword='NOTES', value='reduced chi-squared values of the 1-comp model',
+    hdr_save.set(keyword='NOTES', value='reduced chi-sq. values of the 1-comp model',
                  comment=None, before='DATE')
-    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
     save_map(chiRed_1c, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
     savename = make_save_name(paraRoot, paraDir, "chi2red_2c")
     hdr_save = hdr2D.copy()
-    hdr_save.set(keyword='NOTES', value='reduced chi-squared values of the 2-comp model',
+    hdr_save.set(keyword='NOTES', value='reduced chi-sq. values of the 2-comp model',
                  comment=None, before='DATE')
-    #hdr_save.set(keyword='BUNIT', value='', comment=None, before=1)
     save_map(chiRed_2c, hdr_save, savename)
     logger.debug('{} saved.'.format(savename))
 
@@ -2373,14 +2459,15 @@ def get_best_2comp_residual(reg):
     return res_cube
 
 
-def get_best_2comp_snr_mod(reg):
-    """Calculate the signal-to-noise ratio (SNR) map for the best-fit two-
-    component model.
+def get_peak_snr(reg, data):
+    """Calculate the peak signal-to-noise ratio (SNR) map
 
     Parameters
     ----------
     reg : Region
         The Region object containing the original spectral cube and fitted model results.
+    data : numpy.ndarray or dask.array.Array
+        The data to compute the signal strenght, whether it be a model cube or an actual data cube
 
     Returns
     -------
@@ -2395,21 +2482,15 @@ def get_best_2comp_snr_mod(reg):
     - The best-fit model is determined based on a comparison of log-likelihood values for one-component
       and two-component fits.
     - The RMS noise is calculated directly from the residual cube.
-
-    Examples
-    --------
-    >>> from region import Region
-    >>> reg = Region('input_cube.fits', 'output_root', fittype='nh3')
-    >>> snr_map = get_best_2comp_snr_mod(reg)
-    >>> # Returns a 2D array of SNR values for the best-fit model.
     """
-    modbest = get_best_2comp_model(reg)
-    res_cube = get_best_2comp_residual(reg)
-    best_rms = UCube.get_rms(res_cube._data)
-    return np.nanmax(modbest, axis=0) / best_rms
+    # the better model should have lower estimated rms
+    rms2 = reg.ucube.rms_maps['2']
+    rms1 = reg.ucube.rms_maps['1']
+    rms = da.where(rms2 > rms1, rms1, deepcopy(rms2))
+    return da.max(data, axis=0) / rms
 
 
-def get_best_2comp_model(reg):
+def get_best_2comp_model(reg, lnkmaps=None, reset_model_mask=False):
     """
     Retrieve the best-fit model cube for the given Region object.
 
@@ -2450,29 +2531,51 @@ def get_best_2comp_model(reg):
     >>> best_model = get_best_2comp_model(reg)
     >>> # Returns a 3D NumPy array representing the best-fit model cube.
     """
-    lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, rest_model_mask=True)
 
-    mod1 = reg.ucube.pcubes['1'].get_modelcube()
-    mod2 = reg.ucube.pcubes['2'].get_modelcube()
+    if lnkmaps is None:
+        # Assuming lnk10, lnk20, lnk21 are already Dask arrays
+        lnk10, lnk20, lnk21 = reg.ucube.get_all_lnk_maps(ncomp_max=2, reset_model_mask=reset_model_mask)
+    else:
+        lnk10, lnk20, lnk21 = lnkmaps['lnk10'], lnkmaps['lnk20'], lnkmaps['lnk21']
 
-    # get the best model based on the calculated likelihood
-    modbest = copy(mod1)
-    modbest[:] = 0.0
+    mod1 = reg.ucube.pcubes['1'].get_modelcube()  # Ensure this returns a Dask array
+    mod2 = reg.ucube.pcubes['2'].get_modelcube()  # Ensure this returns a Dask array
 
-    mask = lnk10 > 5
-    modbest[:, mask] = mod1[:, mask]
+    # Create a copy of mod1 as modbest
+    modbest = deepcopy(mod1)
+    modbest = modbest * 0  # Reset values to 0.0 in a Dask-compatible way
 
-    mask = np.logical_and(lnk21 > 5, lnk20 > 5)
-    modbest[:, mask] = mod2[:, mask]
+    # fill in nan values with zero where the cube data exists
+    modbest = da.where(da.isnan(modbest) & reg.ucube.cube_footprint, 0, modbest)
 
-    return modbest
+    # Mask 1: lnk10 > 5
+    mask1 = lnk10 > 5
+    modbest = da.where(mask1, mod1, modbest)  # Use where to selectively assign mod1 values
+
+    # Mask 2: logical_and(lnk21 > 5, lnk20 > 5)
+    mask2 = da.logical_and(lnk21 > 5, lnk20 > 5)
+    modbest = da.where(mask2, mod2, modbest)  # Use where to selectively assign mod2 values
+
+    # Compute or persist the result if needed
+    dask_utils.persist_and_clean(modbest)
+    return dask_utils.reset_graph(modbest)
 
 
-def replace_para(pcube, pcube_ref, mask, multicore=None):
-    """Replace parameter values in a parameter cube with those from a reference
-    cube for specific pixels.
+def replace_para(pcube, pcube_ref, mask, **kwargs):
+    """
+    Replace parameter values in a parameter cube using a reference cube for specific pixels (Deprecated).
 
-    This function updates the `parcube`, `errcube`, and `has_fit` attributes of the input `pcube` based on a mask,
+    .. deprecated:: 1.0
+        This function will be removed in a future release. Use `replace_para_n_mod` instead.
+    """
+    return replace_para_n_mod(pcube, pcube_ref, mask, **kwargs)
+
+
+def replace_para_n_mod(pcube, pcube_ref, mask, multicore=None):
+    """
+    Replace parameter values in a parameter cube with those from a reference cube for specific pixels and update its model accordingly.
+
+    This function updates the `parcube`, `errcube`, and `has_fit` attributes of the input `self` based on a planemask,
     using the corresponding values from the reference cube (`pcube_ref`).
 
     Parameters
@@ -2482,7 +2585,7 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
     pcube_ref : pyspeckit.cube.ParCube
         The reference parameter cube containing the values to replace in `pcube`.
     mask : numpy.ndarray
-        A boolean 2D array indicating the spatial pixels to update. Pixels with `True` in the mask will be updated.
+        A boolean 2D array indicating the spatial pixels to update. Pixels with `True` in the planemask will be updated.
     multicore : int or None, optional
         Number of cores to use for parallel computation. Defaults to None, in which case a single core is used.
 
@@ -2492,32 +2595,31 @@ def replace_para(pcube, pcube_ref, mask, multicore=None):
 
     Notes
     -----
-    - Updates the following attributes of `pcube`:
+    - Updates the following attributes of `self`:
       - `parcube` (fitted parameters)
       - `errcube` (parameter errors)
       - `has_fit` (boolean map indicating successful fits)
-    - Also updates the `_modelcube` attribute of `pcube` with the corresponding model values from `pcube_ref`.
+    - Also updates the `_modelcube` attribute of `self` with the corresponding model values from `pcube_ref`.
     - If `multicore` is specified, it controls the parallelism when computing the model cube from `pcube_ref`.
 
     Examples
     --------
-    >>> replace_para(pcube, pcube_ref, mask, multicore=4)
-    >>> # Updates `pcube` with values from `pcube_ref` for pixels specified by `mask`.
+    >>> replace_para_n_mod(self, pcube_ref, planemask, multicore=4)
+    >>> # Updates `self` with values from `pcube_ref` for pixels specified by `planemask`.
     """
-
-    # replace values in masked pixels with the reference values
+    # Replace values in masked pixels with the reference values
     pcube.parcube[:, mask] = deepcopy(pcube_ref.parcube[:, mask])
     pcube.errcube[:, mask] = deepcopy(pcube_ref.errcube[:, mask])
-    pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
 
+    # Update has_fit
+    if isinstance(pcube, PCube):
+        pcube._has_fit(get=False)
+    else:
+        pcube.has_fit[mask] = deepcopy(pcube_ref.has_fit[mask])
+
+    # Validate the number of cores and update the model cube
     multicore = validate_n_cores(multicore)
-    newmod = pcube_ref.get_modelcube(update=False, multicore=multicore)
-
-    # Convert `pcube._modelcube` to a numpy array if it is currently a dask array
-    if isinstance(pcube._modelcube, da.Array):
-        pcube._modelcube = pcube._modelcube.compute()  # Load the full array into memory
-
-    pcube._modelcube[:, mask] = deepcopy(newmod[:, mask])
+    _ = pcube.get_modelcube(update=True, multicore=multicore, mask=mask)
 
 
 def get_skyheader(cube_header):

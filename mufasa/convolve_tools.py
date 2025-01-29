@@ -20,6 +20,14 @@ import scipy.ndimage as nd
 from spectral_cube.utils import NoBeamError
 import gc
 
+import dask.array as da
+from dask.diagnostics import ProgressBar
+import dask
+from dask.distributed import LocalCluster, Client
+
+from astropy import convolution
+import shutil
+
 # for Astropy 6.1.4 forward compatibility
 try:
     from astropy.units import UnitScaleError
@@ -27,6 +35,9 @@ except ImportError:
     from astropy.units.core import UnitScaleError
 
 from .utils.fits_utils import downsample_header, get_pixel_mapping
+from .utils.memory import monitor_peak_memory, tmp_save_gauge
+from .utils import dask_utils
+from .utils.dask_utils import profile_and_visualize, ensure_dask_client
 
 #=======================================================================================================================
 from .utils.mufasa_log import get_logger
@@ -34,8 +45,14 @@ logger = get_logger(__name__)
 #=======================================================================================================================
 # utility tools for convolve cubes
 
-def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True, **kwargs):
-    # factor = factor * 1.0 # probably unecessary, better option is factor = float(factor)
+@monitor_peak_memory()
+@ensure_dask_client
+def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsample=True,
+                          rechunk=True, scheduler='synchronous', **kwargs):
+    # scheduler='processes' is not recommended, as it uses excessive memory
+
+    kwargs['rechunk'] = rechunk
+    kwargs['scheduler'] = scheduler
 
     if not isinstance(cube, SpectralCube):
         cube = SpectralCube.read(cube, use_dask=True)
@@ -66,28 +83,29 @@ def convolve_sky_byfactor(cube, factor, savename=None, edgetrim_width=5, downsam
         cnv_cube = convolve_sky(cube, beam, **kwargs)
     except NoBeamError:
         cube = cube.with_beam(beam)
-        cnv_cube = convolve_sky(cube, beam, **kwargs)
+        cnv_cube = convolve_sky(cube, beam,  **kwargs)
+
+    gc.collect()
 
     if not np.isnan(cnv_cube.fill_value):
         cnv_cube = cnv_cube.with_fill_value(np.nan)
 
     if downsample:
-        # regrid the convolved cube
-        nhdr = downsample_header(hdr, factor=factor, axis=1)
-        nhdr = downsample_header(nhdr, factor=factor, axis=2)
-        nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1']/factor))
-        nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2']/factor))
-        newcube = cnv_cube.reproject(nhdr, order='bilinear')
+        # downsample and regrid the convolved cube
+        newcube = _downsample(cnv_cube, hdr, factor, scheduler=scheduler, savename=savename)
     else:
         newcube = cnv_cube
+        if savename != None:
+            newcube.write(savename, overwrite=True)
 
-    if savename != None:
-        newcube.write(savename, overwrite=True)
+    gc.collect()
 
     return newcube
 
 
-def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0):
+@monitor_peak_memory()
+@ensure_dask_client
+def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0, rechunk=True, scheduler='synchronous'):
     # return the convolved cube in the same gridding as the input
     # note: iterrefine masks data as well
 
@@ -110,32 +128,150 @@ def convolve_sky(cube, beam, snrmasked=False, iterrefine=False, snr_min=3.0):
 
     maskcube = cube.with_mask(mask)
 
-    # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
-    if maskcube.size > 1e8:
-        logger.warning("maskcube is large ({} pixels)".format(maskcube.size))
-    maskcube.allow_huge_operations = True
-    cnv_cube = maskcube.convolve_to(beam)
-    maskcube.allow_huge_operations = False
+    if isinstance(maskcube._data, da.Array):
+        # persist to clean up the graph and make subsequent calculation
+        # more memory effecient
+        #maskcube._data = dask_utils.persist_and_clean(maskcube._data)
+        #maskcube._data = dask_utils.reset_graph(maskcube._data)
+        #gc.collect()
+        maskcube._data = maskcube._data.persist()
+        pass
+
+    # convolve the cube
+    cnv_cube = _convolve_to(maskcube, beam, scheduler, rechunk=rechunk)
     gc.collect()
 
     if snrmasked and iterrefine:
         # use the convolved cube for new masking
         logger.debug("--- second iteration refinement ---")
         mask = cube.mask.include()
+
+        if rechunk and isinstance(cnv_cube._data, da.Array):
+            # chunk the convoved cube back for more effecient operation
+            cnv_cube = _rechunk(cnv_cube, rechunk=cube._data.chunks)
+
         planemask = snr_mask(cnv_cube, snr_min)
         plane_mask_size = np.sum(planemask)
         if np.sum(planemask) > 25:
-             mask = mask*planemask
+             mask = mask & planemask
              logger.info("snr plane mask size = {}".format(plane_mask_size))
         else:
             logger.warning("snr plane mask too small (size = {}), no snr mask is applied".format(plane_mask_size))
         maskcube = cube.with_mask(mask)
-        maskcube.allow_huge_operations = True
-        cnv_cube = maskcube.convolve_to(beam)
-        maskcube.allow_huge_operations = False
+
+        cnv_cube = _convolve_to(maskcube, beam, scheduler, rechunk=rechunk)
         gc.collect()
 
     return cnv_cube
+
+#@profile_and_visualize(save=True, filename="convole_to.html")
+def _convolve_to(cube, beam, scheduler='synchronous', rechunk=False, save_to_tmp_dir='auto'):
+
+    savename = None
+
+    if save_to_tmp_dir:
+        # dynamically determine if its needed based on data science and free memory
+        if isinstance(save_to_tmp_dir, str):
+            if save_to_tmp_dir == 'auto':
+                # decide whether or not to save temporory based on data size and memory availability
+                save_to_tmp_dir = tmp_save_gauge(cube, factor=20)
+            else:
+                # assume the save_to_tmp_dir is a filename and use this function rather than downstreams
+                savename = save_to_tmp_dir
+                save_to_tmp_dir = False
+        elif isinstance(save_to_tmp_dir, int) or isinstance(save_to_tmp_dir, float):
+            # if given as a number, use it as the factor
+            save_to_tmp_dir = tmp_save_gauge(cube, factor=save_to_tmp_dir)
+
+    print(f"convolve_to save_to_tmp_dir: {save_to_tmp_dir}")
+
+    # enable huge operations (https://spectral-cube.readthedocs.io/en/latest/big_data.html for details)
+    if cube.size > 1e8:
+        logger.warning("cube is large ({} pixels)".format(cube.size))
+        cube.allow_huge_operations = True
+    # base function to handle convolution
+    if isinstance(cube._data, da.Array):
+
+        if rechunk:
+            cube = _rechunk(cube, rechunk)
+
+        print(f"=============== convolving cube with \'{scheduler}\' scheduler =====================")
+        #with cube.use_dask_scheduler(scheduler), ProgressBar():
+        with ProgressBar():
+            cube._data = dask_utils.persist_and_clean(cube._data) # clean up the graph before convolution
+            cnv_cube = cube.convolve_to(beam, save_to_tmp_dir=save_to_tmp_dir)
+            if not save_to_tmp_dir:
+                if savename:
+                    # alternative to using cube.convovle_to's native zarr save, "cube_cnv_tmp.zarr"
+                    cnv_cube._data = dask_utils.store_to_zarr(cnv_cube._data,
+                                                              savename, readback=True, delete_old=True)
+            else:
+                #cnv_cube._data = dask_utils.persist_and_clean(cnv_cube._data)
+                cnv_cube._data.persist()
+    else:
+        cnv_cube = cube.convolve_to(beam)
+
+    cube.allow_huge_operations = False
+
+    return cnv_cube
+
+
+def _rechunk(cube, rechunk):
+    # rechunk the cube as needed
+    # rechunk to not overwhelm the convlution process with sub-optimal chunks
+    # rechunk by planes (not breaking up the spatial image) is recommended
+
+    chunks_og = cube._data.chunks  # record the original chunking
+    if isinstance(rechunk, tuple):
+        logger.info("using user provided tuple for rechunking")
+        cube = cube.rechunk(rechunk)
+    elif isinstance(rechunk, str):
+        cube = cube.rechunk(str)
+    else:
+        cube = cube.rechunk('auto')
+
+    return cube
+
+@monitor_peak_memory()
+def _downsample(cnv_cube, hdr, factor, scheduler='synchronous', savename=None, save_to_tmp_dir=None):
+    """
+    downsamples and reproject
+    """
+
+    if save_to_tmp_dir is None:
+        save_to_tmp_dir = True
+
+    nhdr = FITS_tools.downsample.downsample_header(hdr, factor=factor, axis=1)
+    nhdr = FITS_tools.downsample.downsample_header(nhdr, factor=factor, axis=2)
+    nhdr['NAXIS1'] = int(np.rint(hdr['NAXIS1'] / factor))
+    nhdr['NAXIS2'] = int(np.rint(hdr['NAXIS2'] / factor))
+
+    # use existing chunking to set the blocksize and avoid rechunking
+    chunks = cnv_cube._data.chunks
+    block_size = tuple(chunk[0] for chunk in chunks) # use the shape of the first block
+
+    # spectral-cube reproject currently doesn't support chunking, newcube will have a singel chunk
+    if scheduler == 'synchronous' or scheduler =='threads':
+        print(f"============ downsample reprojecting with \'{scheduler}\' scheduler ===========")
+        with ProgressBar():
+            newcube = cnv_cube.reproject(
+                nhdr, order='bilinear', use_memmap=False, parallel='current-scheduler',
+                return_type='dask', block_size=block_size
+            )  # parallel and return_type are reproject.return_type arguments #no need for spectral cube's save_to_tmp_dir?
+
+            if savename:
+                newcube.write(savename, overwrite=True)
+            elif save_to_tmp_dir:
+                newcube._data = dask_utils.store_to_zarr(newcube._data, "cube_cnv.zarr", readback=True, delete_old=True)
+            else:
+                newcube._data.persist()
+
+    else:
+        msg = f"{scheduler} may not be the safest to run with reproject at the moment, defaulting to non-dask operation"
+        logger.warning(msg)
+        newcube = cnv_cube.reproject(nhdr, order='bilinear')
+
+    return newcube
 
 
 def snr_mask(cube, snr_min=1.0, errmappath=None):
@@ -146,11 +282,16 @@ def snr_mask(cube, snr_min=1.0, errmappath=None):
 
     else:
         # make a quick RMS estimate using median absolute deviation (MAD)
-        errmap = cube.mad_std(axis=0)#, how='ray')
-        logger.info("median rms: {0}".format(np.nanmedian(errmap)))
+        errmap = cube.mad_std(axis=0)
+        logger.debug("median rms: {0}".format(np.nanmedian(errmap)))
 
-    snr = cube.filled_data[:].value / errmap
-    peaksnr = np.nanmax(snr, axis=0)
+    if isinstance(cube._data):
+        snr = cube._data / errmap
+        peaksnr = da.nanmax(snr, axis=0).compute()
+        print("compute peaksnr")
+    else:
+        snr = cube.filled_data[:].value / errmap
+        peaksnr = np.nanmax(snr, axis=0)
 
     #the snr map will inetiabley be noisy, so a little smoothing
     kernel = Gaussian2DKernel(1)
@@ -180,8 +321,11 @@ def snr_mask(cube, snr_min=1.0, errmappath=None):
 
 def edge_trim(cube, trim_width=3):
         # trim the edges by N pixels to guess the location of the peak emission
-        mask = np.any(cube.mask.include(), axis=0)
-        #mask = np.any(np.isfinite(cube._data), axis=0)
+        if isinstance(cube._data, da.Array):
+            mask = da.any(da.isfinite(cube._data), axis=0)
+        else:
+            mask = np.any(cube.mask.include(), axis=0)
+
         if mask.size > 100:
             mask = binary_erosion(mask, disk(trim_width))
         mask = cube.mask.include() & mask

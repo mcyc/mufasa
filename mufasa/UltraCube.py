@@ -16,15 +16,20 @@ import numpy as np
 from spectral_cube import SpectralCube
 # prevent any spectral-cube related warnings from being displayed.
 from spectral_cube.utils import SpectralCubeWarning
+from spectral_cube.dask_spectral_cube import DaskSpectralCube
 warnings.filterwarnings(action='ignore', category=SpectralCubeWarning, append=True)
 from copy import copy
+import shutil
 
 import pyspeckit
 import gc
 from astropy import units as u
 from astropy.units import UnitConversionError
+import astropy.io.fits as fits
 import scipy.ndimage as nd
+from astropy.stats import mad_std
 
+import dask
 import dask.array as da
 
 from . import aic
@@ -32,7 +37,10 @@ from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
 from .spec_models import meta_model
 from .utils.multicore import validate_n_cores
+from .utils import dask_utils, dask_ops, memory
 from .visualization.spec_viz import Plotter
+from . import PCube
+
 #======================================================================================================================#
 from .utils.mufasa_log import get_logger
 logger = get_logger(__name__)
@@ -83,7 +91,9 @@ class UltraCube(object):
 
     """
 
-    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None, cnv_factor=2, n_cores=True):
+    def __init__(self, cubefile=None, cube=None, fittype=None, snr_min=None, rmsfile=None,
+                 cnv_factor=2, n_cores=True, scheduler='threads', chunk_memory_size=16,
+                 worker_memory_limit = None):
         # to hold pyspeckit cubes for fitting
         self.pcubes = {}
         self.residual_cubes = {}
@@ -101,6 +111,29 @@ class UltraCube(object):
         self.fittype = fittype
         self.plotter = None
         self.meta_model = None
+        self.scheduler = scheduler
+        self.chunk_memory_size = chunk_memory_size # the targeted memory size of each dask chunk
+        self.chunks = None # the chunking scheme that UltraCube will use by default
+        self.ray_chunks = None # dask chunking that perserves the spectral axis
+        self.plane_chunks = None # dask chunking that tries to perserve the image plane
+        self.native_chunks = None # the native chunking scheme of the cube data, can be fairly effecient
+        self.cube_size_mb = None
+
+        # pre-configure dask.config
+        self.dask_config_kwargs = {
+            'distributed.worker.memory.limit': '0.5GB',            # A safer limit. Dask default is 4GB
+            'distributed.worker.memory.target': 0.6,               # dask default
+            'distributed.worker.memory.spill': 0.7,                # dask default
+            'distributed.worker.memory.pause': 0.8,                # dask default
+            'distributed.worker.memory.compression': True          # dask default
+        }
+
+        if worker_memory_limit is not None:
+            self.dask_config_kwargs['distributed.worker.memory.limit'] = worker_memory_limit
+            #'distributed.worker.local-dir': '/tmp/dask-local-dir'} # dask default
+
+        # scheduler: {'threads', 'processes', 'synchronous'}
+        #dask.config.set(scheduler=scheduler, n_workers=self.n_cores)
 
         if cubefile is not None:
             self.cubefile = cubefile
@@ -109,6 +142,9 @@ class UltraCube(object):
             if hasattr(cube, 'spectral_axis'):
                 # Load from a SpectralCube instance
                 self.cube = cube
+
+        # the spatial footprint of the cube
+        self.cube_footprint = np.any(self.cube.get_mask_array(),axis=0)
 
         if fittype is not None:
             # for the current usage, setting ncomp=1 is fine. Changes to MetalModel in the future will be needed
@@ -140,7 +176,7 @@ class UltraCube(object):
         """
         return mvf.make_header(ndim=2, ref_header=self.cube.header)
 
-    def load_cube(self, fitsfile):
+    def load_cube(self, fitsfile, chunks=None, chunk_memory_size=None, scheduler=None):
         """
         Load a spectral cube from a FITS file and convert its units to K and km/s.
 
@@ -153,11 +189,56 @@ class UltraCube(object):
         fitsfile : str
             Path to the FITS cube file.
 
+        chunks :
+            the chunking scheme
+
+        chunk_memory_size : int
+            the target memory size of the chunks in MB
+
+        scheduler : str
+            the dask scheduler to use
+
         Returns
         -------
         None
+
+        Notes
+        -----
+        - rechunking is not adviced since many of DaskSpectralCube's functions rechunks the data internally
+          and rechunking can be memory intensive if the blocks are very different
+
         """
-        cube = SpectralCube.read(fitsfile, use_dask=True)
+        # read the cube
+        use_dask = True # may make this a user option in the future
+        cube = SpectralCube.read(fitsfile, use_dask=use_dask)
+        #cube = MDaskCube.read(fitsfile, use_dask=use_dask) #, memmap=False
+
+        # save the data to zarr and load it to enable lazy loading
+        if False:
+            cube._data = store_to_zarr(cube._data, "cube.zarr", readback=True, delete_old=True)
+
+        if use_dask:
+            # this should propagate with new cube results
+            cube._scheduler_kwargs = self.dask_config_kwargs
+
+        if scheduler:
+            # overwrite UltraCube's previous scheduler
+            self.scheduler = scheduler
+
+        self.cube_size_mb = memory.get_size_mb(cube._data)
+
+        # record the cube's native chunking scheme
+        self.chunks_native = cube._data.chunks
+
+        if chunk_memory_size is not None:
+            if chunks:
+                msg = ("Initial rechunking is not adviced, since the data will likely"
+                       "be rechunked again at somepoint by DaskSpectralCube")
+                logger.warning(msg)
+            # set UltraCube object's chunk info accordingly
+            self._set_chunks(chunk_memory_size, chunks)
+
+        # convert the cube unit
         cube = to_K(cube)
 
         if cube.spectral_axis.unit.is_equivalent(u.Hz):
@@ -167,10 +248,31 @@ class UltraCube(object):
                                "The rest frequency of the spectral model will be used instead")
                 cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
 
-        self.cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
+        cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
 
+        if chunks:
+            # rechunk the cube
+            if self.cube_size_mb > 256:
+                # temporary save to the directory during rechunking if the cube is larger than 256 mb
+                save_to_tmp_dir = True
+            else:
+                save_to_tmp_dir = False
+            cube = cube.rechunk(self.chunks, save_to_tmp_dir=True)
 
-    def load_pcube(self, pcube_ref=None):
+        else:
+            total_chunks, mem_size = dask_utils.dask_array_stats(cube._data)
+            avg_chunk_mb = np.round(mem_size/total_chunks, 1)
+            logger.info(f"A cube with a size of {np.round(mem_size/1e3, 2)} GB loaded into a dask array.")
+            logger.info(f"Total number of chunks: {total_chunks}, average chunk size: {avg_chunk_mb} MB")
+
+            if avg_chunk_mb > 128 or total_chunks > 1000:
+                msg = (f"{total_chunks} number of chunks with an average size of {avg_chunk_mb} MB is not optimal"
+                       f"\'auto\' rechunk is recommended")
+                logger.warning(msg)
+
+        self.cube = cube
+
+    def load_pcube(self, pcube_ref=None, pyspeckit=False):
         """
         Load a cube into a pyspeckit.SpectralCube object from a .fits file.
 
@@ -191,7 +293,10 @@ class UltraCube(object):
         cube_temp = SpectralCube.read(self.cubefile, dask=False)
         cube_temp = to_K(cube_temp) # convert the unit to K;
 
-        pcube = pyspeckit.Cube(cube=cube_temp)
+        if pyspeckit:
+            pcube = pyspeckit.Cube(cube=cube_temp)
+        else:
+            pcube = PCube.PCube(cube=cube_temp)
 
         # premptively release memory
         del cube_temp
@@ -215,7 +320,7 @@ class UltraCube(object):
 
 
 
-    def convolve_cube(self, savename=None, factor=None, edgetrim_width=5):
+    def convolve_cube(self, savename=None, factor=None, edgetrim_width=5, scheduler='threads', **kwargs):
         """
         Convolve the SpectralCube to a lower spatial resolution by a specified factor.
 
@@ -227,6 +332,8 @@ class UltraCube(object):
             Factor by which to spatially convolve the cube. If None, the default `self.cnv_factor` is used.
         edgetrim_width : int, optional
             Number of pixels to trim at the edges after convolution. Default is 5.
+        scheduler : str, optional
+            Dask Scheduler 'threads', 'processes', 'synchronous'
 
         Returns
         -------
@@ -245,7 +352,11 @@ class UltraCube(object):
         """
         if factor is None:
             factor = self.cnv_factor
-        self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, edgetrim_width=edgetrim_width)
+
+        kwargs['edgetrim_width'] = edgetrim_width
+        kwargs['scheduler'] = scheduler
+
+        self.cube_cnv = convolve_sky_byfactor(self.cube, factor, savename, **kwargs)
 
 
     def get_cnv_cube(self, filename=None):
@@ -322,6 +433,8 @@ class UltraCube(object):
             if self.pcubes[str(nc)].has_fit.sum() > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
                 mod_mask = self.pcubes[str(nc)].get_modelcube(multicore=kwargs['multicore']) > 0
+                if isinstance(mod_mask, da.Array):
+                    mod_mask.persist()
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -342,9 +455,12 @@ class UltraCube(object):
             that have been fitted (i.e., contain non-zero, finite values in the parameter cube for the specified
             model component) and `False` indicates pixels that were not fitted.
         """
-        parcube = self.pcubes[str(ncomp)].parcube
-        mask = np.any(parcube != 0, axis=0)
-        mask = mask & np.any(np.isfinite(parcube), axis=0)
+        if isinstance(self.pcubes[str(ncomp)], PCube.PCube):
+            mask = self.pcubes[str(ncomp)]._has_fit(get=True)
+        else:
+            parcube = self.pcubes[str(ncomp)].parcube
+            mask = np.any(parcube != 0, axis=0)
+            mask = mask & np.any(np.isfinite(parcube), axis=0)
         return mask
 
 
@@ -354,7 +470,11 @@ class UltraCube(object):
         if self.master_model_mask is None:
             self.master_model_mask = mask
         else:
+            logger.debug("Using logical_or() to join masks")
             self.master_model_mask = np.logical_or(self.master_model_mask, mask)
+
+        if isinstance(self.master_model_mask, da.Array):
+            self.master_model_mask = dask_utils.persist_and_clean(self.master_model_mask, debug=True, visualize_filename="include_mod_mask.svg")
 
     def reset_model_mask(self, ncomps, multicore=True):
         #reset and re-generate master_model_mask for all the components in ncomps
@@ -364,6 +484,7 @@ class UltraCube(object):
             if nc > 0 and hasattr(self.pcubes[str(nc)],'parcube'):
                 # update model mask if any fit has been performed
                 mod_mask = self.pcubes[str(nc)]._modelcube > 0
+                mod_mask = dask_utils.persist_and_clean(mod_mask)
                 self.include_model_mask(mod_mask)
             gc.collect()
 
@@ -376,15 +497,21 @@ class UltraCube(object):
             logger.warning("no fit was performed and thus no file will be saved")
 
 
-    def load_model_fit(self, filename, ncomp, calc_model=True, multicore=None):
-        self.pcubes[str(ncomp)] = load_model_fit(self.cubefile, filename, ncomp, self.fittype)
+    def load_model_fit(self, filename, ncomp, calc_model=True, multicore=None, pyspeckit=False):
+        self.pcubes[str(ncomp)] = load_model_fit(self.cubefile, filename, ncomp, self.fittype, pyspeckit)
         if calc_model:
             if multicore is None: multicore = self.n_cores
             # update model mask
             mod_mask = self.pcubes[str(ncomp)].get_modelcube(multicore=multicore) > 0
-            logger.debug("{}comp model mask size: {}".format(ncomp, np.sum(mod_mask)) )
+            if isinstance(mod_mask, da.Array):
+                mod_mask = dask_utils.persist_and_clean(mod_mask, debug=True, visualize_filename="mod_mask_at_load.svg")
             gc.collect()
             self.include_model_mask(mod_mask)
+
+    def get_all_full_model_stats(self, ncomp_max=2, multicore=True):
+        # effeciently calculated all the model stats, such as rss and AICc from fresh
+        # best for loading previously fitted results and determining the best fit model
+        get_all_full_model_stats(self, ncomp_max=ncomp_max, multicore=multicore)
 
     def get_residual(self, ncomp, multicore=None):
         """
@@ -431,6 +558,19 @@ class UltraCube(object):
 
     def get_rss(self, ncomp, mask=None, planemask=None, update=True, expand=20):
         # residual sum of squares
+
+        compID = str(ncomp)
+
+        if not compID in self.rss_maps:
+            # for the first time calculating, only compute where the cube is finite
+            self.rss_maps[compID] = np.zeros(self.cube_footprint.shape, dtype=float)
+            self.rss_maps[compID][:] = np.nan
+            self.NSamp_maps[compID] = np.zeros(self.cube_footprint.shape, dtype=float)
+            if planemask is not None:
+                planemask = planemask & self.cube_footprint
+            else:
+                planemask = self.cube_footprint
+
         if mask is None:
             mask = self.master_model_mask
         # note: a mechanism is needed to make sure NSamp is consistient across the models
@@ -444,11 +584,11 @@ class UltraCube(object):
         mask = np.logical_or(mask, rrs <= 0)
         rrs[mask] = np.nan
         if planemask is None:
-            self.rss_maps[str(ncomp)] = rrs
-            self.NSamp_maps[str(ncomp)] = nsamp
+            self.rss_maps[compID] = rrs
+            self.NSamp_maps[compID] = nsamp
         else:
-            self.rss_maps[str(ncomp)][planemask] = rrs
-            self.NSamp_maps[str(ncomp)][planemask] = nsamp
+            self.rss_maps[compID][planemask] = rrs
+            self.NSamp_maps[compID][planemask] = nsamp
 
     def get_Tpeak(self, ncomp):
         compID = str(ncomp)
@@ -479,6 +619,15 @@ class UltraCube(object):
             # note that zero component is assumed to have no free-parameter (i.e., no fitting)
             p = ncomp * 4
             self.get_rss(ncomp, update=update, planemask=planemask, expand=expand, **kwargs)
+
+            if not compID in self.AICc_maps:
+                self.AICc_maps[compID] = np.zeros(self.cube_footprint.shape, dtype=float)
+                self.AICc_maps[compID][:] = np.nan
+                if planemask is not None:
+                    planemask = planemask & self.cube_footprint
+                else:
+                    planemask = self.cube_footprint
+
             if planemask is None or not compID in self.AICc_maps:
                 self.AICc_maps[compID] = aic.AICc(rss=self.rss_maps[compID], p=p, N=self.NSamp_maps[compID])
             else:
@@ -489,12 +638,13 @@ class UltraCube(object):
     def get_AICc_likelihood(self, ncomp1, ncomp2, **kwargs):
         return calc_AICc_likelihood(self, ncomp1, ncomp2, **kwargs)
 
-    def get_all_lnk_maps(self, ncomp_max=2, rest_model_mask=True, multicore=True):
-        return get_all_lnk_maps(self, ncomp_max=ncomp_max, rest_model_mask=rest_model_mask, multicore=multicore)
+    def get_all_lnk_maps(self, ncomp_max=2, reset_model_mask=False, multicore=True):
+        return get_all_lnk_maps(self, ncomp_max=ncomp_max, reset_model_mask=reset_model_mask, multicore=multicore)
 
-    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True):
+    def get_best_2c_parcube(self, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5,
+                            return_lnks=True, reset_model_mask=False):
         kwargs = dict(multicore=multicore, lnk21_thres=lnk21_thres, lnk20_thres=lnk20_thres,
-                      lnk10_thres=lnk10_thres, return_lnks=return_lnks)
+                      lnk10_thres=lnk10_thres, return_lnks=return_lnks, reset_model_mask=reset_model_mask)
         return get_best_2c_parcube(self, **kwargs)
 
     def get_best_residual(self, cubetype=None):
@@ -637,6 +787,42 @@ class UltraCube(object):
         self.get_plotter()
         self.plotter.plot_fits_grid(x, y, ncomp, size=size, xsize=xsize, ysize=ysize, xlim=xlim, ylim=ylim,
                                     figsize=figsize, origin=origin, mod_all=mod_all, savename=savename, **kwargs)
+
+
+    def _set_chunks(self, chunk_memory_size, chunks):
+        # estimate different chunking schemes for the object
+        if chunk_memory_size is None:
+            chunk_memory_size = self.chunk_memory_size
+        else:
+            self.chunk_memory_size = chunk_memory_size
+
+        # calculate different chunking schemes based on the cube:
+        # plane chunks for keeping the image planes as intact as possible (for convolution and such)
+        self.plane_chunks = dask_utils.chunk_by_slice(
+            cube_shape=cube.shape,
+            dtype=cube._data.dtype,
+            target_chunk_mb=chunk_memory_size
+        )
+
+        # # ray chunks for keeping the spectral axis completely intacted (for working with spectrum)
+        self.ray_chunks = dask_utils.chunk_by_ray(
+            cube_shape=cube.shape,
+            dtype=cube._data.dtype,
+            target_chunk_mb=chunk_memory_size
+        )
+
+        # Validate and set chunks
+        if dask_utils._is_valid_chunk(chunks) and chunks is not None:
+            self.chunks = chunks
+        elif isinstance(chunks, str):
+            if chunks == 'rays':
+                self.chunks = self.ray_chunks
+            if chunks == 'planes':
+                self.chunks = self.plane_chunks
+        else:
+            # default to rechunking using MUFASA's ray chunking scheme (perserves spectral axis)
+            self.chunks = self.ray_chunks
+
 
 
 class UCubePlus(UltraCube):
@@ -825,8 +1011,70 @@ def save_fit(pcube, savename, ncomp, header_note=None):
     mvf.save_pcube(pcube, savename, ncomp, header_note=header_note)
 
 
+def save_para(savename, parcube, errcube, cube_header, ncomp, npara=4, header_note=None):
+    # a method to save the fitted parameter cube with relavent header information
 
-def load_model_fit(cube, filename, ncomp, fittype):
+    # create a new header using the pcube's cube header as a template
+    hdr_new = mvf.make_header(ndim=3, ref_header=cube_header)
+
+    if header_note is None:
+        header_note = f'Parameter maps derived from {ncomp}-comp model fits'
+
+    hdr_new.set(keyword='NOTES', value=header_note, comment=None, before='DATE')
+
+    # modify the units of the plane accordingly
+    hdr_new.set(keyword ='CDELT3', value=1, comment='[unitless] Coordinate increment at reference point')
+    hdr_new.set(keyword ='CTYPE3', value='FITPAR', comment='fitted parameters')
+    hdr_new.set(keyword ='CRVAL3', value=0, comment='[unitless] Coordinate value at reference point')
+    hdr_new.set(keyword='CRPIX3', value=1, comment='[unitless] Pixel coordinate of reference point')
+    hdr_new.set(keyword ='CUNIT3', value='None', comment='[unitless] Units of coordinate increment and value')
+
+    if ncomp == 1:
+        hdr_new.set(keyword ='PLANE0', value= 'VELOCITY', comment='[km/s] vlsr')
+        hdr_new.set(keyword ='PLANE1', value= 'SIGMA', comment='[km/s] velocity dispersion')
+        hdr_new.set(keyword ='PLANE2', value  = 'TEX', comment='[K] excitation temperature')
+        hdr_new.set(keyword ='PLANE3', value  = 'TAU', comment='[unitless] peak optical depth')
+
+        hdr_new.set(keyword ='PLANE4', value  = 'eVELOCITY', comment='[km/s] estimated error of vlsr')
+        hdr_new.set(keyword ='PLANE5', value  = 'eSIGMA', comment='[km/s] estimated error velocity dispersion')
+        hdr_new.set(keyword ='PLANE6', value = 'eTEX', comment='[K] estimated error excitation temperature')
+        hdr_new.set(keyword ='PLANE7', value = 'eTAU', comment='[unitless] estimated error of peak optical depth')
+
+    elif ncomp > 1:
+        for i in range(0, ncomp):
+            hdr_new.set(keyword=f'PLANE{i * npara + 0}', value=f'VELOCITY_{i + 1}',
+                        comment=f'[km/s] vlsr of component {i+1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 1}', value=f'SIGMA_{i + 1}',
+                        comment=f'[km/s] velocity dispersion of component {i + 1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 2}', value=f'TEX_{i + 1}',
+                        comment=f'[K] excitation temperature of component {i + 1}')
+
+            hdr_new.set(keyword=f'PLANE{i * npara + 3}', value=f'TAU_{i + 1}',
+                        comment=f'[unitless] peak optical depth of component {i + 1}')
+
+        # the loop is split into two so the numbers will be written in ascending order
+        for i in range(0, ncomp):
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 0}', value=f'eVELOCITY_{i + 1}',
+                        comment=f'[km/s] estimated error of component {i+1} vlsr')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 1}', value=f'eSIGMA_{i + 1}',
+                        comment=f'[km/s] estimated error of component {i + 1} velocity dispersion')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 2}', value=f'eTEX_{i + 1}',
+                        comment=f'[K] estimated error of component {i + 1} excitation temperature')
+
+            hdr_new.set(keyword=f'PLANE{(ncomp + i) * npara + 3}', value=f'eTAU_{i + 1}',
+                        comment=f'[unitless] estimated error of component {i + 1} peak optical depth')
+
+    fitcubefile = fits.PrimaryHDU(data=np.concatenate([parcube, errcube]), header=hdr_new)
+    fitcubefile.writeto(savename, overwrite=True)
+    logger.debug("{} saved.".format(savename))
+
+
+
+def load_model_fit(cube, filename, ncomp, fittype, pyspeckit=False):
     """
     Load the spectral fit results from a .fits file.
 
@@ -846,8 +1094,10 @@ def load_model_fit(cube, filename, ncomp, fittype):
     pyspeckit.Cube
         The fitted pyspeckit cube with the loaded model.
     """
-    #pcube = pyspeckit.Cube(cube=cube)
-    pcube = pyspeckit.Cube(cube)
+    if pyspeckit:
+        pcube = pyspeckit.Cube(cube)
+    else:
+        pcube = PCube.PCube(cube)
 
     # register fitter
     if fittype == 'nh3_multi_v':
@@ -986,9 +1236,11 @@ def calc_rss(ucube, compID, usemask=True, mask=None, return_size=True, update_cu
     else:
         modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
+    results =  get_rss(cube, modcube, expand=expand, usemask=usemask, mask=mask,
+                       return_size=return_size, planemask=planemask)
+
     gc.collect()
-    return get_rss(cube, modcube, expand=expand, usemask=usemask, mask=mask, return_size=return_size,
-                   planemask=planemask)
+    return results
 
 
 def calc_chisq(ucube, compID, reduced=False, usemask=False, mask=None, expand=20):
@@ -1083,10 +1335,10 @@ def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20)
 
     Returns
     -------
-    AICc_map : numpy.ndarray
-        A 2D array containing the computed AICc values for the specified regions.
-    NSamp_map : numpy.ndarray, optional
-        A 2D array containing the effective sample size for each spatial pixel.
+    AICc : numpy.ndarray
+        An array containing the computed AICc values for the specified regions.
+    NSamp : numpy.ndarray, optional
+        An array containing the effective sample size for each spatial pixel.
         Only returned if `return_NSamp` is True.
 
     Notes
@@ -1116,45 +1368,45 @@ def calc_AICc(ucube, compID, mask, planemask=None, return_NSamp=True, expand=20)
         modcube = ucube.pcubes[compID].get_modelcube(update=False, multicore=ucube.n_cores)
 
     # get the rss value and sample size
-    rss_map, NSamp_map = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask,
+    rss, NSamp = get_rss(ucube.cube, modcube, expand=expand, usemask=True, mask=mask,
                                  return_size=True, return_mask=False, planemask=planemask)
-    AICc_map = aic.AICc(rss=rss_map, p=p, N=NSamp_map)
+    AICc = aic.AICc(rss=rss, p=p, N=NSamp)
 
     if return_NSamp:
-        return AICc_map, NSamp_map
+        return AICc, NSamp
     else:
-        return AICc_map
+        return AICc
 
 
 def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, expand=0, planemask=None):
-    """
+    r"""
     Calculate the relative likelihood of two models based on their AICc values.
 
     This function computes the logarithmic relative likelihood of model A
     compared to model B, given their corrected Akaike Information Criterion (AICc)
-    values. It can optionally use a second `UltraCube` instance for comparisons.
+    values. Optionally, it allows for comparisons using a second `UltraCube` instance.
 
     Parameters
     ----------
     ucube : UltraCube
-        An instance of the `UltraCube` class containing the spectral data,
+        Instance of the `UltraCube` class containing the spectral data,
         fitted models, and associated parameters for model A.
     ncomp_A : int
         Number of components in model A.
     ncomp_B : int
         Number of components in model B.
     ucube_B : UltraCube, optional
-        An optional second `UltraCube` instance for model B. If provided,
-        AICc values for both models are calculated independently, and a
-        common mask is used. Default is None.
+        Optional second `UltraCube` instance for model B. If provided,
+        AICc values for both models are calculated independently, using a
+        common mask. Default is None.
     multicore : bool, optional
-        Whether to enable parallel processing. Default is True.
+        Enables parallel processing if set to `True`. Default is `True`.
     expand : int, optional
-        Number of spectral channels to expand the region where AICc values
-        are calculated. Default is 0.
+        Number of spectral channels to expand in the region where AICc values
+        are calculated. Only used if `ucube_B` is provided. Default is `0`.
     planemask : numpy.ndarray, optional
         A 2D spatial boolean array specifying which pixels to calculate the
-        relative likelihood for. If None, all pixels are considered. Default is None.
+        relative likelihood for. If `None`, all pixels are considered. Default is `None`.
 
     Returns
     -------
@@ -1164,23 +1416,24 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
 
     Notes
     -----
-    - The likelihood is derived from the difference in AICc values:
+    The relative likelihood is derived from the difference in AICc values:
 
-        .. math::
+    .. math::
 
-            \ln(\mathcal{L}_A / \mathcal{L}_B) = (AICc_B - AICc_A) / 2
+        \ln(\mathcal{L}_A / \mathcal{L}_B) = \frac{AICc_B - AICc_A}{2}
 
-      where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of models A and B.
+    where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of models A and B.
+
     - If `ucube_B` is provided, the models are compared over their common mask, and the AICc values
-      are recalculated fresh.
-    - This function handles mismatches in sample size (`NSamp`) by resetting and updating model masks.
-    - Currently, the expand argument is only used if ucube_B is provided
+      are recalculated.
+    - Mismatches in the sample size (`NSamp`) are handled by resetting and updating model masks.
+    - The `expand` argument is currently used only if `ucube_B` is provided.
 
     Raises
     ------
     ValueError
-        If the required AICc values for the models cannot be calculated due to missing data or invalid masks.
-
+        If the required AICc values for the models cannot be calculated due to missing data
+        or invalid masks.
     """
     if not ucube_B is None:
         # if a second UCube is provide for model comparison, use their common mask and calculate AICc values
@@ -1224,8 +1477,8 @@ def calc_AICc_likelihood(ucube, ncomp_A, ncomp_B, ucube_B=None, multicore=True, 
         lnk = aic.likelihood(ucube.AICc_maps[str(ncomp_A)][planemask], ucube.AICc_maps[str(ncomp_B)][planemask])
     return lnk
 
-def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
-    """
+def get_all_lnk_maps(ucube, ncomp_max=2, reset_model_mask=False, multicore=True):
+    r"""
     Compute log-likelihood ratio maps for model comparisons up to a specified number of components.
 
     This function calculates log-likelihood ratio (lnk) maps for comparing spectral
@@ -1235,36 +1488,40 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
     Parameters
     ----------
     ucube : UltraCube
-        An instance of the `UltraCube` class containing the spectral data and fitted models.
+        Instance of the `UltraCube` class containing the spectral data and fitted models.
     ncomp_max : int, optional
-        The maximum number of components to include in the model comparison.
-        Default is 2.
-    rest_model_mask : bool, optional
-        If True, resets and updates the master model mask in `ucube` for components
-        being compared. Default is True.
+        Maximum number of components to include in the model comparison.
+        Default is `2`.
+    reset_model_mask : bool, optional
+        If `True`, resets and updates the master model mask in `ucube` for components
+        being compared. Default is `False`.
     multicore : bool, optional
-        Whether to enable parallel processing for calculations. Default is True.
+        Enables parallel processing for calculations if set to `True`. Default is `True`.
 
     Returns
     -------
     lnk_maps : tuple of numpy.ndarray
-        Log-likelihood ratio maps for the model comparisons. The returned maps include:
+        Log-likelihood ratio maps for model comparisons. The returned tuple includes:
         - `lnk10`: Comparison between 1-component and 0-component models.
         - `lnk20` (if `ncomp_max >= 2`): Comparison between 2-component and 0-component models.
         - `lnk21` (if `ncomp_max >= 2`): Comparison between 2-component and 1-component models.
 
     Notes
     -----
-    - Log-likelihood ratios are calculated using AICc values for each model as:
+    Log-likelihood ratios are calculated using the AICc values for each model as:
 
-        .. math::
+    .. math::
 
-            \ln(\mathcal{L}_A / \mathcal{L}_B) = (AICc_B - AICc_A) / 2
+        \ln(\mathcal{L}_A / \mathcal{L}_B) = \frac{AICc_B - AICc_A}{2}
 
-      where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of
-      models A and B, respectively.
+    where :math:`\mathcal{L}_A` and :math:`\mathcal{L}_B` are the likelihoods of
+    models A and B, respectively.
+
     - If `ncomp_max` is greater than 2, the function does not compute higher-order
-      comparisons and simply returns the log-likelihood maps for up to 2 components.
+      comparisons and returns the log-likelihood maps for up to 2 components only.
+    - The `reset_model_mask` parameter ensures that the master model mask in `ucube`
+      is updated to include components being compared, which can be useful for ensuring
+      consistent sample sizes.
 
     Raises
     ------
@@ -1272,7 +1529,7 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
         If `ncomp_max` is less than 1 or if model data for the required number of
         components is missing in `ucube`.
     """
-    if rest_model_mask:
+    if reset_model_mask:
         ucube.reset_model_mask(ncomps=[2, 1], multicore=multicore)
 
     if ncomp_max <=1:
@@ -1289,7 +1546,66 @@ def get_all_lnk_maps(ucube, ncomp_max=2, rest_model_mask=True, multicore=True):
         pass
 
 
-def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5, return_lnks=True, include_1c=True):
+def get_all_full_model_stats(ucube, ncomp_max=2, multicore=True):
+    # output all the model stats fresh and overwrite the previous values (including rest the model mask)
+
+    footprint = ucube.cube_footprint
+    models = {}
+    masks = {}
+    # have a combined mask to ensure all compents are sampled sames
+    combined_mask = np.zeros_like(ucube.cube, dtype=bool)
+
+    # for noise model (0) component
+    models['0'] = None
+
+    for nc in range(1, ncomp_max+1):
+        # loop through each componet beyond noise
+        model = ucube.pcubes[str(nc)].get_modelcube(rest_graph=True)
+        models[str(nc)] = model
+        combined_mask = da.logical_or(combined_mask, model > 0)
+
+    # rechunk cube if it doesn't match with the model
+    if ucube.cube._data.chunks != models['1'].chunks:
+        logger.info("Rechunking the cube to match the model")
+        ucube.cube = ucube.cube.rechunk(models['1'].chunks, save_to_tmp_dir=True)
+
+    cube = ucube.cube._data # get the dask array
+
+
+    # pad the mask spectrally, and extend the mask to pixels where no model exists
+    combined_mask = dask_utils.reset_graph(combined_mask)
+    combined_mask = dask_ops.pad_mask(combined_mask, pad=10, include_nosamp=True, planemask=footprint)
+    combined_mask = dask_utils.reset_graph(combined_mask)
+    ucube.master_model_mask = combined_mask
+
+    gc.collect()
+
+    for nc in range(1, ncomp_max+1):
+        # loop through each componet beyond noise again
+        rss, nsamp, rms, chisq_rd, AICc = dask_ops.get_model_stats(cube, models[str(nc)],
+                                                                   combined_mask, p=4*nc)
+        combined_mask = dask_utils.reset_graph(combined_mask)
+        gc.collect()
+        ucube.rss_maps[str(nc)] = rss
+        ucube.NSamp_maps[str(nc)] = nsamp
+        ucube.rms_maps[str(nc)] = rms
+        ucube.rchisq_maps[str(nc)] = chisq_rd
+        ucube.AICc_maps[str(nc)] = AICc
+
+    # get the stats for the noise model
+    nc = 0
+    ucube.NSamp_maps[str(nc)] = nsamp # since they're all using the same mask
+    # calculate the noise AICc assuming it's just a flat baseline of zero
+    AICc, rss = dask_ops.get_noise_AICc(cube, combined_mask, return_rss=True)
+    ucube.AICc_maps[str(nc)] = AICc
+    ucube.rss_maps[str(nc)] = rss
+
+    combined_mask = dask_utils.reset_graph(combined_mask)
+    gc.collect()
+
+
+def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk10_thres=5,
+                        return_lnks=True, include_1c=True, reset_model_mask=False):
     """
     Select the best 2-component parameter cube based on AICc likelihood thresholds.
 
@@ -1354,34 +1670,37 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
         If model fits for 1-component or 2-component models are missing in `ucube`.
 
     """
-    lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore)
+    lnk10, lnk20, lnk21 = get_all_lnk_maps(ucube, ncomp_max=2, multicore=multicore,
+                                           reset_model_mask=reset_model_mask)
 
     parcube = copy(ucube.pcubes['2'].parcube)
     errcube = copy(ucube.pcubes['2'].errcube)
 
     mask = np.logical_and(lnk21 > lnk21_thres, lnk20 > lnk20_thres)
 
+    val_fill = np.nan #the value to fill outside of mask
+
     if include_1c:
         parcube[:4, ~mask] = copy(ucube.pcubes['1'].parcube[:4, ~mask])
         errcube[:4, ~mask] = copy(ucube.pcubes['1'].errcube[:4, ~mask])
-        parcube[4:8, ~mask] = np.nan
-        errcube[4:8, ~mask] = np.nan
+        parcube[4:8, ~mask] = val_fill
+        errcube[4:8, ~mask] = val_fill
 
     else:
-        parcube[:, ~mask] = np.nan
-        errcube[:, ~mask] = np.nan
+        parcube[:, ~mask] = val_fill
+        errcube[:, ~mask] = val_fill
 
     mask = lnk10 > lnk10_thres
-    parcube[:, ~mask] = np.nan
-    errcube[:, ~mask] = np.nan
+    parcube[:, ~mask] = val_fill
+    errcube[:, ~mask] = val_fill
 
     if return_lnks:
         # set lnk pixels with no fit to nan
         mask = ucube.has_fit(ncomp=1)
-        lnk10[~mask] = np.nan
+        lnk10[~mask] = val_fill
         mask = ucube.has_fit(ncomp=2)
-        lnk20[~mask] = np.nan
-        lnk21[~mask] = np.nan
+        lnk20[~mask] = val_fill
+        lnk21[~mask] = val_fill
 
         return parcube, errcube, lnk10, lnk20, lnk21
     else:
@@ -1390,7 +1709,8 @@ def get_best_2c_parcube(ucube, multicore=True, lnk21_thres=5, lnk20_thres=5, lnk
 #======================================================================================================================#
 # statistics tools
 
-def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False, include_nosamp=True, planemask=None):
+def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, return_mask=False,
+            include_nosamp=True, planemask=None):
     """
     Calculate the residual sum of squares (RSS) for a spectral cube model fit.
 
@@ -1398,8 +1718,8 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
     ----------
     cube : SpectralCube
         The spectral data cube to analyze.
-    model : numpy.ndarray
-        The model array to compare against the data cube.
+    model : numpy.ndarray or int
+        The model array to compare against the data cube. If the model is 0, simply the calculation to save memory
     expand : int, optional
         Number of channels to expand the region where the RSS is calculated along the spectral dimension. Default is 20.
     usemask : bool, optional
@@ -1414,7 +1734,6 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         Whether to include spectral regions with no sample data by filling gaps with a default mask. Default is True.
     planemask : numpy.ndarray, optional
         A 2D mask specifying where to calculate RSS for optimized computation. Default is None.
-
     Returns
     -------
     tuple
@@ -1422,60 +1741,129 @@ def get_rss(cube, model, expand=20, usemask=True, mask=None, return_size=True, r
         - Sample size per pixel (if `return_size` is True).
         - Final mask used (if `return_mask` is True).
     """
-    if usemask:
-        if mask is None:
-            # may want to change this for future models that includes absorptions
-            mask = model > 0
-    else:
-        mask = ~np.isnan(model)
+    def _expand_mask(mask, expand):
+        # Add a buffer to the mask of size set by the expand keyword.
+        if expand > 0:
+            mask = expand_mask(mask, expand)
 
-    if include_nosamp:
-        # if there no mask in a given pixel, fill it in with combined spectral mask
-        nsamp_map = np.nansum(mask, axis=0)
-        mm = nsamp_map <= 0
-        try:
-            max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
-            spec_mask_fill = copy(mask[:, max_y[0], max_x[0]])
-        except:
-            spec_mask_fill = np.any(mask, axis=(1, 2))
+        return mask
 
-        # Handle dask compatibility by computing the mask if necessary
+    def _planemask_mask(mask, planemask):
+        # Handle mask based on its type
         if isinstance(mask, da.Array):
+            mask = dask_ops.apply_planemask(mask, planemask, persist=True)
+        else:
+            mask = mask[:, planemask]
+
+        # Check for shape mismatch
+        if mask.shape != residual.shape:
+            msg = (
+                f"mask with shape {mask.shape} does not match the residual shape {residual.shape}. "
+                f"This shouldn't happen; there may be a bug in the code."
+            )
+            logger.error(msg)  # Use logger.error for unexpected critical issues
+            raise ValueError(msg)
+
+        return mask
+
+    if isinstance(model, np.ndarray) or isinstance(model, da.Array):
+        # full computation for typical models
+        if usemask:
+            if mask is None:
+                # may want to change this for future models that includes absorptions
+                mask = model > 0
+        else:
+            mask = ~np.isnan(model)
+
+        if isinstance(mask, da.Array):
+            #planemask = planemask.persist()
+            mask = dask_utils.persist_and_clean(mask)
+            # have the planemask being ndarray just to be safe
             mask = mask.compute()
+            gc.collect()
 
-        # Apply the mask update with numpy-compatible indexing
-        mask[:, mm] = spec_mask_fill[:, np.newaxis]
+        if include_nosamp:
+            # if there no mask in a given pixel, fill it in with combined spectral mask
+            if isinstance(mask, da.Array):
+                nsamp_map = np.nansum(mask, axis=0).compute()
+            else:
+                nsamp_map = np.nansum(mask, axis=0)
+            mm = nsamp_map <= 0
+            try:
+                max_y, max_x = np.where(nsamp_map == np.nanmax(nsamp_map))
+                spec_mask_fill = copy(mask[:, max_y[0], max_x[0]])
+            except:
+                spec_mask_fill = np.any(mask, axis=(1, 2))
 
-        # Convert back to dask if needed
-        if isinstance(cube._data, da.Array):
-            mask = da.from_array(mask, chunks=cube._data.chunksize)
+            # Handle dask compatibility by computing the mask if necessary
+            if isinstance(mask, da.Array):
+                mask = mask.compute()
 
-    # assume flat-baseline model even if no model exists
-    model[np.isnan(model)] = 0
+            # Apply the mask update with numpy-compatible indexing
+            mask[:, mm] = spec_mask_fill[:, np.newaxis]
 
-    # creating mask over region where the model is non-zero,
-    # plus a buffer of size set by the expand keyword.
-    if expand > 0:
-        mask = expand_mask(mask, expand)
-    mask = mask.astype(float)
+            # Convert back to dask if needed
+            if isinstance(cube._data, da.Array):
+                mask = da.from_array(mask, chunks=cube._data.chunksize)
 
-    if planemask is None:
-        residual = get_residual(cube, model)
-        residual = da.from_array(residual) if isinstance(cube._data, da.Array) else residual
-    else:
-        residual = get_residual(cube, model, planemask=planemask)
-        mask_temp = mask
-        mask = mask[:, planemask]
+        # assume flat-baseline model even if no model exists
+        if isinstance(model, da.Array):
+            model = da.where(da.isnan(model), 0, model)
+        else:
+            model[np.isnan(model)] = 0
 
-    # note: using nan-sum may walk over some potential bad pixel cases
-    rss = da.nansum((residual * mask) ** 2, axis=0) if isinstance(residual, da.Array) else np.nansum(
-        (residual * mask) ** 2, axis=0)
-    rss[rss == 0] = np.nan
+        # Add a buffer to the mask of size set by the expand keyword.
+        mask = _expand_mask(mask, expand)
+
+        if planemask is None:
+            residual = get_residual(cube, model)
+            # residual = da.from_array(residual) if not isinstance(cube._data, da.Array) else residual
+        else:
+            # Get residual with planemask applied
+            residual = get_residual(cube, model, planemask=planemask)
+
+            # mask mask with planemask
+            mask = _planemask_mask(mask, planemask)
+
+        # Use da.where for masking instead of residual * mask
+        masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
+
+    elif isinstance(model, int) and model == 0:
+        # simplified calculation if the mode is just 0 (i.e. noise)
+        logger.warning("using noise model for rrs calculation")
+        if not usemask:
+            msg = ("Model cannot be 0 if usemask=False")
+            raise TypeError(msg)
+
+        if mask is not None:
+            mask = _expand_mask(mask, expand)
+
+        if planemask is None:
+            residual = cube
+        else:
+            residual = apply_planemask(cube, planemask, persist=True)
+
+            # mask mask with planemask
+            mask = _planemask_mask(mask, planemask)
+
+        if mask is None:
+            logger.warning("mask is None for calculating rrs when mask is zero")
+            mask = np.ones(residual.shape, dtype=bool)
+            masked_residual = residual
+        else:
+            # Use da.where for masking instead of residual * mask
+            masked_residual = da.where(mask, residual, 0) if isinstance(residual, da.Array) else np.where(mask, residual, 0)
+
+    # Calculate RSS
+    rss = da.nansum(masked_residual ** 2, axis=0).compute() if isinstance(masked_residual, da.Array) else np.nansum(
+        masked_residual ** 2, axis=0)
+    rss = da.where(rss == 0, np.nan, rss) if isinstance(rss, da.Array) else np.where(rss == 0, np.nan, rss)
 
     returns = (rss.compute() if isinstance(rss, da.Array) else rss,)
 
     if return_size:
-        nsamp = da.nansum(mask, axis=0) if isinstance(mask, da.Array) else np.nansum(mask, axis=0)
+        nsamp = da.nansum(mask, axis=0).compute() if isinstance(mask, da.Array) else np.nansum(mask, axis=0)
+        nsamp = nsamp.astype(np.float64)
         nsamp[np.isnan(rss)] = np.nan
         returns += (nsamp.compute() if isinstance(nsamp, da.Array) else nsamp,)
     if return_mask:
@@ -1543,6 +1931,9 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
     else:
         mask = ~np.isnan(model)
 
+    if isinstance(mask, da.Array):
+        mask = mask.persist()
+
     residual = get_residual(cube, model)
 
     # creating mask over region where the model is non-zero,
@@ -1564,6 +1955,9 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
     rms = get_rms(residual)
     chisq /= rms ** 2
 
+    if isinstance(chisq, da.Array):
+        chisq = chisq.compute()
+
     gc.collect()
 
     if reduced:
@@ -1571,33 +1965,35 @@ def get_chisq(cube, model, expand=20, reduced=True, usemask=True, mask=None):
         return chisq
     else:
         # return the ch-squared values and the number of data points used
-        return chisq, np.nansum(mask, axis=0)
+        if isinstance(mask, da.Array):
+            return chisq, np.nansum(mask, axis=0).compute()
+        else:
+            return chisq, np.nansum(mask, axis=0)
 
 
-def get_masked_moment(cube, model, order=0, expand=10, mask=None):
+def get_masked_moment(cube, model, order=0, expand=10, mask=None, scheduler=None):
     """
     Calculate a masked moment of a spectral cube.
 
     This function generates a moment map (e.g., integrated intensity, centroid)
-    for the input spectral cube, applying a mask derived from the provided model
-    and optionally expanding the mask region.
+    for the input spectral cube, applying a mask derived from the provided model.
 
     Parameters
     ----------
-    cube : SpectralCube
+    cube : spectral_cube.SpectralCube
         The spectral cube containing the observed data, from which the moment
-        is calculated.
-    model : numpy.ndarray
-        A 3D array representing the model cube, used to derive the mask. The
-        dimensions must match the cube.
+        is calculated. This must be an instance of the `SpectralCube` class
+        from the `spectral_cube` package.
+    model : dask.array.Array
+        A 3D Dask array representing the model cube, used to derive the mask.
+        The dimensions of the array must match those of the cube.
     order : int, optional
         The order of the moment to compute:
         - `0` for integrated intensity (default),
         - `1` for centroid,
         - `2` for line width.
     expand : int, optional
-        Number of spectral channels to expand the mask around the model.
-        Default is 10.
+        Currently not supported. May be deprecated in future versions. Default is 10.
     mask : numpy.ndarray, optional
         A 3D boolean array specifying which elements to include in the moment
         calculation. If provided, it is combined with the mask derived from
@@ -1612,7 +2008,10 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     Notes
     -----
     - The mask is generated by identifying non-zero elements in the model and
-      optionally expanding this region by the `expand` parameter.
+      excluding regions with low signal-to-noise ratios using a threshold of
+      0.1 times the residual RMS.
+    - The `expand` parameter is currently not supported and may be deprecated
+      in a future release.
     - Pixels with low signal-to-noise ratios are excluded from the moment map
       based on the mask.
     - The function uses the spectral axis of the cube for moment calculations.
@@ -1627,40 +2026,23 @@ def get_masked_moment(cube, model, order=0, expand=10, mask=None):
     >>> from spectral_cube import SpectralCube
     >>> cube = SpectralCube.read("example_cube.fits")
     >>> model = np.random.random(cube.shape)
-    >>> moment_map = get_masked_moment(cube, model, order=0, expand=5)
+    >>> moment_map = get_masked_moment(cube, model, order=0)
     >>> moment_map.write("masked_moment.fits")
     """
+    # If no mask is provided, create one based on the model
     if mask is None:
-        mask = model > 0
-    else:
-        mask = np.logical_and(mask, np.isfinite(model))
+        residual = get_residual(cube, model)
+        rms = mad_std(residual, axis=0)
+        mask = model > 0.1*rms
 
-    # get mask over where signal is stronger than the median
-    peak_T = np.nanmax(model, axis=0)
-    med_peak_T = np.nanmedian(peak_T)
-    mask_highT_2d = peak_T > med_peak_T
-
-    mask_lowT = mask.copy()
-    mask_lowT[:, mask_highT_2d] = False
-
-    # get all the spectral channels greater than 10% of the median peak
-    specmask = model > med_peak_T*0.1
-    specmask = np.any(specmask, axis=(1,2))
-
-    # adopte those spectral channles for low signal regions
-    mask_lowT[specmask, :] = True
-    mask[:, ~mask_highT_2d] = mask_lowT[:, ~mask_highT_2d]
-
-    # creating mask over region where the model is non-zero,
-    # plus a buffer of size set by the expand keyword.
-
-    if expand > 0:
-        mask = expand_mask(mask, expand)
-    mask = mask.astype(float)
-
-    maskcube = cube.with_mask(mask.astype(bool))
+    # Apply the mask to the cube and return the moment
+    maskcube = cube.with_mask(mask.compute().astype(bool))
     maskcube = maskcube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-    mom = maskcube.moment(order=order)
+    if scheduler is not None and isinstance(maskcube._data, da.Array):
+        with maskcube.use_dask_scheduler(scheduler):
+            mom = maskcube.moment(order=order)
+    else:
+        mom = maskcube.moment(order=order)
     return mom
 
 
@@ -1703,7 +2085,10 @@ def expand_mask(mask, expand):
     """
     selem = np.ones(expand,dtype=bool)
     selem.shape += (1,1,)
-    mask = nd.binary_dilation(mask, selem)
+    if isinstance(mask, da.Array):
+        mask = dask_ops.dask_binary_dilation(mask, selem)
+    else:
+        mask = nd.binary_dilation(mask, selem)
     return mask
 
 
@@ -1784,28 +2169,46 @@ def get_residual(cube, model, planemask=None):
       specified spatial pixels, which can reduce computation time.
     - Handles memory-efficient computation when dask is enabled.
     """
-    # Get the cube data as a dask array or numpy array
-    data = cube.filled_data[:].value  # dask array if dask is enabled, numpy array otherwise
+    # Get the cube data as a Dask or NumPy array
+    data = cube._data
 
-    # Calculate residual with or without a planemask
     if planemask is None:
         residual = data - model
     else:
-        # If dask, apply the mask in a memory-efficient way
-        if isinstance(data, da.Array):
-            planemask_expanded = da.from_array(planemask, chunks=data.chunksize[1:])
-            residual = data[:, planemask_expanded] - model[:, planemask]
+        # only operate on the masked pixels
+        logger.debug(f"==== computing 2D-masked residual ====")
+        logger.debug(f"planemask type:{type(planemask)}; planemask shape:{planemask.shape}")
+        logger.debug(f"model type:{type(model)}; data type:{type(data)}")
+        logger.debug(f"model shape:{model.shape}; data shape:{data.shape}")
+        # mask model
+        if isinstance(model, da.Array):
+            model_masked = dask_ops.apply_planemask(model, planemask, persist=False)
+        elif isinstance(model, np.ndarray):
+            model_masked = model[:, planemask]
         else:
-            # Non-dask (numpy array), use direct masking
-            residual = data[:, planemask] - model[:, planemask]
+            msg = (f"The model type is {type(model)}. This shouldn't happen; there may be a bug in the code.")
+            logger.error(msg)  # Use logger.error for unexpected critical issues
+            raise TypeError(msg)
 
-    # If residual is a dask array, compute only if needed (e.g., for direct use in numpy context)
-    if isinstance(residual, da.Array):
-        residual = residual.compute()
+        # mask data
+        if isinstance(data, da.Array):
+            data_masked = dask_ops.apply_planemask(data, planemask, persist=False)
+        elif isinstance(data, np.ndarray):
+            data_masked = data[:, planemask]
+        else:
+            msg = (f"The data type is {type(data)}. This shouldn't happen; there may be a bug in the code.")
+            logger.error(msg)  # Use logger.error for unexpected critical issues
+            raise TypeError(msg)
+
+        residual = data_masked - model_masked
+
+
+    if isinstance(residual, da.Array): # may be redundant, but better safe than sorry
+        residual = dask_utils.persist_and_clean(residual, debug=False, visualize_filename=None)
+        residual.compute()
 
     # Run garbage collection for memory management
     gc.collect()
-
     return residual
 
 
@@ -1825,7 +2228,10 @@ def get_Tpeak(model):
         A 2D array where each element corresponds to the peak value of the model
         cube along the spectral axis for each spatial pixel.
     """
-    return np.nanmax(model, axis=0)
+    if isinstance(model, da.Array):
+        return np.nanmax(model, axis=0).compute()
+    else:
+        return np.nanmax(model, axis=0)
 
 
 def is_K(data_unit):
@@ -1939,4 +2345,196 @@ def to_K(cube):
         return cube
 
     return convert_to_kelvin(cube)
+
+
+
+
+
+
+#=============================================================================
+
+from spectral_cube.dask_spectral_cube import DaskSpectralCube, add_save_to_tmp_dir_option
+from spectral_cube import cube_utils
+from astropy import convolution
+from astropy.wcs.utils import proj_plane_pixel_area
+class MDaskCube(DaskSpectralCube):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _new_cube_with(self, *args, **kwargs):
+        # Call the parent method to get the base cube data and metadata
+        parent_cube = super()._new_cube_with(*args, **kwargs)
+
+        # Ensure the returned cube is of the subclass type
+        return type(self)(parent_cube._data, parent_cube._wcs, meta=parent_cube.meta, mask=parent_cube._mask)
+
+    @classmethod
+    def read(cls, *args, **kwargs):
+        # Ensure `use_dask` defaults to True if not explicitly provided
+        if kwargs.get('use_dask') is None:
+            kwargs['use_dask'] = True
+
+        # Use the parent class's `read` method to get the initial data
+        parent_instance = super().read(*args, **kwargs)
+
+        # Ensure the returned instance is of the subclass type
+        return cls(parent_instance._data, parent_instance._wcs, meta=parent_instance.meta, mask=parent_instance._mask)
+
+    @add_save_to_tmp_dir_option
+    def convolve_to(self, beam, convolve=convolution.convolve, **kwargs):
+        """
+        Convolve each channel in the cube to a specified beam
+
+        Parameters
+        ----------
+        beam : `radio_beam.Beam`
+            The beam to convolve to
+        convolve : function
+            The astropy convolution function to use, either
+            `astropy.convolution.convolve` or
+            `astropy.convolution.convolve_fft`
+        save_to_tmp_dir : bool
+            If `True`, the computation will be carried out straight away and
+            saved to a temporary directory. This can improve performance,
+            especially if carrying out several operations sequentially. If
+            `False`, the computation is only carried out when accessing
+            specific parts of the data or writing to disk.
+        kwargs : dict
+            Keyword arguments to pass to the convolution function
+
+        Returns
+        -------
+        cube : `SpectralCube`
+            A SpectralCube with a single ``beam``
+        """
+
+        # Check if the beams are the same.
+        if beam == self.beam:
+            warnings.warn("The given beam is identical to the current beam. "
+                          "Skipping convolution.")
+            return self
+
+        pixscale = proj_plane_pixel_area(self.wcs.celestial) ** 0.5 * u.deg
+
+        convolution_kernel = beam.deconvolve(self.beam).as_kernel(pixscale)
+        kernel = convolution_kernel.array.reshape((1,) + convolution_kernel.array.shape)
+
+        if self.unit.is_equivalent(u.Jy / u.beam):
+            beam_ratio_factor = (beam.sr / self.beam.sr).value
+        else:
+            beam_ratio_factor = 1.
+
+        # See #631: kwargs get passed within self.apply_function_parallel_spatial
+        def convfunc(img, **kwargs):
+            return convolve(img, kernel, normalize_kernel=True, **kwargs).reshape(img.shape) * beam_ratio_factor
+
+        if convolve is convolution.convolve_fft and 'allow_huge' not in kwargs:
+            kwargs['allow_huge'] = self.allow_huge_operations
+
+        return self.apply_function_parallel_spatial(convfunc,
+                                                    accepts_chunks=True,
+                                                    **kwargs).with_beam(beam, raise_error_jybm=False)
+
+    @add_save_to_tmp_dir_option
+    def apply_function_parallel_spatial(self,
+                                        function,
+                                        accepts_chunks=False,
+                                        **kwargs):
+        """
+        Apply a function in parallel along the spatial dimension.  The
+        function will be performed on data with masked values replaced with the
+        cube's fill value.
+
+        Parameters
+        ----------
+        function : function
+            The function to apply in the spatial dimension.  It must take
+            two arguments: an array representing an image and a boolean array
+            representing the mask.  It may also accept ``**kwargs``.  The
+            function must return an object with the same shape as the input
+            image.
+        accepts_chunks : bool
+            Whether the function can take chunks with shape (ns, ny, nx) where
+            ``ns`` is the number of spectral channels in the cube and ``nx``
+            and ``ny`` may be greater than one.
+        save_to_tmp_dir : bool
+            If `True`, the computation will be carried out straight away and
+            saved to a temporary directory. This can improve performance,
+            especially if carrying out several operations sequentially. If
+            `False`, the computation is only carried out when accessing
+            specific parts of the data or writing to disk.
+        kwargs : dict
+            Passed to ``function``
+        """
+
+        if accepts_chunks:
+            def wrapper(data_slices, **kwargs):
+                if data_slices.size > 0:
+                    return function(data_slices, **kwargs)
+                else:
+                    return data_slices
+        else:
+            def wrapper(data_slices, **kwargs):
+                if data_slices.size > 0:
+                    out = np.zeros_like(data_slices)
+                    for index in range(data_slices.shape[0]):
+                        out[index] = function(data_slices[index], **kwargs)
+                    return out
+                else:
+                    return data_slices
+
+        # Rechunk so that there is only one chunk in the image plane
+        #rechunk = ('auto', -1, -1),
+        return self._map_blocks_to_cube(wrapper,
+                                        rechunk=('auto', -1, -1),
+                                        fill=self._fill_value, **kwargs)
+
+
+    def _map_blocks_to_cube(self, function, additional_arrays=None, fill=np.nan, rechunk=None,
+                            return_new_cube=True,
+                            **kwargs):
+        """
+        Call dask's map_blocks, returning a new spectral cube.
+        """
+
+        data = self._get_filled_data(fill=fill)
+
+        if rechunk is not None:
+            data = data.rechunk(rechunk)
+
+        if additional_arrays is None:
+            newdata = da.map_blocks(function, data, dtype=data.dtype, **kwargs)
+        else:
+            additional_arrays = [array.rechunk(data.chunksize) for array in additional_arrays]
+            newdata = da.map_blocks(function, data, *additional_arrays, dtype=data.dtype, **kwargs)
+
+
+        if True:
+            # not saving the result itermediately seems to cause issue down the line with LocalCluster
+            zarr_tmp = "tmp.zarr"
+            try:
+                shutil.rmtree(zarr_tmp)
+            except FileNotFoundError:
+                pass
+            newdata.to_zarr(zarr_tmp, overwrite=True, compute=True)
+            newdata = da.from_zarr(zarr_tmp)
+
+        # Create final output cube
+        if return_new_cube:
+            newcube = self._new_cube_with(data=newdata,
+                                          wcs=self.wcs,
+                                          mask=self.mask,
+                                          meta=self.meta,
+                                          fill_value=self.fill_value)
+
+            return newcube
+        else:
+            return newdata
+
+    # NOTE: the following three methods could also be implemented spaxel by
+    # spaxel using apply_function_parallel_spectral but then take longer (but
+    # less memory)
+
+
+
 
