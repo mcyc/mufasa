@@ -9,6 +9,7 @@ from pyspeckit.spectrum.models import model
 from pyspeckit.spectrum.models.ammonia_constants import (line_names, freq_dict, voff_lines_dict, tau_wts_dict)
 from pyspeckit.spectrum.models.ammonia_constants import (ckms, h, kb)
 
+from .BaseModels import BaseModel
 from .SpecModels import AmmoniaModel
 
 #=======================================================================================================================
