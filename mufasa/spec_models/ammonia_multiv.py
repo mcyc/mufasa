@@ -1,5 +1,22 @@
-from __future__ import print_function
-__author__ = 'mcychen'
+"""
+ammonia_multiv.py
+
+DEPRECATED: This module is deprecated and will be removed in v1.6.0.
+Use the 'SpecModels.AmmoniaModel' class instead.
+"""
+
+#===============================================================================================
+
+import warnings
+
+warnings.warn(
+    "The `ammonia_multiv.py` module is deprecated and will be removed in v1.6.0."
+    "Use the 'SpecModels.AmmoniaModel' class instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+#===============================================================================================
 
 from .SpecModels import AmmoniaModel
 

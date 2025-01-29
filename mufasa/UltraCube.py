@@ -30,7 +30,7 @@ import dask.array as da
 from . import aic
 from . import multi_v_fit as mvf
 from . import convolve_tools as cnvtool
-from .spec_models import meta_model
+from .spec_models.meta_model import MetaModel
 from .utils.multicore import validate_n_cores
 from .visualization.spec_viz import Plotter
 #======================================================================================================================#
@@ -113,7 +113,7 @@ class UltraCube(object):
         if fittype is not None:
             # for the current usage, setting ncomp=1 is fine. Changes to MetalModel in the future will be needed
             # to elimiate needing ncomp during its intialization
-            self.meta_model = meta_model.MetaModel(fittype=fittype, ncomp=1)
+            self.meta_model = MetaModel(fittype=fittype, ncomp=1)
 
         if not snr_min is None:
             self.snr_min = snr_min
@@ -846,19 +846,10 @@ def load_model_fit(cube, filename, ncomp, fittype):
     pyspeckit.Cube
         The fitted pyspeckit cube with the loaded model.
     """
-    #pcube = pyspeckit.Cube(cube=cube)
     pcube = pyspeckit.Cube(cube)
 
-    # register fitter
-    if fittype == 'nh3_multi_v':
-        linename = 'oneone'
-        from .spec_models import ammonia_multiv as ammv
-        fitter = ammv.nh3_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
-
-    elif fittype == 'n2hp_multi_v':
-        linename = 'onezero'
-        from .spec_models import n2hp_multiv as n2hpmv
-        fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=[linename])
+    meta_model = MetaModel(fittype=fittype, ncomp=ncomp)
+    fitter = meta_model.fitter
 
     pcube.specfit.Registry.add_fitter(fittype, fitter, fitter.npars)
     pcube.xarr.velocity_convention = 'radio'
