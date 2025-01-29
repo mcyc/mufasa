@@ -30,7 +30,7 @@ def ammonia_multi_v(xarr, *args, **kwargs):
 
 def _ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
                       return_components=False):
-    return nh3model._single_spectrum(xarr, tex, tau_dict, width, xoff_v, background_ta=background_ta)
+    return nh3model._single_spectrum_hf(xarr, tex, tau_dict, width, xoff_v, background_ta=background_ta)
 
 def T_antenna(Tbright, nu):
     return nh3model.T_antenna(Tbright, nu)
