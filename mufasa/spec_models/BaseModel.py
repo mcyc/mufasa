@@ -3,7 +3,6 @@ import numpy as np
 from pyspeckit.spectrum.models import model
 from astropy import constants
 from astropy import units as u
-#from pyspeckit.spectrum.models.ammonia import (ckms, h, kb)
 
 TCMB = 2.7315  # Cosmic Microwave Background temperature in K
 ckms = constants.c.to(u.km / u.s).value  # Speed of light in km/s
@@ -15,18 +14,8 @@ class BaseModel:
     """
     Generalized base class for multi-component spectral models.
 
-    Attributes
-    ----------
-    molecular_constants : dict
-        Dictionary containing molecule-specific parameters, such as:
-            - freq_dict
-            - voff_lines_dict
-            - tau_wts_dict
-    line_names : list of str
-        Default line names for the molecule (e.g., ['oneone'], ['onezero']).
     """
     molecular_constants = None
-    line_names = None
 
     # Universal constants
     TCMB = TCMB  # Cosmic Microwave Background temperature in K
@@ -35,7 +24,7 @@ class BaseModel:
     h = h
     kb = kb
 
-    def __init__(self, molecular_constants, line_names=None):
+    def __init__(self, line_names=None):
         """
         Initialize the BaseModel with molecule-specific constants.
 
@@ -46,14 +35,10 @@ class BaseModel:
         line_names : list of str, optional
             List of line names for the molecule. If not provided, use the default.
         """
-        if not molecular_constants:
-            raise ValueError("Molecular constants (freq_dict, voff_lines_dict, tau_wts_dict) must be provided.")
-        self.molecular_constants = molecular_constants
         self.line_names = line_names or ['default_line']
 
 
-    @classmethod
-    def multi_v_model_generator(cls, n_comp):
+    def multi_v_model_generator(self, n_comp):
         """
         Generalized model generator for multi-component spectral models.
 
@@ -67,16 +52,18 @@ class BaseModel:
         model : `model.SpectralModel`
             A spectral model class built from N different velocity components.
         """
+        cls = self.__class__
+
         n_para = n_comp * 4  # vel, width, tex, tau per component
         idx_comp = np.arange(n_comp)
 
-        nlines = len(cls.line_names)
+        nlines = len(self.line_names)
         if nlines > 1:
             raise NotImplementedError("Modeling more than one line is not yet implemented. Use a single line.")
 
         def vtau_multimodel(xarr, *args):
             assert len(args) == n_para
-            return cls.multi_v_spectrum(xarr, *args)
+            return self.multi_v_spectrum(xarr, *args)
 
         mod = model.SpectralModel(
             vtau_multimodel, n_para,
@@ -93,8 +80,7 @@ class BaseModel:
         return mod
 
 
-    @classmethod
-    def multi_v_spectrum(cls, xarr, *args):
+    def multi_v_spectrum(self, xarr, *args):
         """
         Generalized multi-component spectrum generator.
 
@@ -110,6 +96,8 @@ class BaseModel:
         spectrum : array-like
             Generated spectrum for the given parameters.
         """
+        cls = self.__class__
+
         if xarr.unit.to_string() != 'GHz':
             xarr = xarr.as_unit('GHz')
 
@@ -117,10 +105,10 @@ class BaseModel:
         tau_dict = {}
 
         for vel, width, tex, tau in zip(args[::4], args[1::4], args[2::4], args[3::4]):
-            for linename in cls.line_names:
+            for linename in self.line_names:
                 tau_dict[linename] = tau
 
-            model_spectrum = cls._single_spectrum(
+            model_spectrum = self._single_spectrum(
                 xarr, tex, tau_dict, width, vel, background_ta=background_ta
             )
 
@@ -130,10 +118,10 @@ class BaseModel:
         return model_spectrum - cls.T_antenna(cls.TCMB, xarr.value)
 
 
-    @classmethod
-    def _single_spectrum(cls, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
+
+    def _single_spectrum(self, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
         """
-        Generalized helper function to compute single-component spectrum.
+        Compute a single molecular line spectrum without hyperfine structures.
 
         Parameters
         ----------
@@ -147,39 +135,41 @@ class BaseModel:
             Line width (in km/s).
         xoff_v : float
             Velocity offset (in km/s).
-        background_ta : float or array-like
-            Background antenna temperature.
+        background_ta : float or array-like, optional
+            Background antenna temperature, default is 0.
 
         Returns
         -------
         spectrum : array-like
-            Generated single-component spectrum.
+            Generated single-component spectrum without hyperfine splitting.
         """
-        molecular_constants = cls.molecular_constants
-        freq_dict = molecular_constants['freq_dict']
-        voff_lines_dict = molecular_constants['voff_lines_dict']
-        tau_wts_dict = molecular_constants['tau_wts_dict']
+        cls = self.__class__
 
         runspec = np.zeros(len(xarr))
-        for linename in cls.line_names:
-            voff_lines = np.array(voff_lines_dict[linename])
-            tau_wts = np.array(tau_wts_dict[linename])
-            lines = (1 - voff_lines / cls.ckms) * freq_dict[linename] / 1e9
-            tau_wts /= tau_wts.sum()
-            nuwidth = np.abs(width / cls.ckms * lines)
-            nuoff = xoff_v / cls.ckms * lines
 
-            tauprof = np.zeros(len(xarr))
-            for kk, nuo in enumerate(nuoff):
-                tauprof += (tau_dict[linename] * tau_wts[kk] *
-                            np.exp(-(xarr.value + nuo - lines[kk]) ** 2 /
-                                   (2.0 * nuwidth[kk] ** 2)))
+        for linename in self.line_names:
+            # Get molecule-specific constants
+            freq_dict = cls.molecular_constants['freq_dict']
 
+            # Retrieve the central frequency for the given transition
+            line = freq_dict['linename'] / 1e9  # Convert to GHz
+
+            # Compute single-value quantities (no hyperfine structure)
+            nuoff = xoff_v / cls.ckms * line  # Shift frequency by velocity offset
+            nuwidth = np.abs(width / cls.ckms * line)  # Compute Gaussian width
+            tau0 = tau_dict[linename]  # Optical depth for this transition
+
+            # Compute the optical depth profile (single Gaussian function)
+            tauprof = tau0 * np.exp(-((xarr.value + nuoff - line) ** 2) / (2.0 * nuwidth ** 2))
+
+            # Compute Planck function temperature
             T0 = (cls.h * xarr.value * 1e9 / cls.kb)
-            runspec += ((T0 / (np.exp(T0 / tex) - 1) * (1 - np.exp(-tauprof)) +
-                         background_ta * np.exp(-tauprof)))
 
-        return runspec
+            # Compute the spectrum
+            runspec += (T0 / (np.exp(T0 / tex) - 1) * (1 - np.exp(-tauprof)) +
+                        background_ta * np.exp(-tauprof))
+
+        return runspec  # Return the molecular line spectrum
 
 
     @staticmethod
