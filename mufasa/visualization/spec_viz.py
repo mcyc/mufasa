@@ -4,6 +4,7 @@ import astropy.units as u
 from pyspeckit.spectrum.units import SpectroscopicAxis
 import warnings
 
+from ..spec_models.meta_model import MetaModel
 
 # =======================================================================================================================
 
@@ -70,15 +71,8 @@ class Plotter(object):
         # Set the x-axis label
         self.xlab = r"$v_{\mathrm{LSR}}$ (km s$^{-1}$)"
 
-        # Handle the fittype selection
-        if fittype == "nh3_multi_v":
-            from ..spec_models.ammonia_multiv import ammonia_multi_v
-            self.model_func = ammonia_multi_v
-        elif fittype == "n2hp_multi_v":
-            from ..spec_models.n2hp_multiv import n2hp_multi_v
-            self.model_func = n2hp_multi_v
-        else:
-            raise ValueError(f"{fittype} is not one of the currently accepted fittypes.")
+        meta_model = MetaModel(fittype=fittype, ncomp=1) #ncomp is just a placehoder here
+        self.model_func = meta_model.model_func
 
         # Process ncomp_list for parcubes
         self.parcubes = {}

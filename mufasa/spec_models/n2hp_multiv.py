@@ -1,8 +1,24 @@
-from __future__ import print_function
-__author__ = 'mcychen'
+"""
+n2hp_multiv.py
+
+DEPRECATED: This module is deprecated and will be removed in v1.6.0.
+Use the 'SpecModels.N2HplusModel' class instead.
+"""
+
+#===============================================================================================
+
+import warnings
+
+warnings.warn(
+    "The `n2hp_multiv.py` module is deprecated and will be removed in v1.6.0. "
+    "Use the 'SpecModels.N2HplusModel' class instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+#===============================================================================================
 
 from .SpecModels import N2HplusModel
-
 n2hp_model = N2HplusModel()
 
 def n2hp_multi_v_model_generator(n_comp, linenames = None):
