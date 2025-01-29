@@ -39,7 +39,7 @@ class N2HplusModel(BaseModel):
     Inherits from BaseModel and sets N2H+-specific molecular constants and line names.
     """
 
-    from n2hp_constants import (freq_dict, voff_lines_dict, tau_wts_dict)
+    from .n2hp_constants import (freq_dict, voff_lines_dict, tau_wts_dict)
 
     # Set N2H+-specific molecular constants and default line names
     molecular_constants = {

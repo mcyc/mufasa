@@ -1,7 +1,15 @@
 from __future__ import print_function
 import numpy as np
 from pyspeckit.spectrum.models import model
-from pyspeckit.spectrum.models.ammonia import (ckms, h, kb)
+from astropy import constants
+from astropy import units as u
+#from pyspeckit.spectrum.models.ammonia import (ckms, h, kb)
+
+TCMB = 2.7315  # Cosmic Microwave Background temperature in K
+ckms = constants.c.to(u.km / u.s).value  # Speed of light in km/s
+ccms = constants.c.to(u.cm / u.s).value  # Planck constant
+h = constants.h.cgs.value
+kb = constants.k_B.cgs.value  # Boltzmann constant
 
 class BaseModel:
     """
@@ -21,10 +29,11 @@ class BaseModel:
     line_names = None
 
     # Universal constants
-    TCMB = 2.7315  # Cosmic Microwave Background temperature in K
-    ckms = ckms  # Speed of light in km/s
-    h = h        # Planck constant
-    kb = kb      # Boltzmann constant
+    TCMB = TCMB  # Cosmic Microwave Background temperature in K
+    ckms = ckms
+    ccms = ccms
+    h = h
+    kb = kb
 
     def __init__(self, molecular_constants, line_names=None):
         """
@@ -103,8 +112,6 @@ class BaseModel:
         """
         if xarr.unit.to_string() != 'GHz':
             xarr = xarr.as_unit('GHz')
-
-        molecular_constants = cls.molecular_constants
 
         background_ta = cls.T_antenna(cls.TCMB, xarr.value)
         tau_dict = {}
