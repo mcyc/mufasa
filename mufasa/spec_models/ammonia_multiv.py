@@ -9,6 +9,9 @@ from pyspeckit.spectrum.models import model
 from pyspeckit.spectrum.models.ammonia_constants import (line_names, freq_dict, voff_lines_dict, tau_wts_dict)
 from pyspeckit.spectrum.models.ammonia_constants import (ckms, h, kb)
 
+from .BaseModels import BaseModel
+from .SpecModels import AmmoniaModel
+
 #=======================================================================================================================
 # set CMB as a global constant
 
@@ -16,7 +19,24 @@ TCMB = 2.7315 # K
 
 #=======================================================================================================================
 
-def nh3_multi_v_model_generator(n_comp, linenames = None):
+nh3model = AmmoniaModel()
+
+def nh3_multi_v_model_generator(n_comp, linenames=None):
+    return nh3model.multi_v_model_generator(n_comp)
+
+def ammonia_multi_v(xarr, *args, **kwargs):
+    return nh3model.multi_v_spectrum(xarr, *args)
+
+def _ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
+                      return_components=False):
+    return nh3model._single_spectrum(xarr, tex, tau_dict, width, xoff_v, background_ta=background_ta)
+
+def T_antenna(Tbright, nu):
+    return nh3model.T_antenna(Tbright, nu)
+
+#=======================================================================================================================
+
+def _nh3_multi_v_model_generator(n_comp, linenames = None):
     """
     Works for up to 2 componet fits at the moment
     Parameters
@@ -104,7 +124,7 @@ def ammonia_multi_v(xarr, *args, **kwargs):
     return model_spectrum - T_antenna(TCMB, xarr.value)
 
 
-def _ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
+def __ammonia_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
                       return_components=False):
     """
     Helper function: given a dictionary of ammonia optical depths, an excitation tmeperature... etc, and produce a
