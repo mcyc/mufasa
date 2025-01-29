@@ -15,8 +15,26 @@ TCMB = 2.7315 # K
 
 #=======================================================================================================================
 
+from .SpecModels import N2HplusModel
+
+n2hp_model = N2HplusModel()
 
 def n2hp_multi_v_model_generator(n_comp, linenames = None):
+    return n2hp_model.multi_v_model_generator(n_comp)
+
+def n2hp_multi_v(xarr, *args, **kwargs):
+    return n2hp_model.multi_v_spectrum(xarr, *args)
+
+def _n2hp_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
+                      return_components=False):
+    return n2hp_model._single_spectrum(xarr, tex, tau_dict, width, xoff_v, background_ta=background_ta)
+
+def T_antenna(Tbright, nu):
+    return n2hp_model.T_antenna(Tbright, nu)
+
+#=======================================================================================================================
+
+def _n2hp_multi_v_model_generator(n_comp, linenames = None):
     """
     Works for up to 2 component fits at the moment
     Parameters
@@ -68,7 +86,7 @@ def n2hp_multi_v_model_generator(n_comp, linenames = None):
     return mod
 
 
-def n2hp_multi_v(xarr, *args, **kwargs):
+def _n2hp_multi_v(xarr, *args, **kwargs):
     # the parameters are in the order of vel, width, tex, tau for each velocity component
 
     # note: it may be worth while replacing *args with a single list like keyword called parameters
@@ -104,7 +122,7 @@ def n2hp_multi_v(xarr, *args, **kwargs):
     return model_spectrum - T_antenna(TCMB, xarr.value)
 
 
-def _n2hp_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
+def __n2hp_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
                       return_components=False):
     """
     Helper function: given a dictionary of ammonia optical depths, an excitation tmeperature... etc, and produce a
@@ -177,7 +195,7 @@ def _n2hp_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta
         return runspec
 
 
-def T_antenna(Tbright, nu):
+def _T_antenna(Tbright, nu):
     """
     Calculate antenna temperatures over nu (in GHz)
     """
