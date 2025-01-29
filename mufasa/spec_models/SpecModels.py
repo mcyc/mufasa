@@ -1,7 +1,7 @@
 
-from .BaseModels import BaseModel
+from .HyperfineModel import HyperfineModel
 
-class AmmoniaModel(BaseModel):
+class AmmoniaModel(HyperfineModel):
     """
     Model class for ammonia multi-component spectral fitting.
 
@@ -9,7 +9,7 @@ class AmmoniaModel(BaseModel):
     """
 
     from pyspeckit.spectrum.models.ammonia\
-        import (line_names, freq_dict, voff_lines_dict, tau_wts_dict)
+        import (freq_dict, voff_lines_dict, tau_wts_dict) #line_names
 
     # Set ammonia-specific molecular constants and default line names
     molecular_constants = {
@@ -17,9 +17,8 @@ class AmmoniaModel(BaseModel):
         'voff_lines_dict': voff_lines_dict,
         'tau_wts_dict': tau_wts_dict
     }
-    line_names = ['oneone']  # Default line name for ammonia
 
-    def __init__(self, line_names=None):
+    def __init__(self, line_names=['oneone']):
         """
         Initialize the AmmoniaModel with specific line names.
 
@@ -28,11 +27,10 @@ class AmmoniaModel(BaseModel):
         line_names : list of str, optional
             List of ammonia line names (default is ['oneone']).
         """
-        super().__init__(self.molecular_constants, line_names=line_names)
+        super().__init__(line_names)
 
 
-
-class N2HplusModel(BaseModel):
+class N2HplusModel(HyperfineModel):
     """
     Model class for N2H+ (Diazenylium) multi-component spectral fitting.
 
@@ -47,9 +45,8 @@ class N2HplusModel(BaseModel):
         'voff_lines_dict': voff_lines_dict,
         'tau_wts_dict': tau_wts_dict
     }
-    line_names = ['onezero']  # Default line name for N2H+
 
-    def __init__(self, line_names=None):
+    def __init__(self, line_names=['onezero']):
         """
         Initialize the N2HplusModel with specific line names.
 
@@ -58,5 +55,5 @@ class N2HplusModel(BaseModel):
         line_names : list of str, optional
             List of N2H+ line names (default is ['onezero']).
         """
-        super().__init__(self.molecular_constants, line_names=line_names)
+        super().__init__(line_names=line_names)
 
