@@ -152,7 +152,7 @@ class BaseModel:
             freq_dict = cls.molecular_constants['freq_dict']
 
             # Retrieve the central frequency for the given transition
-            line = freq_dict['linename'] / 1e9  # Convert to GHz
+            line = freq_dict[linename] / 1e9  # Convert to GHz
 
             # Compute single-value quantities (no hyperfine structure)
             nuoff = xoff_v / cls.ckms * line  # Shift frequency by velocity offset

@@ -109,7 +109,21 @@ class HyperfineModel(BaseModel):
 
 
     def deblend(self, xarr, tex, tau, xoff_v, width):
-        return self._single_spectrum(xarr, tex, tau, width, xoff_v, background_ta=0.0)
+        """
+        Returns a single spectra with hyperfine strucutre removed.
+
+        Does not currently support multi-components
+
+        """
+        cls = self.__class__
+        tau_dict = {}
+        for linename in self.line_names:
+            print(f"linename: {linename}")
+            tau_dict[linename] = tau
+
+        background_ta = cls.T_antenna(cls.TCMB, xarr.value)
+        spec = self._single_spectrum(xarr, tex, tau_dict, width, xoff_v, background_ta=background_ta)
+        return spec - cls.T_antenna(cls.TCMB, xarr.value)
 
 
 

@@ -1,13 +1,21 @@
-__author__ = 'mcychen'
-
-
 """
-==================================================================
-Ammonia inversion transition: deblended fitter (Hyperfine-removed)
-==================================================================
+n2hp_deblended.py
+
+DEPRECATED: This module is deprecated and will be removed in v1.6.0.
+Use the deblend() method of a 'SpecModels.N2HplusModel' class instead.
+
 """
 
 #=======================================================================================================================
+
+import warnings
+
+warnings.warn(
+    "The `n2hp_deblended.py` module is deprecated and will be removed in v1.6.0."
+    "Use the deblend() of a 'SpecModels.N2HplusModel' object instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 from pyspeckit.spectrum.models import hyperfine
 from .n2hp_constants import (line_names, freq_dict)

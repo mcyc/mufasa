@@ -1,17 +1,25 @@
-__author__ = 'mcychen'
-
-
 """
-==================================================================
-Ammonia inversion transition: deblended fitter (Hyperfine-removed)
-==================================================================
+nh3_deblended.py
+
+DEPRECATED: This module is deprecated and will be removed in v1.6.0.
+Use the deblend() method of the 'SpecModels.AmmoniaModel' class instead.
+
 """
 
 #=======================================================================================================================
 
 from pyspeckit.spectrum.models import hyperfine
-from pyspeckit.spectrum.models.ammonia_constants import (line_names, freq_dict, aval_dict, ortho_dict, voff_lines_dict,
-                                                         tau_wts_dict, line_labels)
+from pyspeckit.spectrum.models.ammonia_constants import (line_names, freq_dict)
+
+import warnings
+
+warnings.warn(
+    "The `nh3_deblended.py` module is deprecated and will be removed in v1.6.0."
+    "Use the deblend() of a 'SpecModels.AmmoniaModel' object instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
 
 #=======================================================================================================================
 

@@ -20,10 +20,11 @@ import gc
 from pyspeckit.parallel_map import parallel_map
 
 from .utils.multicore import validate_n_cores
+from .spec_models.meta_model import MetaModel
 
 #=======================================================================================================================
 
-def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp=None, tau_wgt=0.1, n_cpu=None, linetype='nh3'):
+def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp=None, tau_wgt=0.1, n_cpu=None, linetype='nh3', fittype=None):
     """
     Deblend hyperfine structures in a cube based on fitted models.
 
@@ -60,15 +61,22 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp=None, tau_wgt=0.1,
     """
 
     # get different types of deblending models
-    if linetype == 'nh3':
-        from .spec_models import nh3_deblended
-        deblend_mod = nh3_deblended.nh3_vtau_singlemodel_deblended
 
-    elif linetype == 'n2hp':
-        from .spec_models import n2hp_deblended
-        deblend_mod = n2hp_deblended.n2hp_vtau_singlemodel_deblended
-    else:
-        raise Exception("{} is an invalid linetype".format(linetype))
+    if fittype is None:
+        if linetype == 'nh3':
+            #from .spec_models import nh3_deblended
+            #deblend_mod = nh3_deblended.nh3_vtau_singlemodel_deblended
+            fittype = 'nh3_multi_v'
+
+        elif linetype == 'n2hp':
+            #from .spec_models import n2hp_deblended
+            #deblend_mod = n2hp_deblended.n2hp_vtau_singlemodel_deblended
+            fittype = 'n2hp_multi_v'
+        else:
+            raise TypeError("{} is an invalid linetype".format(linetype))
+
+    meta_model = MetaModel(fittype=fittype)
+    deblend_mod = meta_model.model_func
 
     # open the reference cube file
     cube = specCubeRef
