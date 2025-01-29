@@ -29,7 +29,7 @@ def n2hp_multi_v(xarr, *args, **kwargs):
 
 def _n2hp_spectrum(xarr, tex, tau_dict, width, xoff_v, line_names, background_ta=0.0, fillingfraction=None,
                       return_components=False):
-    return n2hp_model._single_spectrum(xarr, tex, tau_dict, width, xoff_v, background_ta=background_ta)
+    return n2hp_model._single_spectrum_hf(xarr, tex, tau_dict, width, xoff_v, background_ta=background_ta)
 
 def T_antenna(Tbright, nu):
     return n2hp_model.T_antenna(Tbright, nu)

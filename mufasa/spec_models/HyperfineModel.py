@@ -4,8 +4,9 @@ from .BaseModel import BaseModel
 
 class HyperfineModel(BaseModel):
     """
-    A subclass of BaseModel generate spectral models with hyperfine lines by
-    overriding the _single_spectrum method.
+    A subclass of BaseModel generate spectral models with hyperfine lines.
+
+    Overrides the multi_v_spectrum() from BaseModel to use hyperfine lines
 
     """
 
@@ -16,7 +17,46 @@ class HyperfineModel(BaseModel):
         """
         super().__init__(line_names=line_names)
 
-    def _single_spectrum(self, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
+
+    def multi_v_spectrum(self, xarr, *args):
+        """
+        Generalized multi-component spectrum generator.
+
+        Parameters
+        ----------
+        xarr : array-like
+            Frequency array (in GHz).
+        args : list
+            Model parameters (vel, width, tex, tau) for each component.
+
+        Returns
+        -------
+        spectrum : array-like
+            Generated spectrum for the given parameters.
+        """
+        cls = self.__class__
+
+        if xarr.unit.to_string() != 'GHz':
+            xarr = xarr.as_unit('GHz')
+
+        background_ta = cls.T_antenna(cls.TCMB, xarr.value)
+        tau_dict = {}
+
+        for vel, width, tex, tau in zip(args[::4], args[1::4], args[2::4], args[3::4]):
+            for linename in self.line_names:
+                tau_dict[linename] = tau
+
+            model_spectrum = self._single_spectrum_hf(
+                xarr, tex, tau_dict, width, vel, background_ta=background_ta
+            )
+
+            # Update background for the next component
+            background_ta = model_spectrum
+
+        return model_spectrum - cls.T_antenna(cls.TCMB, xarr.value)
+
+
+    def _single_spectrum_hf(self, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
         """
         Generalized helper function to compute single-component spectrum.
 
@@ -66,5 +106,11 @@ class HyperfineModel(BaseModel):
                          background_ta * np.exp(-tauprof)))
 
         return runspec
+
+
+    def deblend(self, xarr, tex, tau, xoff_v, width):
+        return self._single_spectrum(xarr, tex, tau, width, xoff_v, background_ta=0.0)
+
+
 
 
