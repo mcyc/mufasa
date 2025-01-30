@@ -8,18 +8,16 @@ Use the deblend() method of the 'SpecModels.AmmoniaModel' class instead.
 
 #=======================================================================================================================
 
-from pyspeckit.spectrum.models import hyperfine
-from pyspeckit.spectrum.models.ammonia_constants import (line_names, freq_dict)
-
 import warnings
 
 warnings.warn(
-    "The `nh3_deblended.py` module is deprecated and will be removed in v1.6.0."
+    "nh3_deblended.py is deprecated and will be removed in v1.6.0."
     "Use the deblend() of a 'SpecModels.AmmoniaModel' object instead.",
     DeprecationWarning,
     stacklevel=2
 )
-
+from pyspeckit.spectrum.models import hyperfine
+from pyspeckit.spectrum.models.ammonia_constants import (line_names, freq_dict)
 
 #=======================================================================================================================
 

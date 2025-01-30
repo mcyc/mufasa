@@ -28,10 +28,6 @@ class LineSetup(object):
     def __init__(self, linetype='nh3', new_recipe=True):
 
         if linetype == 'nh3':
-            from pyspeckit.spectrum.models.ammonia_constants import voff_lines_dict
-
-            voff = voff_lines_dict['oneone']
-
             # define max and min values of tex and tau to use for the test
             # a spectrum with tex and tau values both below the specified minima has an intensity below the expected GAS rms
 
@@ -47,10 +43,6 @@ class LineSetup(object):
                 self.tau_min = 0.3
 
         elif linetype == 'n2hp':
-            from .spec_models.n2hp_constants import voff_lines_dict
-
-            voff = voff_lines_dict['onezero']
-
             # define max and min values of tex and tau to use for the test
             if new_recipe:
                 self.tex_max = 8.0
