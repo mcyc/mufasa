@@ -10,9 +10,8 @@ class AmmoniaModel(HyperfineModel):
 
     Inherits from `HyperfineModel` and applies ammonia-specific molecular constants.
     """
-
-    from .m_constants import nh3_constants
-    molecular_constants = nh3_constants
+    from .m_constants import nh3_constants as _nh3_constants
+    _molecular_constants = _nh3_constants
 
     def __init__(self, line_names=['oneone']):
         """
@@ -32,9 +31,8 @@ class N2HplusModel(HyperfineModel):
 
     Inherits from `HyperfineModel` and applies N₂H⁺-specific molecular constants.
     """
-
-    from .m_constants import n2hp_constants
-    molecular_constants = n2hp_constants
+    from .m_constants import n2hp_constants as _n2hp_constants
+    _molecular_constants = _n2hp_constants
 
     def __init__(self, line_names=['onezero']):
         """

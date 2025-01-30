@@ -131,7 +131,7 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
 
-    freq_dict = mod_info.model.molecular_constants['freq_dict']
+    freq_dict = mod_info.model._molecular_constants['freq_dict']
     linename = mod_info.model.line_names
 
     Texmin = mod_info.Texmin
@@ -217,7 +217,7 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
 
-    freq_dict = mod_info.model.molecular_constants['freq_dict']
+    freq_dict = mod_info.model._molecular_constants['freq_dict']
     linename = mod_info.model.line_names
     nu0 = mod_info.rest_value
 

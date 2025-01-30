@@ -82,7 +82,7 @@ class HyperfineModel(BaseModel):
             Computed spectrum with hyperfine components.
         """
         cls = self.__class__
-        molecular_constants = cls.molecular_constants
+        molecular_constants = cls._molecular_constants
         freq_dict = molecular_constants['freq_dict']
         voff_lines_dict = molecular_constants['voff_lines_dict']
         tau_wts_dict = molecular_constants['tau_wts_dict']
@@ -91,10 +91,10 @@ class HyperfineModel(BaseModel):
         for linename in self.line_names:
             voff_lines = np.array(voff_lines_dict[linename])
             tau_wts = np.array(tau_wts_dict[linename])
-            lines = (1 - voff_lines / cls.ckms) * freq_dict[linename] / 1e9
+            lines = (1 - voff_lines / cls._ckms) * freq_dict[linename] / 1e9
             tau_wts /= tau_wts.sum()
-            nuwidth = np.abs(width / cls.ckms * lines)
-            nuoff = xoff_v / cls.ckms * lines
+            nuwidth = np.abs(width / cls._ckms * lines)
+            nuoff = xoff_v / cls._ckms * lines
 
             tauprof = np.zeros(len(xarr))
             for kk, nuo in enumerate(nuoff):
@@ -102,7 +102,7 @@ class HyperfineModel(BaseModel):
                             np.exp(-(xarr.value + nuo - lines[kk]) ** 2 /
                                    (2.0 * nuwidth[kk] ** 2)))
 
-            T0 = (cls.h * xarr.value * 1e9 / cls.kb)
+            T0 = (cls._h * xarr.value * 1e9 / cls._kb)
             runspec += ((T0 / (np.exp(T0 / tex) - 1) * (1 - np.exp(-tauprof)) +
                          background_ta * np.exp(-tauprof)))
 
