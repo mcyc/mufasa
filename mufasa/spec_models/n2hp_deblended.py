@@ -18,10 +18,12 @@ warnings.warn(
 )
 
 from pyspeckit.spectrum.models import hyperfine
-from .n2hp_constants import (line_names, freq_dict)
+#from .n2hp_constants import (line_names, freq_dict)
+from .molecular_constants import n2hp_constants
 #=======================================================================================================================
 
-
+line_names = n2hp_constants['line_names']
+freq_dict = n2hp_constants['freq_dict']
 tau0 = 1.0
 
 # represent the tau profile of nh3 spectra as a single Gaussian for each individual velocity slab

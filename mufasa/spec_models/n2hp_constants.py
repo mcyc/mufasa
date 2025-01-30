@@ -1,3 +1,17 @@
+"""
+DEPRECATED: n2hp_constants.py is deprecated and will be removed in v1.6.0.
+Use the deblend() method of the 'SpecModels.AmmoniaModel' class instead.
+
+"""
+import warnings
+
+warnings.warn(
+    "n2hp_constants.py is deprecated and will be removed in v1.6.0."
+    "Use the mufasa.spec_models.molecular_constant.n2hp_constants instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
 # N2H+ constants taken from pyspeckit/spectrum/models/n2hp.py
 # Formatted to match pyspeckit/spectrum/models/ammonia_constants.py
 
