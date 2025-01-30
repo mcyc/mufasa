@@ -1,3 +1,6 @@
+"""
+Defines the MetaModel class for managing spectral model parameters, constraints, and fitting functions.
+"""
 
 __author__ = 'mcychen'
 

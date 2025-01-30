@@ -1,8 +1,9 @@
 """
-ammonia_multiv.py
+`Deprecated` - will be removed in v1.6.0.
 
-DEPRECATED: This module is deprecated and will be removed in v1.6.0.
-Use the 'SpecModels.AmmoniaModel' class instead.
+.. deprecated:: 1.5.0
+    This module is deprecated and will be removed in v1.6.0.
+    Use instances of :class:`AmmoniaModel <mufasa.spec_models.SpecModels.AmmoniaModel>` instead.
 """
 
 #===============================================================================================

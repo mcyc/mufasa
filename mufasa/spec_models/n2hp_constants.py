@@ -1,7 +1,9 @@
 """
-DEPRECATED: n2hp_constants.py is deprecated and will be removed in v1.6.0.
-Use the deblend() method of the 'SpecModels.AmmoniaModel' class instead.
+`Deprecated` - will be removed in v1.6.0.
 
+.. deprecated:: 1.5.0
+    This module is deprecated and will be removed in v1.6.0.
+    Use :mod:`m_constants <mufasa.spec_models.m_constants>` instead
 """
 import warnings
 

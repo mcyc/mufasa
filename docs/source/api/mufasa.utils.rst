@@ -13,9 +13,11 @@ mufasa.utils
    :toctree:
 
    dataframe
+   decorators
    fits_utils
    interpolate
    map_divide
+   memory
    mufasa_log
    multicore
    neighbours

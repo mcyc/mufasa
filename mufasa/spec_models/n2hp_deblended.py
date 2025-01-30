@@ -1,9 +1,9 @@
 """
-n2hp_deblended.py
+`Deprecated` - will be removed in v1.6.0.
 
-DEPRECATED: This module is deprecated and will be removed in v1.6.0.
-Use the deblend() method of a 'SpecModels.N2HplusModel' class instead.
-
+.. deprecated:: 1.5.0
+    This module is deprecated and will be removed in v1.6.0.
+    Use :meth:`deblend()` from :class:`N2HplusModel <mufasa.spec_models.SpecModels.N2HplusModel>` instead.
 """
 
 #=======================================================================================================================
@@ -19,7 +19,7 @@ warnings.warn(
 
 from pyspeckit.spectrum.models import hyperfine
 #from .n2hp_constants import (line_names, freq_dict)
-from .molecular_constants import n2hp_constants
+from .m_constants import n2hp_constants
 #=======================================================================================================================
 
 line_names = n2hp_constants['line_names']

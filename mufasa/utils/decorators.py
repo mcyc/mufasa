@@ -1,30 +1,32 @@
 """
-This module hosts various utility decorators
+Utility decorators for function and class enhancements.
+
+Includes decorators for marking deprecations and other utilities.
 """
 import warnings
 import functools
 
 def deprecated(reason: str, removal_version: str = None):
     """
-    A decorator to mark functions or classes as deprecated.
+    Mark a function or class as deprecated.
 
     Parameters
     ----------
     reason : str
-        A message explaining why the function/class is deprecated and what to use instead.
+        Explanation of why it is deprecated and what to use instead.
     removal_version : str, optional
-        The version when this function/class is expected to be removed.
+        Expected version when it will be removed.
 
     Returns
     -------
     function
-        The wrapped function with a deprecation warning.
+        The decorated function with a deprecation warning.
 
     Examples
     --------
-    @deprecated("Use 'new_function' instead.", "2.0.0")
-    def old_function():
-        pass
+    >>> @deprecated("Use 'new_function' instead.", "2.0.0")
+    >>> def old_function():
+    >>>     pass
     """
     def decorator(func):
         message = f"'{func.__name__}' is deprecated. {reason}"

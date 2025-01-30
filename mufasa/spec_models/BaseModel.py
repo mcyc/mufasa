@@ -1,4 +1,9 @@
-from __future__ import print_function
+"""
+Base class for multi-component spectral models.
+
+Provides core functionality for generating molecular line spectra with or without hyperfine structure.
+"""
+
 import numpy as np
 from pyspeckit.spectrum.models import model
 from astropy import constants
@@ -40,19 +45,18 @@ class BaseModel:
 
     def multi_v_model_generator(self, n_comp):
         """
-        Generalized model generator for multi-component spectral models.
+        Generate a multi-component spectral model.
 
         Parameters
         ----------
         n_comp : int
-            Number of velocity components to fit.
+            Number of velocity components.
 
         Returns
         -------
         model : `model.SpectralModel`
-            A spectral model class built from N different velocity components.
+            Spectral model with `n_comp` velocity components.
         """
-        cls = self.__class__
 
         n_para = n_comp * 4  # vel, width, tex, tau per component
         idx_comp = np.arange(n_comp)
@@ -82,19 +86,20 @@ class BaseModel:
 
     def multi_v_spectrum(self, xarr, *args):
         """
-        Generalized multi-component spectrum generator.
+        Generate a multi-component spectrum.
 
         Parameters
         ----------
         xarr : array-like
-            Frequency array (in GHz).
+            Frequency array in GHz.
         args : list
-            Model parameters (vel, width, tex, tau) for each component.
+            Model parameters (velocity, width, excitation temperature, optical depth)
+            for each component, provided in sequence.
 
         Returns
         -------
         spectrum : array-like
-            Generated spectrum for the given parameters.
+            Computed spectrum for the given components.
         """
         cls = self.__class__
 
@@ -118,30 +123,29 @@ class BaseModel:
         return model_spectrum - cls.T_antenna(cls.TCMB, xarr.value)
 
 
-
     def _single_spectrum(self, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
         """
-        Compute a single molecular line spectrum without hyperfine structures.
+        Compute a single-component molecular line spectrum.
 
         Parameters
         ----------
         xarr : array-like
-            Frequency array (in GHz).
+            Frequency array in GHz.
         tex : float
-            Excitation temperature.
+            Excitation temperature (K).
         tau_dict : dict
-            Optical depth dictionary.
+            Optical depth for each transition.
         width : float
-            Line width (in km/s).
+            Line width (km/s).
         xoff_v : float
-            Velocity offset (in km/s).
+            Velocity offset (km/s).
         background_ta : float or array-like, optional
-            Background antenna temperature, default is 0.
+            Background antenna temperature (default: 0.0).
 
         Returns
         -------
         spectrum : array-like
-            Generated single-component spectrum without hyperfine splitting.
+            Computed molecular line spectrum without hyperfine structure.
         """
         cls = self.__class__
 
@@ -171,23 +175,22 @@ class BaseModel:
 
         return runspec  # Return the molecular line spectrum
 
-
     @staticmethod
     def T_antenna(Tbright, nu):
         """
-        Calculate antenna temperatures over frequency (GHz).
+        Compute the antenna temperature.
 
         Parameters
         ----------
         Tbright : float
-            Brightness temperature.
+            Brightness temperature (K).
         nu : array-like
-            Frequency array (in GHz).
+            Frequency array in GHz.
 
         Returns
         -------
         T_antenna : array-like
-            Antenna temperature.
+            Computed antenna temperature.
         """
         T0 = (h * nu * 1e9 / kb)
         return T0 / (np.exp(T0 / Tbright) - 1)

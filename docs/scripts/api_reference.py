@@ -212,7 +212,11 @@ API_REFERENCE = {
         'module': 'mufasa.spec_models',
         'description': '''This sub-package hosts the codes for sepctral models.''',
         'members': [
+            {'name': 'mufasa.spec_models.BaseModel', 'type': 'module', 'description': '''No description available.'''},
+            {'name': 'mufasa.spec_models.HyperfineModel', 'type': 'module', 'description': '''No description available.'''},
+            {'name': 'mufasa.spec_models.SpecModels', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.spec_models.ammonia_multiv', 'type': 'module', 'description': '''No description available.'''},
+            {'name': 'mufasa.spec_models.m_constants', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.spec_models.meta_model', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.spec_models.n2hp_constants', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.spec_models.n2hp_deblended', 'type': 'module', 'description': '''No description available.'''},
@@ -220,13 +224,42 @@ API_REFERENCE = {
             {'name': 'mufasa.spec_models.nh3_deblended', 'type': 'module', 'description': '''No description available.'''}
         ]
     },
+    'mufasa.spec_models.BaseModel': {
+        'module': 'mufasa.spec_models.BaseModel',
+        'description': '''Base class for multi-component spectral models.''',
+        'members': [
+            {'name': 'BaseModel', 'type': 'class', 'description': '''Generalized base class for multi-component spectral models.'''}
+        ]
+    },
+    'mufasa.spec_models.HyperfineModel': {
+        'module': 'mufasa.spec_models.HyperfineModel',
+        'description': '''Defines the HyperfineModel for spectral modeling with hyperfine structure.''',
+        'members': [
+            {'name': 'HyperfineModel', 'type': 'class', 'description': '''Spectral model for multi-component fitting with hyperfine structure.'''}
+        ]
+    },
+    'mufasa.spec_models.SpecModels': {
+        'module': 'mufasa.spec_models.SpecModels',
+        'description': '''Spectral models for multi-component fitting of ammonia (NH₃) and N₂H⁺ (Diazenylium).''',
+        'members': [
+            {'name': 'AmmoniaModel', 'type': 'class', 'description': '''Ammonia (NH₃) spectral model for multi-component fitting.'''},
+            {'name': 'N2HplusModel', 'type': 'class', 'description': '''N₂H⁺ (Diazenylium) spectral model for multi-component fitting.'''}
+        ]
+    },
     'mufasa.spec_models.ammonia_multiv': {
         'module': 'mufasa.spec_models.ammonia_multiv',
-        'description': '''Undocumented''',
+        'description': '''.''',
         'members': [
-            {'name': 'T_antenna', 'type': 'function', 'description': '''Calculate antenna temperatures over nu (in GHz).'''},
+            {'name': 'T_antenna', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'ammonia_multi_v', 'type': 'function', 'description': '''Undocumented'''},
-            {'name': 'nh3_multi_v_model_generator', 'type': 'function', 'description': '''Works for up to 2 componet fits at the moment.'''}
+            {'name': 'nh3_multi_v_model_generator', 'type': 'function', 'description': '''Undocumented'''}
+        ]
+    },
+    'mufasa.spec_models.m_constants': {
+        'module': 'mufasa.spec_models.m_constants',
+        'description': '''This module hosts molecular_constants used to build specific molecular line model classes in.''',
+        'members': [
+
         ]
     },
     'mufasa.spec_models.meta_model': {
@@ -238,30 +271,30 @@ API_REFERENCE = {
     },
     'mufasa.spec_models.n2hp_constants': {
         'module': 'mufasa.spec_models.n2hp_constants',
-        'description': '''Undocumented''',
+        'description': '''.''',
         'members': [
 
         ]
     },
     'mufasa.spec_models.n2hp_deblended': {
         'module': 'mufasa.spec_models.n2hp_deblended',
-        'description': '''Undocumented''',
+        'description': '''.''',
         'members': [
             {'name': 'n2hp_vtau_singlemodel_deblended', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
     'mufasa.spec_models.n2hp_multiv': {
         'module': 'mufasa.spec_models.n2hp_multiv',
-        'description': '''Undocumented''',
+        'description': '''.''',
         'members': [
-            {'name': 'T_antenna', 'type': 'function', 'description': '''Calculate antenna temperatures over nu (in GHz).'''},
+            {'name': 'T_antenna', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'n2hp_multi_v', 'type': 'function', 'description': '''Undocumented'''},
-            {'name': 'n2hp_multi_v_model_generator', 'type': 'function', 'description': '''Works for up to 2 component fits at the moment.'''}
+            {'name': 'n2hp_multi_v_model_generator', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
     'mufasa.spec_models.nh3_deblended': {
         'module': 'mufasa.spec_models.nh3_deblended',
-        'description': '''Undocumented''',
+        'description': '''DEPRECATED: This module is deprecated and will be removed in v1.''',
         'members': [
             {'name': 'nh3_vtau_singlemodel_deblended', 'type': 'function', 'description': '''Undocumented'''}
         ]
@@ -271,9 +304,11 @@ API_REFERENCE = {
         'description': '''This sub-package provides utility functions and tools for data processing,.''',
         'members': [
             {'name': 'mufasa.utils.dataframe', 'type': 'module', 'description': '''No description available.'''},
+            {'name': 'mufasa.utils.decorators', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.fits_utils', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.interpolate', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.map_divide', 'type': 'module', 'description': '''No description available.'''},
+            {'name': 'mufasa.utils.memory', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.mufasa_log', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.multicore', 'type': 'module', 'description': '''No description available.'''},
             {'name': 'mufasa.utils.neighbours', 'type': 'module', 'description': '''No description available.'''}
@@ -286,6 +321,13 @@ API_REFERENCE = {
             {'name': 'assign_to_dataframe', 'type': 'function', 'description': '''Assign values from a new data array to an existing DataFrame based on spatial coordinates and component index.'''},
             {'name': 'make_dataframe', 'type': 'function', 'description': '''Create a DataFrame from a 3D parameter array, applying optional velocity and error thresholds.'''},
             {'name': 'read', 'type': 'function', 'description': '''Read a FITS file and convert the data to a pandas DataFrame, optionally including the header.'''}
+        ]
+    },
+    'mufasa.utils.decorators': {
+        'module': 'mufasa.utils.decorators',
+        'description': '''Utility decorators for function and class enhancements.''',
+        'members': [
+            {'name': 'deprecated', 'type': 'function', 'description': '''Mark a function or class as deprecated.'''}
         ]
     },
     'mufasa.utils.fits_utils': {
@@ -312,6 +354,19 @@ API_REFERENCE = {
             {'name': 'watershed_divide', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
+    'mufasa.utils.memory': {
+        'module': 'mufasa.utils.memory',
+        'description': '''This module provides tools to monitor memory usage and.''',
+        'members': [
+            {'name': 'calculate_dask_memory_limit', 'type': 'function', 'description': '''Mimic Dask's default memory limit setting.'''},
+            {'name': 'calculate_target_memory', 'type': 'function', 'description': '''Calculate target memory per core for chunked computations.'''},
+            {'name': 'get_size_mb', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'get_system_free_memory', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'monitor_peak_memory', 'type': 'function', 'description': '''Decorator to monitor and record the peak memory usage of a function.'''},
+            {'name': 'peak_memory', 'type': 'function', 'description': '''Decorator to monitor and display the peak memory usage of a function,.'''},
+            {'name': 'tmp_save_gauge', 'type': 'function', 'description': '''Return whether or not it's worth DaskSpectralCube results temporary.'''}
+        ]
+    },
     'mufasa.utils.mufasa_log': {
         'module': 'mufasa.utils.mufasa_log',
         'description': '''Undocumented''',
@@ -335,6 +390,7 @@ API_REFERENCE = {
         'description': '''Undocumented''',
         'members': [
             {'name': 'disk_neighbour', 'type': 'function', 'description': '''Undocumented'''},
+            {'name': 'footprint_rectangle', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'get_neighbor_coord', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'get_valid_neighbors', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'maxref_neighbor_coords', 'type': 'function', 'description': '''Undocumented'''},

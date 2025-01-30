@@ -1,5 +1,8 @@
 """
-This module hosts molecular_constants used to build SpectralModels such as N2HplusModel(HyperfineModel)
+This module hosts molecular_constants used to build specific molecular line model classes in
+:mod:`SpectralModels <mufasa.spec_models.SpecModels>` using the
+:class:`BaseModel <mufasa.spec_models.BaseModel>` and
+:class:`BaseModel <mufasa.spec_models.BaseModel>`
 
 """
 

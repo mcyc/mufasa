@@ -1,67 +1,48 @@
+"""
+Spectral models for multi-component fitting, including ammonia (NH₃) and aiazenylium (N₂H⁺).
+"""
 
 from .HyperfineModel import HyperfineModel
 
 class AmmoniaModel(HyperfineModel):
     """
-    Model class for ammonia multi-component spectral fitting.
+    Ammonia (NH₃) spectral model for multi-component fitting.
 
-    Inherits from BaseModel and sets ammonia-specific molecular constants and line names.
+    Inherits from `HyperfineModel` and applies ammonia-specific molecular constants.
     """
 
-    # Set ammonia-specific molecular constants and default line names
-    from .molecular_constants import nh3_constants
+    from .m_constants import nh3_constants
     molecular_constants = nh3_constants
-
-    #from pyspeckit.spectrum.models.ammonia\
-    #    import (freq_dict, voff_lines_dict, tau_wts_dict) #line_names
-
-    # Set ammonia-specific molecular constants and default line names
-    #molecular_constants = {
-    #    'freq_dict': freq_dict,
-    #    'voff_lines_dict': voff_lines_dict,
-    #    'tau_wts_dict': tau_wts_dict
-    #}
 
     def __init__(self, line_names=['oneone']):
         """
-        Initialize the AmmoniaModel with specific line names.
+        Initialize the ammonia model.
 
         Parameters
         ----------
         line_names : list of str, optional
-            List of ammonia line names (default is ['oneone']).
+            Ammonia spectral line names (default: ['oneone']).
         """
         super().__init__(line_names)
 
 
 class N2HplusModel(HyperfineModel):
     """
-    Model class for N2H+ (Diazenylium) multi-component spectral fitting.
+    N₂H⁺ (Diazenylium) spectral model for multi-component fitting.
 
-    Inherits from BaseModel and sets N2H+-specific molecular constants and line names.
+    Inherits from `HyperfineModel` and applies N₂H⁺-specific molecular constants.
     """
 
-    #from .n2hp_constants import (freq_dict, voff_lines_dict, tau_wts_dict)
-    from .molecular_constants import n2hp_constants
-
-    # Set N2H+-specific molecular constants and default line names
-    '''
-    molecular_constants = {
-        'freq_dict': freq_dict,
-        'voff_lines_dict': voff_lines_dict,
-        'tau_wts_dict': tau_wts_dict
-    }
-    '''
-    molecular_constants =n2hp_constants
+    from .m_constants import n2hp_constants
+    molecular_constants = n2hp_constants
 
     def __init__(self, line_names=['onezero']):
         """
-        Initialize the N2HplusModel with specific line names.
+        Initialize the N₂H⁺ model.
 
         Parameters
         ----------
         line_names : list of str, optional
-            List of N2H+ line names (default is ['onezero']).
+            N₂H⁺ spectral line names (default: ['onezero']).
         """
         super().__init__(line_names=line_names)
-
