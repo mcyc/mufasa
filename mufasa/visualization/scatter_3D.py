@@ -60,13 +60,13 @@ class ScatterPPV(object):
             # get the rest frequency
             if self.fittype == "nh3_multi_v":
                 #from pyspeckit.spectrum.models.ammonia_constants import freq_dict
-                from ..spec_models.molecular_constants import nh3_constants
+                from ..spec_models.m_constants import nh3_constants
                 freq_dict = nh3_constants['nh3_constants']
                 self.rest_freq = freq_dict['oneone']*1e-9 # in GHz
 
             elif self.fittype == "n2hp_multi_v":
                 #from ..spec_models.n2hp_constants import freq_dict
-                from ..spec_models.molecular_constants import n2hp_constants
+                from ..spec_models.m_constants import n2hp_constants
                 freq_dict = nh3_constants['n2hp_constants']
                 self.rest_freq = freq_dict['onezero']*1e-9 # in GHz
 

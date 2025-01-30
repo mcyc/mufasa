@@ -1,15 +1,16 @@
-
+"""
+Defines the HyperfineModel for spectral modeling with hyperfine structure.
+"""
 import numpy as np
 from .BaseModel import BaseModel
 
 class HyperfineModel(BaseModel):
     """
-    A subclass of BaseModel generate spectral models with hyperfine lines.
+    Spectral model for multi-component fitting with hyperfine structure.
 
-    Overrides the multi_v_spectrum() from BaseModel to use hyperfine lines
+    Inherits from `BaseModel` and applies hyperfine-specific molecular constants.
 
     """
-
     def __init__(self, line_names=None):
         """
         Initialize HyperfineModel.
@@ -20,19 +21,20 @@ class HyperfineModel(BaseModel):
 
     def multi_v_spectrum(self, xarr, *args):
         """
-        Generalized multi-component spectrum generator.
+        Generate a multi-component spectrum with hyperfine structure.
 
         Parameters
         ----------
         xarr : array-like
-            Frequency array (in GHz).
+            Frequency array in GHz.
         args : list
-            Model parameters (vel, width, tex, tau) for each component.
+            Model parameters (velocity, width, excitation temperature, optical depth)
+            for each component, provided in sequence.
 
         Returns
         -------
         spectrum : array-like
-            Generated spectrum for the given parameters.
+            Computed spectrum with hyperfine components.
         """
         cls = self.__class__
 
@@ -55,30 +57,29 @@ class HyperfineModel(BaseModel):
 
         return model_spectrum - cls.T_antenna(cls.TCMB, xarr.value)
 
-
     def _single_spectrum_hf(self, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):
         """
-        Generalized helper function to compute single-component spectrum.
+        Compute a single-component spectrum with hyperfine structure.
 
         Parameters
         ----------
         xarr : array-like
-            Frequency array (in GHz).
+            Frequency array in GHz.
         tex : float
-            Excitation temperature.
+            Excitation temperature (K).
         tau_dict : dict
-            Optical depth dictionary.
+            Optical depth for each hyperfine component.
         width : float
-            Line width (in km/s).
+            Line width (km/s).
         xoff_v : float
-            Velocity offset (in km/s).
-        background_ta : float or array-like
-            Background antenna temperature.
+            Velocity offset (km/s).
+        background_ta : float or array-like, optional
+            Background antenna temperature (default: 0.0).
 
         Returns
         -------
         spectrum : array-like
-            Generated single-component spectrum.
+            Computed spectrum with hyperfine components.
         """
         cls = self.__class__
         molecular_constants = cls.molecular_constants
@@ -107,13 +108,27 @@ class HyperfineModel(BaseModel):
 
         return runspec
 
-
     def deblend(self, xarr, tex, tau, xoff_v, width):
         """
-        Returns a single spectra with hyperfine strucutre removed.
+        Compute a spectrum without hyperfine structures.
 
-        Does not currently support multi-components
+        Parameters
+        ----------
+        xarr : array-like
+            Frequency array in GHz.
+        tex : float
+            Excitation temperature (K).
+        tau : float
+            Optical depth.
+        xoff_v : float
+            Velocity offset (km/s).
+        width : float
+            Line width (km/s).
 
+        Returns
+        -------
+        spectrum : array-like
+            Computed spectrum without hyperfine structure.
         """
         cls = self.__class__
         tau_dict = {}

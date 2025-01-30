@@ -1399,6 +1399,49 @@ you can also search with the search bar located on the top right corner of the w
              :mod:`mufasa.slab_sort`
    
    
+   * - :obj:`~mufasa.spec_models.BaseModel.BaseModel`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.spec_models.BaseModel
+
+          .. autoshortsummary:: mufasa.spec_models.BaseModel.BaseModel
+
+          .. container:: caption
+
+             :mod:`mufasa.spec_models.BaseModel`
+   
+   * - :obj:`~mufasa.spec_models.HyperfineModel.HyperfineModel`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.spec_models.HyperfineModel
+
+          .. autoshortsummary:: mufasa.spec_models.HyperfineModel.HyperfineModel
+
+          .. container:: caption
+
+             :mod:`mufasa.spec_models.HyperfineModel`
+   
+   * - :obj:`~mufasa.spec_models.SpecModels.AmmoniaModel`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.spec_models.SpecModels
+
+          .. autoshortsummary:: mufasa.spec_models.SpecModels.AmmoniaModel
+
+          .. container:: caption
+
+             :mod:`mufasa.spec_models.SpecModels`
+   * - :obj:`~mufasa.spec_models.SpecModels.N2HplusModel`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.spec_models.SpecModels
+
+          .. autoshortsummary:: mufasa.spec_models.SpecModels.N2HplusModel
+
+          .. container:: caption
+
+             :mod:`mufasa.spec_models.SpecModels`
+   
    * - :obj:`~mufasa.spec_models.ammonia_multiv.T_antenna`
      - .. container:: sk-apisearch-desc
 
@@ -1429,6 +1472,7 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.spec_models.ammonia_multiv`
+   
    
    * - :obj:`~mufasa.spec_models.meta_model.MetaModel`
      - .. container:: sk-apisearch-desc
@@ -1527,6 +1571,17 @@ you can also search with the search bar located on the top right corner of the w
 
              :mod:`mufasa.utils.dataframe`
    
+   * - :obj:`~mufasa.utils.decorators.deprecated`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.decorators
+
+          .. autoshortsummary:: mufasa.utils.decorators.deprecated
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.decorators`
+   
    * - :obj:`~mufasa.utils.fits_utils.downsample_header`
      - .. container:: sk-apisearch-desc
 
@@ -1589,6 +1644,77 @@ you can also search with the search bar located on the top right corner of the w
           .. container:: caption
 
              :mod:`mufasa.utils.map_divide`
+   
+   * - :obj:`~mufasa.utils.memory.calculate_dask_memory_limit`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.calculate_dask_memory_limit
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.calculate_target_memory`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.calculate_target_memory
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.get_size_mb`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.get_size_mb
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.get_system_free_memory`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.get_system_free_memory
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.monitor_peak_memory`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.monitor_peak_memory
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.peak_memory`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.peak_memory
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
+   * - :obj:`~mufasa.utils.memory.tmp_save_gauge`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.memory
+
+          .. autoshortsummary:: mufasa.utils.memory.tmp_save_gauge
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.memory`
    
    * - :obj:`~mufasa.utils.mufasa_log.OriginContextFilter`
      - .. container:: sk-apisearch-desc
@@ -1658,6 +1784,16 @@ you can also search with the search bar located on the top right corner of the w
           .. currentmodule:: mufasa.utils.neighbours
 
           .. autoshortsummary:: mufasa.utils.neighbours.disk_neighbour
+
+          .. container:: caption
+
+             :mod:`mufasa.utils.neighbours`
+   * - :obj:`~mufasa.utils.neighbours.footprint_rectangle`
+     - .. container:: sk-apisearch-desc
+
+          .. currentmodule:: mufasa.utils.neighbours
+
+          .. autoshortsummary:: mufasa.utils.neighbours.footprint_rectangle
 
           .. container:: caption
 

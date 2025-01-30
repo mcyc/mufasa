@@ -4,7 +4,7 @@ mufasa.utils.neighbours
 =======================
 
 .. automodule:: mufasa.utils.neighbours
-   :exclude-members: _hidden_member, disk_neighbour, get_neighbor_coord, get_valid_neighbors, maxref_neighbor_coords, square_neighbour
+   :exclude-members: _hidden_member, disk_neighbour, footprint_rectangle, get_neighbor_coord, get_valid_neighbors, maxref_neighbor_coords, square_neighbour
    
 .. rubric:: Functions
 
@@ -13,6 +13,7 @@ mufasa.utils.neighbours
    :nosignatures:
 
    disk_neighbour
+   footprint_rectangle
    get_neighbor_coord
    get_valid_neighbors
    maxref_neighbor_coords

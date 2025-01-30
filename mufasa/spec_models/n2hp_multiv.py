@@ -1,8 +1,9 @@
 """
-n2hp_multiv.py
+`Deprecated` - will be removed in v1.6.0.
 
-DEPRECATED: This module is deprecated and will be removed in v1.6.0.
-Use the 'SpecModels.N2HplusModel' class instead.
+.. deprecated:: 1.5.0
+    This module is deprecated and will be removed in v1.6.0.
+    Use instances of :class:`N2HplusModel <mufasa.spec_models.SpecModels.N2HplusModel>` instead.
 """
 
 #===============================================================================================

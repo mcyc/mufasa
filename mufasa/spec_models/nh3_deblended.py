@@ -1,9 +1,8 @@
 """
-nh3_deblended.py
+`Deprecated` - will be removed in v1.6.0.
 
-DEPRECATED: This module is deprecated and will be removed in v1.6.0.
-Use the deblend() method of the 'SpecModels.AmmoniaModel' class instead.
-
+.. deprecated:: 1.6.0
+    Use :meth:`deblend()` from :class:`AmmoniaModel <mufasa.spec_models.SpecModels.AmmoniaModel>` instead
 """
 
 #=======================================================================================================================
