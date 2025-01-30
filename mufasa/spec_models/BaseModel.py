@@ -103,7 +103,7 @@ class BaseModel:
         if xarr.unit.to_string() != 'GHz':
             xarr = xarr.as_unit('GHz')
 
-        background_ta = cls.T_antenna(cls.TCMB, xarr.value)
+        background_ta = cls.T_antenna(cls._TCMB, xarr.value)
         tau_dict = {}
 
         for vel, width, tex, tau in zip(args[::4], args[1::4], args[2::4], args[3::4]):
@@ -117,7 +117,7 @@ class BaseModel:
             # Update background for the next component
             background_ta = model_spectrum
 
-        return model_spectrum - cls.T_antenna(cls.TCMB, xarr.value)
+        return model_spectrum - cls.T_antenna(cls._TCMB, xarr.value)
 
 
     def _single_spectrum(self, xarr, tex, tau_dict, width, xoff_v, background_ta=0.0):

@@ -134,9 +134,9 @@ class MetaModel(object):
         else:
             raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
 
-        freq_dict = self.model.molecular_constants['freq_dict']
-        voff_lines_dict = self.model.molecular_constants['voff_lines_dict']
-        tau_wts_dict = self.model.molecular_constants['tau_wts_dict']
+        freq_dict = self.model._molecular_constants['freq_dict']
+        voff_lines_dict = self.model._molecular_constants['voff_lines_dict']
+        tau_wts_dict = self.model._molecular_constants['tau_wts_dict']
 
         self.fitter = self.model.multi_v_model_generator(n_comp=ncomp)
 
