@@ -240,7 +240,7 @@ API_REFERENCE = {
     },
     'mufasa.spec_models.SpecModels': {
         'module': 'mufasa.spec_models.SpecModels',
-        'description': '''Spectral models for multi-component fitting of ammonia (NH₃) and N₂H⁺ (Diazenylium).''',
+        'description': '''Spectral models for multi-component fitting, including ammonia (NH₃) and aiazenylium (N₂H⁺).''',
         'members': [
             {'name': 'AmmoniaModel', 'type': 'class', 'description': '''Ammonia (NH₃) spectral model for multi-component fitting.'''},
             {'name': 'N2HplusModel', 'type': 'class', 'description': '''N₂H⁺ (Diazenylium) spectral model for multi-component fitting.'''}
@@ -248,7 +248,7 @@ API_REFERENCE = {
     },
     'mufasa.spec_models.ammonia_multiv': {
         'module': 'mufasa.spec_models.ammonia_multiv',
-        'description': '''.''',
+        'description': '''`Deprecated` - will be removed in v1.''',
         'members': [
             {'name': 'T_antenna', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'ammonia_multi_v', 'type': 'function', 'description': '''Undocumented'''},
@@ -257,35 +257,35 @@ API_REFERENCE = {
     },
     'mufasa.spec_models.m_constants': {
         'module': 'mufasa.spec_models.m_constants',
-        'description': '''This module hosts molecular_constants used to build specific molecular line model classes in.''',
+        'description': '''This module hosts _molecular_constants used to build specific molecular line model classes in.''',
         'members': [
 
         ]
     },
     'mufasa.spec_models.meta_model': {
         'module': 'mufasa.spec_models.meta_model',
-        'description': '''Undocumented''',
+        'description': '''Defines the MetaModel class for managing spectral model parameters, constraints, and fitting functions.''',
         'members': [
             {'name': 'MetaModel', 'type': 'class', 'description': '''A class to store spectral model-specific information relevant to spectral modeling tasks, such as fitting.'''}
         ]
     },
     'mufasa.spec_models.n2hp_constants': {
         'module': 'mufasa.spec_models.n2hp_constants',
-        'description': '''.''',
+        'description': '''`Deprecated` - will be removed in v1.''',
         'members': [
 
         ]
     },
     'mufasa.spec_models.n2hp_deblended': {
         'module': 'mufasa.spec_models.n2hp_deblended',
-        'description': '''.''',
+        'description': '''`Deprecated` - will be removed in v1.''',
         'members': [
             {'name': 'n2hp_vtau_singlemodel_deblended', 'type': 'function', 'description': '''Undocumented'''}
         ]
     },
     'mufasa.spec_models.n2hp_multiv': {
         'module': 'mufasa.spec_models.n2hp_multiv',
-        'description': '''.''',
+        'description': '''`Deprecated` - will be removed in v1.''',
         'members': [
             {'name': 'T_antenna', 'type': 'function', 'description': '''Undocumented'''},
             {'name': 'n2hp_multi_v', 'type': 'function', 'description': '''Undocumented'''},
@@ -294,7 +294,7 @@ API_REFERENCE = {
     },
     'mufasa.spec_models.nh3_deblended': {
         'module': 'mufasa.spec_models.nh3_deblended',
-        'description': '''DEPRECATED: This module is deprecated and will be removed in v1.''',
+        'description': '''`Deprecated` - will be removed in v1.''',
         'members': [
             {'name': 'nh3_vtau_singlemodel_deblended', 'type': 'function', 'description': '''Undocumented'''}
         ]

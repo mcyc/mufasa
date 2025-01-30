@@ -9,25 +9,24 @@ from pyspeckit.spectrum.models import model
 from astropy import constants
 from astropy import units as u
 
+# Universal constants
 TCMB = 2.7315  # Cosmic Microwave Background temperature in K
-ckms = constants.c.to(u.km / u.s).value  # Speed of light in km/s
-ccms = constants.c.to(u.cm / u.s).value  # Planck constant
-h = constants.h.cgs.value
-kb = constants.k_B.cgs.value  # Boltzmann constant
+h = constants.h.cgs.value  # Planck's constant in erg·s.
+kb = constants.k_B.cgs.value  # Boltzmann constant in erg/K.
 
 class BaseModel:
     """
     Generalized base class for multi-component spectral models.
-
     """
-    molecular_constants = None
+
+    _molecular_constants = None  # This is intended to be set in subclasses
 
     # Universal constants
-    TCMB = TCMB  # Cosmic Microwave Background temperature in K
-    ckms = ckms
-    ccms = ccms
-    h = h
-    kb = kb
+    _TCMB = TCMB # Cosmic Microwave Background (CMB) temperature in Kelvin.
+    _ckms = constants.c.to(u.km / u.s).value  # Speed of light in kilometers per second (km/s).
+    _ccms = constants.c.to(u.cm / u.s).value  # Speed of light in centimeters per second (cm/s).
+    _h = h  # Planck's constant in erg·s.
+    _kb = kb  # Boltzmann constant in erg/K.
 
     def __init__(self, line_names=None):
         """
@@ -35,8 +34,6 @@ class BaseModel:
 
         Parameters
         ----------
-        molecular_constants : dict
-            Molecule-specific constants (freq_dict, voff_lines_dict, tau_wts_dict).
         line_names : list of str, optional
             List of line names for the molecule. If not provided, use the default.
         """
@@ -153,21 +150,21 @@ class BaseModel:
 
         for linename in self.line_names:
             # Get molecule-specific constants
-            freq_dict = cls.molecular_constants['freq_dict']
+            freq_dict = cls._molecular_constants['freq_dict']
 
             # Retrieve the central frequency for the given transition
             line = freq_dict[linename] / 1e9  # Convert to GHz
 
             # Compute single-value quantities (no hyperfine structure)
-            nuoff = xoff_v / cls.ckms * line  # Shift frequency by velocity offset
-            nuwidth = np.abs(width / cls.ckms * line)  # Compute Gaussian width
+            nuoff = xoff_v / cls._ckms * line  # Shift frequency by velocity offset
+            nuwidth = np.abs(width / cls._ckms * line)  # Compute Gaussian width
             tau0 = tau_dict[linename]  # Optical depth for this transition
 
             # Compute the optical depth profile (single Gaussian function)
             tauprof = tau0 * np.exp(-((xarr.value + nuoff - line) ** 2) / (2.0 * nuwidth ** 2))
 
             # Compute Planck function temperature
-            T0 = (cls.h * xarr.value * 1e9 / cls.kb)
+            T0 = (cls._h * xarr.value * 1e9 / cls._kb)
 
             # Compute the spectrum
             runspec += (T0 / (np.exp(T0 / tex) - 1) * (1 - np.exp(-tauprof)) +
