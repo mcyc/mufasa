@@ -110,7 +110,7 @@ def register_pcube(pcube, mod_info):
         # Specify the reference rest frequency if not present
         logger.warning("The cube has no reference rest frequency."
                        " The rest frequency of the spectral model will be used instead")
-        pcube.xarr.refX = mod_info.freq_dict[linename] * u.Hz
+        pcube.xarr.refX = mod_info.rest_value
 
     if pcube.xarr.velocity_convention is None:
         pcube.xarr.velocity_convention = 'radio'
@@ -119,84 +119,9 @@ def register_pcube(pcube, mod_info):
     fitter = mod_info.fitter
     pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
     logger.debug("number of parameters is {0}".format(fitter.npars))
-    logger.debug("the line to fit is {0}".format(mod_info.linenames))
+    logger.debug("the line to fit is {0}".format(mod_info.model.line_names))
     return pcube
 
-# setup_cube is depreciated
-'''
-def setup_cube(cube, mod_info, return_spectral_cube=False):
-
-    if hasattr(cube, 'spectral_axis'):
-        # if it's a SpectralCube object
-        pcube = pyspeckit.Cube(cube=cube)
-
-        if isinstance(cube._data, dask.array.Array):
-            logger.info("SpectralCube uses dask")
-            # load the entire array onto pcube
-            pcube.data = cube._data.compute()
-            pcube.data = cube._data.compute()
-
-
-        if False:# #isinstance(cube._data, np.ndarray):
-            logger.info("SpectralCube does not use dask")
-            pcube = pyspeckit.Cube(cube=cube)
-
-        elif False: # isinstance(cube._data, dask.array.Array):
-            logger.info("SpectralCube uses dask")
-
-            if cube.spectral_axis.flags['OWNDATA']:
-                xarr = SpectroscopicAxis(cube.spectral_axis,
-                                         unit=cube.spectral_axis.unit,
-                                         refX=cube.wcs.wcs.restfrq,
-                                         refX_unit='Hz')
-            else:
-                xarr = SpectroscopicAxis(cube.spectral_axis.copy(),
-                                         unit=cube.spectral_axis.unit,
-                                         refX=cube.wcs.wcs.restfrq,
-                                         refX_unit='Hz')
-
-            pcube = pyspeckit.Cube(cube=cube._data.compute(), xarr=xarr, header=cube.header)
-
-            if (cube.unit in ('undefined', u.dimensionless_unscaled)
-                    and 'BUNIT' in cube._meta):
-                pcube.unit = cube._meta['BUNIT']
-            else:
-                pcube.unit = cube.unit
-
-    elif isinstance(cube, str):
-        cubename = cube
-        if return_spectral_cube:
-            cube = SpectralCube.read(cube)
-            # pcube = pyspeckit.Cube(filename=cubename)
-            pcube = pyspeckit.Cube(cube=cube)
-
-        else:
-            pcube = pyspeckit.Cube(filename=cubename)
-
-    pcube.unit = "K"
-    if np.isnan(pcube.wcs.wcs.restfrq):
-        # Specify the rest frequency not present
-        pcube.xarr.refX = mod_info.freq_dict[linename] * u.Hz
-    pcube.xarr.velocity_convention = 'radio'
-
-    # always register the fitter just in case different lines are used
-    fitter = mod_info.fitter
-    pcube.specfit.Registry.add_fitter(mod_info.fittype, fitter, fitter.npars)
-    logger.debug("number of parameters is {0}".format(fitter.npars))
-    logger.debug("the line to fit is {0}".format(mod_info.linenames))
-
-    if return_spectral_cube:
-        # the following check on rest-frequency may not be necessarily for GAS, but better be safe than sorry
-        # note: this assume the data cube has the right units
-        if np.isnan(cube._wcs.wcs.restfrq):
-            # Specify the rest frequency not present
-            cube = cube.with_spectral_unit(u.Hz, rest_value=mod_info.rest_value)
-        cube = cube.with_spectral_unit(u.km / u.s, velocity_convention='radio')
-
-        return pcube, cube
-    else:
-        return pcube
-'''
 
 def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fittype='nh3_multi_v', snr_min=None, **kwargs):
     # a simper version of cubefit_gen that assumes good user provided guesses
@@ -205,8 +130,9 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
 
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
-    freq_dict = mod_info.freq_dict
-    linename = mod_info.linenames
+
+    freq_dict = mod_info.model._molecular_constants['freq_dict']
+    linename = mod_info.model.line_names
 
     Texmin = mod_info.Texmin
     Texmax = mod_info.Texmax
@@ -215,9 +141,6 @@ def cubefit_simp(cube, pcube, ncomp, guesses, multicore=None, maskmap=None, fitt
     taumax = mod_info.taumax
     taumin = mod_info.taumin
     eps = mod_info.eps
-
-    # deprecated and no longer needed
-    #pcube = setup_cube(cube, mod_info, return_spectral_cube=False)
 
     register_pcube(pcube, mod_info)
 
@@ -293,8 +216,10 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
 
     # get information on the spectral model
     mod_info = MetaModel(fittype, ncomp)
-    freq_dict = mod_info.freq_dict
-    linename = mod_info.linenames
+
+    freq_dict = mod_info.model._molecular_constants['freq_dict']
+    linename = mod_info.model.line_names
+    nu0 = mod_info.rest_value
 
     Texmin = mod_info.Texmin
     Texmax = mod_info.Texmax
@@ -402,8 +327,8 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
         logger.debug("provided guesses accepted")
 
     # re-normalize the degenerated tau & text for the purpose of estimate guesses
-    guesses[3::4], guesses[2::4] = g_refine.tautex_renorm(guesses[3::4], guesses[2::4], tau_thresh=taumin,
-                                                          nu=mod_info.rest_value.to("GHz").value)
+    guesses[3::4], guesses[2::4] = g_refine.tautex_renorm(guesses[3::4], guesses[2::4],
+                                                          tau_thresh=taumin, nu=nu0.to("GHz").value)
 
     # The guesses should be fine in the first case, but just in case, make sure the guesses are confined within the
     # appropriate limits
@@ -485,7 +410,7 @@ def cubefit_gen(cube, pcube, ncomp=2, paraname=None, modname=None, chisqname=Non
         model.write(modname, overwrite=True)
 
     if chisqname != None:
-        chisq = get_chisq(cube, pcube.get_modelcube(), expand=20, rest_value=mod_info.rest_value)
+        chisq = get_chisq(cube, pcube.get_modelcube(), expand=20, rest_value=nu0)
         chisqfile = fits.PrimaryHDU(data=chisq, header=cube.wcs.celestial.to_header())
         chisqfile.writeto(chisqname, overwrite=True)
 
@@ -586,9 +511,9 @@ def make_header(ndim, ref_header):
         if (key in hdr_new) and (hdr_new[key] != ndim):
             hdr_new.set(keyword=key, value=ndim, comment=comment)
 
-    hdr_new.add_history("====================================================================")
+    hdr_new.add_history("==================================================")
     hdr_new.add_history(f"Written by MUFASA v{__version__} on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    hdr_new.add_comment("====================================================================")
+    hdr_new.add_comment("==================================================")
     hdr_new.add_comment("MUFASA citation: Chen et al. (2020), DOI: 10.3847/1538-4357/ab7378")
     hdr_new.add_comment("MUFASA is available on GitHub at: https://github.com/mcyc/mufasa")
 

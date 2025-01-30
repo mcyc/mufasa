@@ -1,19 +1,29 @@
-__author__ = 'mcychen'
-
-
 """
-==================================================================
-Ammonia inversion transition: deblended fitter (Hyperfine-removed)
-==================================================================
+`Deprecated` - will be removed in v1.6.0.
+
+.. deprecated:: 1.5.0
+    This module is deprecated and will be removed in v1.6.0.
+    Use :meth:`deblend()` from :class:`N2HplusModel <mufasa.spec_models.SpecModels.N2HplusModel>` instead.
 """
 
 #=======================================================================================================================
+
+import warnings
+
+warnings.warn(
+    "The `n2hp_deblended.py` module is deprecated and will be removed in v1.6.0."
+    "Use the deblend() of a 'SpecModels.N2HplusModel' object instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 from pyspeckit.spectrum.models import hyperfine
-from .n2hp_constants import (line_names, freq_dict)
+#from .n2hp_constants import (line_names, freq_dict)
+from .m_constants import n2hp_constants
 #=======================================================================================================================
 
-
+line_names = n2hp_constants['line_names']
+freq_dict = n2hp_constants['freq_dict']
 tau0 = 1.0
 
 # represent the tau profile of nh3 spectra as a single Gaussian for each individual velocity slab

@@ -1,3 +1,6 @@
+"""
+Defines the MetaModel class for managing spectral model parameters, constraints, and fitting functions.
+"""
 
 __author__ = 'mcychen'
 
@@ -102,46 +105,24 @@ class MetaModel(object):
 
         # for the NH3 (1,1) multicomponent model
         if self.fittype == 'nh3_multi_v':
-            from pyspeckit.spectrum.models.ammonia_constants import freq_dict, voff_lines_dict, tau_wts_dict
-            from . import ammonia_multiv as ammv
-            from importlib import reload
-            reload(ammv)
+
+            from .SpecModels import AmmoniaModel
+            self.model = AmmoniaModel()
 
             self.linetype = 'nh3'
             # the current implementation only fits the 1-1 lines
             self.linename = 'oneone'
-            self.linenames = [self.linename]
-            self.fitter = ammv.nh3_multi_v_model_generator(n_comp=ncomp, linenames=self.linenames)
-
-            self.freq_dict = freq_dict
-            self.rest_value = freq_dict[self.linename] * u.Hz
-            self.voffs = voff_lines_dict[self.linename]
-            self.tau_wts = tau_wts_dict[self.linename]
-            self.voff_at_peak = self.voffs[np.argmax(self.tau_wts)] # velocity offset at the brightest hyperfine line
-
-            # the function to compute the spectral model
-            self.model_func = ammv.ammonia_multi_v
 
 
         # for the N2H+ (1-0) multi-component model
         elif self.fittype == 'n2hp_multi_v':
-            from .n2hp_constants import freq_dict, voff_lines_dict, tau_wts_dict
-            from . import n2hp_multiv as n2hpmv
+
+            from .SpecModels import N2HplusModel
+            self.model = N2HplusModel()
 
             self.linetype = 'n2hp'
             # the current implementation only fits the 1-0 lines
             self.linename = 'onezero'
-            self.linenames = [self.linename]
-            self.fitter = n2hpmv.n2hp_multi_v_model_generator(n_comp=ncomp, linenames=self.linenames)
-
-            self.freq_dict = freq_dict
-            self.rest_value = freq_dict[self.linename] * u.Hz
-            self.voffs = voff_lines_dict[self.linename]
-            self.tau_wts = tau_wts_dict[self.linename]
-            self.voff_at_peak = self.voffs[np.argmax(self.tau_wts)] # velocity offset at the brightest hyperfine line
-
-            # the function to compute the spectral model
-            self.model_func = n2hpmv.n2hp_multi_v
 
             # change the parameter limits from the default to better reflects N2H+ (1-0)
             self.taumax = 40.0  # when the satellite hyperfine lines becomes optically thick
@@ -152,6 +133,21 @@ class MetaModel(object):
 
         else:
             raise FitTypeError("\'{}\' is an invalid fittype".format(fittype))
+
+        freq_dict = self.model.molecular_constants['freq_dict']
+        voff_lines_dict = self.model.molecular_constants['voff_lines_dict']
+        tau_wts_dict = self.model.molecular_constants['tau_wts_dict']
+
+        self.fitter = self.model.multi_v_model_generator(n_comp=ncomp)
+
+        # the function to compute the spectral model
+        self.model_func = self.model.multi_v_spectrum
+
+        self.linenames = [self.linename]
+        self.rest_value = freq_dict[self.linename] * u.Hz
+        self.voffs = voff_lines_dict[self.linename]
+        self.tau_wts = tau_wts_dict[self.linename]
+        self.voff_at_peak = self.voffs[np.argmax(self.tau_wts)]  # velocity offset at the brightest hyperfine line
 
     def model_function(self, xarr, parameters, planemask=None, multithreaded=False):
         """

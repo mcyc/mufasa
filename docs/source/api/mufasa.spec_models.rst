@@ -12,7 +12,11 @@ mufasa.spec_models
 .. autosummary::
    :toctree:
 
+   BaseModel
+   HyperfineModel
+   SpecModels
    ammonia_multiv
+   m_constants
    meta_model
    n2hp_constants
    n2hp_deblended
