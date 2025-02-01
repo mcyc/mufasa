@@ -1,13 +1,13 @@
 Quick Start
 ===========
-        Let's get started quickly with **MUFASA**! If needed, use the navigation bar on the right to skip ahead to a specific topic.
+        Let's get started **MUFASA**. Use the navigation bar on the right to skip ahead as needed.
 
 Run Spectral Fits
 ------------------
 
 .. note::
 
-   **Install:** If you haven't installed MUFASA already, see :doc:`Install <installation>`.
+   **Installation:** If you haven't installed MUFASA already, see :doc:`Install <installation>`.
 
 
 Setting Up

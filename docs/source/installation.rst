@@ -1,10 +1,5 @@
 Installation
 =================
-.. note::
-
-   **Recommended Install**
-    MUFASA is currently undergoing rapid developments,
-    install from the source (see Option 3) to stay up-to-date with the latest version.
 
 System Requirements
 --------------------
@@ -17,14 +12,16 @@ Instructions
 
 1. **Install from PyPI**:
 
-   The easiest way to install MUFASA is through PyPI. Run the following command in your terminal:
+   The easiest way to install MUFASA is through PyPI. Run the following command in your terminal
+   to get the latest stable version:
 
    .. code-block:: bash
 
        pip install mufasa
 
 2. **Install from Source**:
-   to install the latest developing version, clone the MUFASA GitHub repository:
+   to install the latest developing version, clone the MUFASA GitHub repository and install by
+   using:
 
    .. code-block:: bash
 
@@ -33,12 +30,12 @@ Instructions
         pip install -e .
 
 
-   To use a specific version using a tag, for example, v1.4.2, run the following after
-   the initial install:
+   To switch to a particular version specified by a tag, (e.g., v1.4.3) or a git branch, run the following
+   from your local git repository:
 
    .. code-block:: bash
 
-        git checkout v1.4.2
+        git checkout v1.4.3
         git pull
 
    .. note::
