@@ -29,7 +29,7 @@ def deblend(para, specCubeRef, vmin=4.0, vmax=11.0, f_spcsamp=None, tau_wgt=0.1,
     Deblend hyperfine structures in a cube based on fitted models.
 
     This function reconstructs the fitted model with Gaussian lines accounting
-    for optical depths (e.g., similar to CO (J = 0-1)).
+    for optical depths (e.g., similar to CO rotational transitions).
 
     Parameters
     ----------
