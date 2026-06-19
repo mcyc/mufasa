@@ -11,10 +11,42 @@ from astropy.convolution import convolve_fft, Gaussian2DKernel
 
 class MockCloud(object):
     """
-    A class designed to generate synthetic spectral based on empirically motivated physical parameters
+    Generate synthetic 2D parameter maps for a single molecular cloud component.
 
-    Randomly generate mock parameters for molecular cloud structures using the same seed so the physical
-    parameters generated are spatially correlated similar to observations of real clouds
+    Fields are generated from an underlying 2D random field with a power-law
+    power spectrum (see `generate_powerlaw_field_pixel_based`). Passing the
+    same seed to multiple `get_*` methods yields spatially correlated maps,
+    mimicking the physical relationships expected in a real molecular cloud
+    (e.g., regions of high column density tending to have narrower linewidths).
+
+    Parameters
+    ----------
+    box_size : int, optional
+        Size of the grid in pixels (e.g., 256 for a 256x256 map). Default is 256.
+    pixel_size : float, optional
+        Physical size of each pixel, in parsecs. Default is 0.01.
+
+    Attributes
+    ----------
+    box_size : int
+        Grid size in pixels, as passed at construction.
+    pixel_size : float
+        Pixel scale in parsecs, as passed at construction.
+    largest_scale : float
+        Physical size of the full map (box_size * pixel_size), in parsecs.
+    beta : float
+        Power-law index of the column density power spectrum.
+    lognorm_kw : dict
+        Parameters (mean, std) for the column density log-normal distribution.
+    vlos_kw : dict
+        Parameters (alpha, beta, coherent_scale, std) for the line-of-sight
+        velocity field.
+    sigv_kw : dict
+        Parameters (field_sign, mean_log, std_log) for the velocity dispersion
+        log-normal distribution.
+    field, field_log_normal, field_vlos, field_sigv : ndarray or None
+        Cached fields from the most recent `get_*` call of the corresponding
+        type. None until the relevant method has been called at least once.
     """
 
     def __init__(self, box_size=256, pixel_size=0.01):
@@ -58,12 +90,35 @@ class MockCloud(object):
         self.field_sigv = None
 
     def set_seed(self, seed):
+        """
+        Set the primary seed and derive a secondary seed from it.
+
+        Parameters
+        ----------
+        seed : int or None
+            Seed for `random` and downstream field generation. If None,
+            no-op (current seed and seed2 are left unchanged).
+        """
         if seed is not None:
             self.seed = seed
             random.seed(seed)
             self.seed2 = random.randint(1, 42000)  # pick a random integer in that range
 
     def isnewseed(self, seed):
+        """
+        Check whether `seed` differs from the currently stored seed.
+
+        Parameters
+        ----------
+        seed : int or None
+            Seed to compare against `self.seed`. None always returns False,
+            signaling "no new seed requested, reuse cached field if available."
+
+        Returns
+        -------
+        new : bool
+            True if `seed` is not None and differs from `self.seed`.
+        """
 
         if seed is None:
             new = False
@@ -73,6 +128,24 @@ class MockCloud(object):
         return new
 
     def get_powerlaw_field(self, seed=None):
+        """
+        Generate (or retrieve the cached) 2D power-law random field.
+
+        This is the base field from which `get_lognormal_field` derives the
+        column density proxy map. Calling with the same seed as the last call
+        returns the cached field rather than regenerating it.
+
+        Parameters
+        ----------
+        seed : int, optional
+            Random seed for field generation. If None, reuses the most
+            recently generated field (or the default seed if none exists yet).
+
+        Returns
+        -------
+        field : ndarray
+            2D power-law random field, normalized to zero mean and unit variance.
+        """
 
         new = self.isnewseed(seed)
 
@@ -90,6 +163,30 @@ class MockCloud(object):
         return self.field
 
     def get_lognormal_field(self, seed=None, invert=False):
+        """
+        Generate a log-normal column density proxy map.
+
+        Built by exponentiating a scaled version of the underlying power-law
+        field (see `get_powerlaw_field`), consistent with the column density
+        statistics of isothermal, supersonic turbulence (e.g., Vazquez-Semadeni
+        1994; Padoan et al. 2003).
+
+        Parameters
+        ----------
+        seed : int, optional
+            Random seed for field generation. If None, reuses the most
+            recently generated field (or the default seed if none exists yet).
+        invert : bool, optional
+            If True, flip the sign of the underlying power-law field before
+            exponentiating, reversing which spatial structures correspond to
+            density peaks vs. troughs. Default is False.
+
+        Returns
+        -------
+        field_log_normal : ndarray
+            2D log-normal column density proxy map, with mean and standard
+            deviation set by `self.lognorm_kw`.
+        """
         # Generate the power-law field
 
         if self.isnewseed(seed) or self.field_log_normal is None:
@@ -107,7 +204,33 @@ class MockCloud(object):
         return self.field_log_normal
 
     def get_kinetic_powerlaw_field(self, seed=None, seed2=None):
+        """
+        Generate a 2D power-law random field using the velocity power spectrum.
 
+        This is the shared base field used by both `get_velocity_field` and
+        `get_sigma_v`, so that the line-of-sight velocity and velocity
+        dispersion maps share the same underlying turbulent structure
+        (scaled by `self.vlos_kw['beta']` and `self.vlos_kw['coherent_scale']`).
+
+        Parameters
+        ----------
+        seed : int, optional
+            Random seed for field generation. If None, reuses `self.seed`.
+        seed2 : int or True, optional
+            Secondary seed used to modify the phase of large-scale structures
+            (see `generate_powerlaw_field_pixel_based`). If True, uses
+            `self.seed2`. If None, no large-scale phase modification is applied.
+
+        Returns
+        -------
+        field : ndarray
+            2D power-law random field, normalized to zero mean and unit variance.
+        """
+        # TODO: the seed/seed2 interaction here needs further investigation —
+        # self.seed2 is read before self.set_seed(seed) updates self.seed below,
+        # so seed2=True may reflect a prior call's secondary seed rather than
+        # one freshly tied to the current `seed`. Likely to be superseded by
+        # the upcoming MockCloud/MockComponent restructuring.
         if seed2 is True:
             seed2 = self.seed2
 
