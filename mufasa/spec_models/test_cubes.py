@@ -11,13 +11,14 @@ from astropy.convolution import convolve_fft, Gaussian2DKernel
 
 class MockCloud(object):
     """
-    Generate synthetic 2D parameter maps for a single molecular cloud component.
+    Orchestrate a collection of `MockComponent` instances sharing a common grid.
 
-    Fields are generated from an underlying 2D random field with a power-law
-    power spectrum (see `generate_powerlaw_field_pixel_based`). Passing the
-    same seed to multiple `get_*` methods yields spatially correlated maps,
-    mimicking the physical relationships expected in a real molecular cloud
-    (e.g., regions of high column density tending to have narrower linewidths).
+    `MockCloud` owns the spatial grid (`box_size`, `pixel_size`) and holds a
+    list of `MockComponent` instances, one per cloud component, each
+    representing an independent set of column density, velocity dispersion,
+    and line-of-sight velocity maps. The only thing that couples components
+    together is their relative placement along the velocity axis, handled by
+    `get_velocity_fields`.
 
     Parameters
     ----------
@@ -25,6 +26,13 @@ class MockCloud(object):
         Size of the grid in pixels (e.g., 256 for a 256x256 map). Default is 256.
     pixel_size : float, optional
         Physical size of each pixel, in parsecs. Default is 0.01.
+    n_components : int, optional
+        Number of components to create at construction. Default is 1.
+    seeds : list of int, optional
+        Seed for each component, in order. If None, seeds are auto-generated
+        as 42, 43, 44, ... (one per component) to ensure components are
+        statistically independent by default. If provided, must have length
+        `n_components`.
 
     Attributes
     ----------
@@ -34,271 +42,128 @@ class MockCloud(object):
         Pixel scale in parsecs, as passed at construction.
     largest_scale : float
         Physical size of the full map (box_size * pixel_size), in parsecs.
-    beta : float
-        Power-law index of the column density power spectrum.
-    lognorm_kw : dict
-        Parameters (mean, std) for the column density log-normal distribution.
-    vlos_kw : dict
-        Parameters (alpha, beta, coherent_scale, std) for the line-of-sight
-        velocity field.
-    sigv_kw : dict
-        Parameters (field_sign, mean_log, std_log) for the velocity dispersion
-        log-normal distribution.
-    field, field_log_normal, field_vlos, field_sigv : ndarray or None
-        Cached fields from the most recent `get_*` call of the corresponding
-        type. None until the relevant method has been called at least once.
+    components : list of MockComponent
+        The cloud's components, in order.
     """
 
-    def __init__(self, box_size=256, pixel_size=0.01):
-
-        self.seed = None
-        self.seed2 = None
-        self.set_seed(42)  # set default seed 1 & 2
+    def __init__(self, box_size=256, pixel_size=0.01, n_components=1, seeds=None):
 
         self.box_size = box_size
         self.pixel_size = pixel_size
         self.largest_scale = box_size * pixel_size  # parsecs
 
-        self.beta = 2.7  # spectral index of column density power spectrum
-
-        self.lognorm_kw = dict(
-            mean=1.0,  # Mean column density (arbitrary units)
-            std=0.3  # Standard deviation of the log-normal distribution
-        )
-
-        # Note - for VLOS's beta:
-        # empirical beta ~2.8-3.2 (Elmegreen & Scalo 2004)
-        # simulation beta ~ 2.7 (Padoan et al. 2003)
-
-        self.vlos_kw = dict(
-            alpha=0.5,  # Larson's relation index
-            beta=2 * 0.5 + 2,  # Comforms to Larson's relation and Burgers' turbulence
-            coherent_scale=0.5,  # pc, the scale for which velocity has roughly the same structure as the column density
-            std=0.75  # km/s, the standard deviation to normalize the velocity field standard deviation
-        )
-
-        # these default values mimic GAS & KEYSTONE NH3 results
-        self.sigv_kw = dict(
-            field_sign=-1, # (-1 or 1) Default of -1 means linewidth anti-correlates with column density
-            mean_log=0.45,  # Mean of the log-normal (arbitrary units)
-            std_log=0.6  # Standard deviation of the log-normal distribution
-        )
-
-        self.field = None
-        self.field_log_normal = None
-        self.field_vlos = None
-        self.field_sigv = None
-
-    def set_seed(self, seed):
-        """
-        Set the primary seed and derive a secondary seed from it.
-
-        Parameters
-        ----------
-        seed : int or None
-            Seed for `random` and downstream field generation. If None,
-            no-op (current seed and seed2 are left unchanged).
-        """
-        if seed is not None:
-            self.seed = seed
-            random.seed(seed)
-            self.seed2 = random.randint(1, 42000)  # pick a random integer in that range
-
-    def isnewseed(self, seed):
-        """
-        Check whether `seed` differs from the currently stored seed.
-
-        Parameters
-        ----------
-        seed : int or None
-            Seed to compare against `self.seed`. None always returns False,
-            signaling "no new seed requested, reuse cached field if available."
-
-        Returns
-        -------
-        new : bool
-            True if `seed` is not None and differs from `self.seed`.
-        """
-
-        if seed is None:
-            new = False
-        else:
-            new = seed != self.seed
-
-        return new
-
-    def get_powerlaw_field(self, seed=None):
-        """
-        Generate (or retrieve the cached) 2D power-law random field.
-
-        This is the base field from which `get_lognormal_field` derives the
-        column density proxy map. Calling with the same seed as the last call
-        returns the cached field rather than regenerating it.
-
-        Parameters
-        ----------
-        seed : int, optional
-            Random seed for field generation. If None, reuses the most
-            recently generated field (or the default seed if none exists yet).
-
-        Returns
-        -------
-        field : ndarray
-            2D power-law random field, normalized to zero mean and unit variance.
-        """
-
-        new = self.isnewseed(seed)
-
-        if new or self.field is None:
-            self.set_seed(seed)
-            # generate a new powerlaw field
-            kwargs = dict(
-                box_size=self.box_size,
-                pixel_size=self.pixel_size,
-                beta=self.beta,
-                random_seed=self.seed
+        if seeds is None:
+            seeds = [42 + i for i in range(n_components)]
+        elif len(seeds) != n_components:
+            raise ValueError(
+                f"len(seeds)={len(seeds)} does not match n_components={n_components}"
             )
-            self.field = generate_powerlaw_field_pixel_based(**kwargs)
 
-        return self.field
+        self.components = [
+            MockComponent(box_size=box_size, pixel_size=pixel_size, seed=seed)
+            for seed in seeds
+        ]
 
-    def get_lognormal_field(self, seed=None, invert=False):
+    def add_component(self, seed=None):
         """
-        Generate a log-normal column density proxy map.
-
-        Built by exponentiating a scaled version of the underlying power-law
-        field (see `get_powerlaw_field`), consistent with the column density
-        statistics of isothermal, supersonic turbulence (e.g., Vazquez-Semadeni
-        1994; Padoan et al. 2003).
+        Append a new component to `self.components`.
 
         Parameters
         ----------
         seed : int, optional
-            Random seed for field generation. If None, reuses the most
-            recently generated field (or the default seed if none exists yet).
-        invert : bool, optional
-            If True, flip the sign of the underlying power-law field before
-            exponentiating, reversing which spatial structures correspond to
-            density peaks vs. troughs. Default is False.
+            Seed for the new component. If None, uses `MockComponent`'s
+            default seed (42) — note this may duplicate an existing
+            component's seed if not set explicitly.
 
         Returns
         -------
-        field_log_normal : ndarray
-            2D log-normal column density proxy map, with mean and standard
-            deviation set by `self.lognorm_kw`.
+        component : MockComponent
+            The newly created and appended component.
         """
-        # Generate the power-law field
-
-        if self.isnewseed(seed) or self.field_log_normal is None:
-
-            field = self.get_powerlaw_field(seed)
-            if invert:
-                field *= -1
-            mean = self.lognorm_kw['mean']
-            std = self.lognorm_kw['std']
-
-            # Scale and exponentiate to create log-normal distribution
-            field_scaled = np.log(mean) - 0.5 * (std ** 2) + std * field
-            self.field_log_normal = np.exp(field_scaled)
-
-        return self.field_log_normal
-
-    def get_kinetic_powerlaw_field(self, seed=None, seed2=None):
-        """
-        Generate a 2D power-law random field using the velocity power spectrum.
-
-        This is the shared base field used by both `get_velocity_field` and
-        `get_sigma_v`, so that the line-of-sight velocity and velocity
-        dispersion maps share the same underlying turbulent structure
-        (scaled by `self.vlos_kw['beta']` and `self.vlos_kw['coherent_scale']`).
-
-        Parameters
-        ----------
-        seed : int, optional
-            Random seed for field generation. If None, reuses `self.seed`.
-        seed2 : int or True, optional
-            Secondary seed used to modify the phase of large-scale structures
-            (see `generate_powerlaw_field_pixel_based`). If True, uses
-            `self.seed2`. If None, no large-scale phase modification is applied.
-
-        Returns
-        -------
-        field : ndarray
-            2D power-law random field, normalized to zero mean and unit variance.
-        """
-        # TODO: the seed/seed2 interaction here needs further investigation —
-        # self.seed2 is read before self.set_seed(seed) updates self.seed below,
-        # so seed2=True may reflect a prior call's secondary seed rather than
-        # one freshly tied to the current `seed`. Likely to be superseded by
-        # the upcoming MockCloud/MockComponent restructuring.
-        if seed2 is True:
-            seed2 = self.seed2
-
+        kwargs = dict(box_size=self.box_size, pixel_size=self.pixel_size)
         if seed is not None:
-            self.set_seed(seed)
+            kwargs['seed'] = seed
+        component = MockComponent(**kwargs)
+        self.components.append(component)
+        return component
 
-        kwargs = dict(
-            box_size=self.box_size,
-            pixel_size=self.pixel_size,
-            beta=self.vlos_kw['beta'],  # specific for velocity
-            random_seed=self.seed,
-            random_seed_2=seed2,
-            length_scale=self.vlos_kw['coherent_scale'] / self.pixel_size,  # coherent_scale in pixel unit
-        )
-        return generate_powerlaw_field_pixel_based(**kwargs)
+    def get_velocity_fields(self, offsets):
+        """
+        Generate per-component v_los maps, placed along the velocity axis
+        in ascending order and centered/sign-flipped per a fixed convention.
 
+        Components are placed in the order given by `self.components`, from
+        lowest to highest velocity centroid, spaced according to `offsets`.
+        Positions are then shifted so that the midpoint between the lowest
+        and highest position sits at 0 (symmetric placement for any `n`;
+        for odd `n` with evenly-spaced gaps this also puts the middle
+        component exactly at 0). Sign flipping follows:
 
-    def get_velocity_field(self, seed=None, seed2=True, skewness=None):
+        - 1 component: never sign-flipped.
+        - 2 components: the higher (second) component has its v_los field
+          sign-flipped, mirroring its turbulent structure in addition to
+          shifting it. This matches the common observational scenario of
+          two overlapping but kinematically distinct cloud components.
+        - >2 components: each component independently has a ~50/50 chance
+          of being sign-flipped, drawn deterministically from that
+          component's own seed (so the flip pattern is reproducible for a
+          given set of component seeds).
 
-        field_vlos = self.get_kinetic_powerlaw_field(seed=seed, seed2=seed2)
+        Parameters
+        ----------
+        offsets : float or list of float
+            Spacing between consecutive components, in units of each
+            component's own `vlos_kw['std']` (i.e. as a multiple of its
+            velocity dispersion). If a scalar, components are evenly spaced
+            by that amount. If a list, must have length
+            `len(self.components) - 1`, giving the gap between each
+            consecutive pair of components.
 
-        def standardize(field_vlos):
-            # ensure normalization
-            field_vlos -= np.mean(field_vlos)
-            field_vlos /= np.std(field_vlos)
-            return field_vlos
+        Returns
+        -------
+        fields : list of ndarray
+            v_los map for each component, in order, after sign-flipping
+            (where applicable) and shifting to its target position.
+        """
+        n = len(self.components)
 
-        field_vlos = standardize(field_vlos)
+        if n == 1:
+            gaps = []
+        elif np.isscalar(offsets):
+            gaps = [offsets] * (n - 1)
+        else:
+            if len(offsets) != n - 1:
+                raise ValueError(
+                    f"len(offsets)={len(offsets)} does not match "
+                    f"len(self.components) - 1 = {n - 1}"
+                )
+            gaps = list(offsets)
 
-        if skewness is not None and skewness != 0:
-            # ensure normalization
-            # transform into a skewed Gaussian
-            a = -skewness
-            norm_cdf = norm.cdf(field_vlos)
-            field_vlos = skewnorm.ppf(norm_cdf, a)
-            # recenter
-            field_vlos = standardize(field_vlos)
+        # cumulative positions, ascending, before centering
+        raw_positions = np.concatenate([[0.0], np.cumsum(gaps)])
 
-        # re-normalize the standard deviation of the vlos distribution
-        scaling_factor = self.vlos_kw['std'] / np.std(field_vlos)
-        self.field_vlos = field_vlos * scaling_factor
+        # center on the midpoint between the lowest and highest position,
+        # so placement is symmetric regardless of n's parity
+        midpoint = (raw_positions[0] + raw_positions[-1]) / 2
+        positions = raw_positions - midpoint
 
-        if self.field_vlos is not None:
-            return self.field_vlos
+        # determine sign flips
+        flips = np.ones(n)
+        if n == 2:
+            flips[1] = -1
+        elif n > 2:
+            for i, component in enumerate(self.components):
+                rng = np.random.RandomState(component.seed)
+                if rng.rand() < 0.5:
+                    flips[i] = -1
 
+        fields = []
+        for component, position, flip_sign in zip(self.components, positions, flips):
+            field = component.get_velocity_field()
+            sigv = component.vlos_kw['std']
+            fields.append(flip_sign * field + sigv * position)
 
-    def get_sigma_v(self, seed=None):
-        field_pl = self.get_kinetic_powerlaw_field(seed=seed)
-        field_pl *= self.sigv_kw['field_sign']  # correlate or anti-correlate with column density
-
-        # Scale and exponentiate to create log-normal distribution for sigma_v
-        mean = self.sigv_kw['mean_log']
-        std = self.sigv_kw['std_log']
-        field_scaled = np.log(mean) - 0.5 * (std ** 2) + std * field_pl
-        self.field_sigv = np.exp(field_scaled)
-        return self.field_sigv
-
-
-    def get_column_density(self):
-        pass
-
-    def get_tau(self):
-        # scales with log-normal power spectrum, normalized tp 0.1 - 8?
-        pass
-
-    def get_tex(self):
-        # uniform box function like distribution in [4-8] K?
-        pass
+        return fields
 
 
 class MockComponent(object):
