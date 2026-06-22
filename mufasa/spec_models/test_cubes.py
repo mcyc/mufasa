@@ -54,11 +54,15 @@ class MockCloud(object):
         by the time `__init__` returns.
     """
 
-    def __init__(self, box_size=256, pixel_size=0.01, n_components=1, seeds=None, v_offsets=None):
+    def __init__(self, box_size=256, largest_scale=2.5, n_components=1, seeds=None, v_offsets=None,
+                 vlos_std=0.5, coherent_scale=0.5):
 
         self.box_size = box_size
-        self.pixel_size = pixel_size
-        self.largest_scale = box_size * pixel_size  # parsecs
+        #self.pixel_size = pixel_size
+        #self.largest_scale = box_size * pixel_size  # parsecs
+        self.largest_scale = largest_scale # parsecs
+        self.pixel_size = largest_scale/box_size
+
 
         if seeds is None:
             seeds = [42 + i for i in range(n_components)]
@@ -68,13 +72,15 @@ class MockCloud(object):
             )
 
         self.components = [
-            MockComponent(box_size=box_size, pixel_size=pixel_size, seed=seed)
+            MockComponent(box_size=self.box_size, pixel_size=self.pixel_size, seed=seed, vlos_std=vlos_std, coherent_scale=coherent_scale)
             for seed in seeds
         ]
 
         # place components' v_los fields along the velocity axis; defaults
         # to 1 velocity dispersion of spacing if v_offsets is not given
-        self.apply_velocity_offsets(1.0 if v_offsets is None else v_offsets)
+        # self.apply_velocity_offsets(1.0 if v_offsets is None else v_offsets)
+        if v_offsets:
+            self.apply_velocity_offsets(v_offsets)
 
     def add_component(self, seed=None):
         """
@@ -258,7 +264,7 @@ class MockComponent(object):
     corresponding `get_*` method is called again with a different seed.
     """
 
-    def __init__(self, box_size, pixel_size, seed=42):
+    def __init__(self, box_size, pixel_size, seed=42, vlos_std=0.5, coherent_scale=0.5):
 
         self.seed = None
         self.seed2 = None
@@ -279,10 +285,10 @@ class MockComponent(object):
         # simulation beta ~ 2.7 (Padoan et al. 2003)
 
         self.vlos_kw = dict(
-            alpha=0.5,  # Larson's relation index
+            # alpha=0.5,  # Larson's relation index
             beta=2 * 0.5 + 2,  # Comforms to Larson's relation and Burgers' turbulence
-            coherent_scale=0.5,  # pc, the scale for which velocity has roughly the same structure as the column density
-            std=0.75  # km/s, the standard deviation to normalize the velocity field standard deviation
+            coherent_scale=coherent_scale,  # pc, the scale for which velocity has roughly the same structure as the column density
+            std=vlos_std  # km/s, the standard deviation to normalize the velocity field standard deviation
         )
 
         # these default values mimic GAS & KEYSTONE NH3 results
