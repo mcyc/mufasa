@@ -17,8 +17,8 @@ class MockCloud(object):
     list of `MockComponent` instances, one per cloud component, each
     representing an independent set of column density, velocity dispersion,
     and line-of-sight velocity maps. The only thing that couples components
-    together is their relative placement along the velocity axis, handled by
-    `get_velocity_fields`.
+    together is their relative placement along the velocity axis, applied at
+    construction via `apply_velocity_offsets`.
 
     Parameters
     ----------
@@ -33,6 +33,12 @@ class MockCloud(object):
         as 42, 43, 44, ... (one per component) to ensure components are
         statistically independent by default. If provided, must have length
         `n_components`.
+    v_offsets : float or list of float, optional
+        Spacing between consecutive components' v_los fields, passed to
+        `apply_velocity_offsets` at the end of construction. If None
+        (default), components are spaced by 1.0 (one velocity dispersion,
+        i.e. each component's own `vlos_kw['std']`). See
+        `apply_velocity_offsets` for the full placement convention.
 
     Attributes
     ----------
@@ -43,10 +49,12 @@ class MockCloud(object):
     largest_scale : float
         Physical size of the full map (box_size * pixel_size), in parsecs.
     components : list of MockComponent
-        The cloud's components, in order.
+        The cloud's components, in order. Each component's `field_vlos` has
+        already been placed (shifted/sign-flipped) by `apply_velocity_offsets`
+        by the time `__init__` returns.
     """
 
-    def __init__(self, box_size=256, pixel_size=0.01, n_components=1, seeds=None):
+    def __init__(self, box_size=256, pixel_size=0.01, n_components=1, seeds=None, v_offsets=None):
 
         self.box_size = box_size
         self.pixel_size = pixel_size
@@ -64,9 +72,18 @@ class MockCloud(object):
             for seed in seeds
         ]
 
+        # place components' v_los fields along the velocity axis; defaults
+        # to 1 velocity dispersion of spacing if v_offsets is not given
+        self.apply_velocity_offsets(1.0 if v_offsets is None else v_offsets)
+
     def add_component(self, seed=None):
         """
         Append a new component to `self.components`.
+
+        Note this does not re-run `apply_velocity_offsets` — the newly added
+        component's `field_vlos` remains unplaced (raw) until
+        `apply_velocity_offsets` is called again explicitly across the full,
+        updated `self.components` list.
 
         Parameters
         ----------
@@ -87,10 +104,27 @@ class MockCloud(object):
         self.components.append(component)
         return component
 
-    def get_velocity_fields(self, offsets):
+    def apply_velocity_offsets(self, offsets):
         """
-        Generate per-component v_los maps, placed along the velocity axis
-        in ascending order and centered/sign-flipped per a fixed convention.
+        Place each component's v_los field along the velocity axis, in
+        ascending order, centered/sign-flipped per a fixed convention.
+
+        Unlike most `get_*` methods in this module, this method does not
+        generate new fields — it reads each component's *current*
+        `field_vlos` (the raw, unplaced field cached by `MockComponent` at
+        construction) and overwrites it in place with the shifted/flipped
+        result.
+
+        .. warning::
+            Calling this method more than once **compounds** the placement,
+            since each call places whatever is currently in `field_vlos`,
+            not the original raw field. Call it only once per desired
+            placement (as `MockCloud.__init__` does automatically); to
+            re-place from scratch, construct a new `MockCloud`, or manually
+            regenerate each component's raw field first via
+            `component.field_vlos = component.get_velocity_field(component.seed)`
+            (which always regenerates fresh, since `get_velocity_field` does
+            not cache/early-return) before calling this again.
 
         Components are placed in the order given by `self.components`, from
         lowest to highest velocity centroid, spaced according to `offsets`.
@@ -122,8 +156,8 @@ class MockCloud(object):
         Returns
         -------
         fields : list of ndarray
-            v_los map for each component, in order, after sign-flipping
-            (where applicable) and shifting to its target position.
+            Placed v_los map for each component, in order (same arrays as
+            `[c.field_vlos for c in self.components]` after this call).
         """
         n = len(self.components)
 
@@ -159,9 +193,10 @@ class MockCloud(object):
 
         fields = []
         for component, position, flip_sign in zip(self.components, positions, flips):
-            field = component.get_velocity_field()
             sigv = component.vlos_kw['std']
-            fields.append(flip_sign * field + sigv * position)
+            placed = flip_sign * component.field_vlos + sigv * position
+            component.field_vlos = placed
+            fields.append(placed)
 
         return fields
 
@@ -201,9 +236,26 @@ class MockComponent(object):
     sigv_kw : dict
         Parameters (field_sign, mean_log, std_log) for the velocity dispersion
         log-normal distribution.
-    field, field_log_normal, field_vlos, field_sigv : ndarray or None
-        Cached fields from the most recent `get_*` call of the corresponding
-        type. None until the relevant method has been called at least once.
+    field : ndarray
+        Underlying power-law random field used to derive `field_column_density`.
+    field_column_density : ndarray
+        Column density proxy map, generated at construction via
+        `get_lognormal_field` using `seed`. Named for the physical quantity
+        rather than the generating method, since column density may be
+        derived through other means (and may require unit scaling) in the
+        future.
+    field_vlos : ndarray
+        Line-of-sight velocity map, generated at construction via
+        `get_velocity_field` using `seed`.
+    field_sigv : ndarray
+        Velocity dispersion map, generated at construction via `get_sigma_v`
+        using `seed`.
+
+    Notes
+    -----
+    All four field attributes above are populated once at construction time
+    using `seed`, and are then cached/overwritten in place if the
+    corresponding `get_*` method is called again with a different seed.
     """
 
     def __init__(self, box_size, pixel_size, seed=42):
@@ -241,9 +293,15 @@ class MockComponent(object):
         )
 
         self.field = None
-        self.field_log_normal = None
+        self.field_column_density = None
         self.field_vlos = None
         self.field_sigv = None
+
+        # eagerly populate all fields at construction so they're immediately
+        # available as attributes, without requiring an explicit get_* call
+        self.field_column_density = self.get_lognormal_field(self.seed)
+        self.field_sigv = self.get_sigma_v(self.seed)
+        self.field_vlos = self.get_velocity_field(self.seed)
 
     def set_seed(self, seed):
         """
@@ -339,13 +397,13 @@ class MockComponent(object):
 
         Returns
         -------
-        field_log_normal : ndarray
+        field_column_density : ndarray
             2D log-normal column density proxy map, with mean and standard
             deviation set by `self.lognorm_kw`.
         """
         # Generate the power-law field
 
-        if self.isnewseed(seed) or self.field_log_normal is None:
+        if self.isnewseed(seed) or self.field_column_density is None:
 
             field = self.get_powerlaw_field(seed)
             if invert:
@@ -355,9 +413,9 @@ class MockComponent(object):
 
             # Scale and exponentiate to create log-normal distribution
             field_scaled = np.log(mean) - 0.5 * (std ** 2) + std * field
-            self.field_log_normal = np.exp(field_scaled)
+            self.field_column_density = np.exp(field_scaled)
 
-        return self.field_log_normal
+        return self.field_column_density
 
     def get_kinetic_powerlaw_field(self, seed=None, seed2=None):
         """
