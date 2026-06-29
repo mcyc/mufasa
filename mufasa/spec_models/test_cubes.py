@@ -39,6 +39,12 @@ class MockCloud(object):
         (default), components are spaced by 1.0 (one velocity dispersion,
         i.e. each component's own `vlos_kw['std']`). See
         `apply_velocity_offsets` for the full placement convention.
+    volume_density_profile : str or tuple, optional
+        Volume-density profile specification. Use ``"plummer"`` for the
+        default Plummer-like profile, or ``("plummer", dict)`` to override
+        parameters such as ``profile_index``, ``rho0``, ``r_flat``, and
+        ``modulation_std``. ``"powerlaw"`` is reserved for a future pure
+        power-law profile.
 
     Attributes
     ----------
@@ -52,10 +58,13 @@ class MockCloud(object):
         The cloud's components, in order. Each component's `field_vlos` has
         already been placed (shifted/sign-flipped) by `apply_velocity_offsets`
         by the time `__init__` returns.
+    volume_density_profile : str or tuple
+        Volume-density profile specification shared by new components.
     """
 
     def __init__(self, box_size=256, largest_scale=2.5, n_components=1, seeds=None, v_offsets=None,
-                 vlos_std=0.5, coherent_scale=0.5, column_density_pdf="lognormal"):
+                 vlos_std=0.5, coherent_scale=0.5, column_density_pdf="lognormal",
+                 volume_density_profile="plummer"):
 
         self.box_size = box_size
         #self.pixel_size = pixel_size
@@ -63,6 +72,7 @@ class MockCloud(object):
         self.largest_scale = largest_scale # parsecs
         self.pixel_size = largest_scale/box_size
         self.column_density_pdf = column_density_pdf
+        self.volume_density_profile = volume_density_profile
 
 
         if seeds is None:
@@ -73,7 +83,15 @@ class MockCloud(object):
             )
 
         self.components = [
-            MockComponent(box_size=self.box_size, pixel_size=self.pixel_size, seed=seed, vlos_std=vlos_std, coherent_scale=coherent_scale, column_density_pdf=column_density_pdf)
+            MockComponent(
+                box_size=self.box_size,
+                pixel_size=self.pixel_size,
+                seed=seed,
+                vlos_std=vlos_std,
+                coherent_scale=coherent_scale,
+                column_density_pdf=column_density_pdf,
+                volume_density_profile=volume_density_profile,
+            )
             for seed in seeds
         ]
 
@@ -108,6 +126,7 @@ class MockCloud(object):
             box_size=self.box_size,
             pixel_size=self.pixel_size,
             column_density_pdf=self.column_density_pdf,
+            volume_density_profile=self.volume_density_profile,
         )
         if seed is not None:
             kwargs['seed'] = seed
@@ -230,6 +249,13 @@ class MockComponent(object):
         Physical size of each pixel, in parsecs.
     seed : int, optional
         Initial seed for this component's field generation. Default is 42.
+    volume_density_profile : str or tuple, optional
+        Volume-density profile specification. Use ``"plummer"`` for the
+        default Plummer-like profile, or ``("plummer", dict)`` to override
+        parameters. The Plummer-like map uses a deterministic radial envelope
+        multiplied by a stochastic modulation derived from the column-density
+        field, so it is phase-aligned with column density but is not a
+        self-consistent 3D filament model.
 
     Attributes
     ----------
@@ -247,6 +273,10 @@ class MockComponent(object):
     sigv_kw : dict
         Parameters (field_sign, mean_log, std_log) for the velocity dispersion
         log-normal distribution.
+    volume_density_kw : dict
+        Parameters for the volume-density proxy map. For the default
+        Plummer-like profile, these include ``profile_index``, ``rho0``,
+        ``r_flat``, and ``modulation_std``.
     field : ndarray
         Underlying power-law random field used to derive `field_column_density`.
     field_column_density : ndarray
@@ -255,6 +285,9 @@ class MockComponent(object):
         rather than the generating method, since column density may be
         derived through other means (and may require unit scaling) in the
         future.
+    field_volume_density : ndarray
+        Effective 2D volume-density proxy map, generated at construction via
+        `get_volume_density` using `seed`.
     field_vlos : ndarray
         Line-of-sight velocity map, generated at construction via
         `get_velocity_field` using `seed`.
@@ -264,12 +297,13 @@ class MockComponent(object):
 
     Notes
     -----
-    All four field attributes above are populated once at construction time
+    All five field attributes above are populated once at construction time
     using `seed`, and are then cached/overwritten in place if the
     corresponding `get_*` method is called again with a different seed.
     """
 
-    def __init__(self, box_size, pixel_size, seed=42, vlos_std=0.5, coherent_scale=0.5, column_density_pdf="lognormal"):
+    def __init__(self, box_size, pixel_size, seed=42, vlos_std=0.5, coherent_scale=0.5,
+                 column_density_pdf="lognormal", volume_density_profile="plummer"):
 
         self.seed = None
         self.seed2 = None
@@ -289,9 +323,22 @@ class MockComponent(object):
             xmin=0.1,
             mean=1.0,
         )
+        self.volume_density_kw = dict(
+            profile_index=2.0,  # Asymptotic outer slope, rho(r) ∝ r**(-p)
+            # Central density in cm^-3; default follows the order of
+            # magnitude used by Smith, Glover & Klessen 2014.
+            rho0=1e5,
+            # Flat inner radius in pc; default follows the order of
+            # magnitude used by Arzoumanian+ 2011.
+            r_flat=0.03,
+            modulation_std=0.3,  # Independent lognormal modulation strength
+        )
         self.column_density_pdf = None
+        self.volume_density_profile = None
         self._field_column_density_kind = None
+        self._field_volume_density_kind = None
         self.set_column_density_pdf(column_density_pdf)
+        self.set_volume_density_profile(volume_density_profile)
 
         # Note - for VLOS's beta:
         # empirical beta ~2.8-3.2 (Elmegreen & Scalo 2004)
@@ -313,12 +360,14 @@ class MockComponent(object):
 
         self.field = None
         self.field_column_density = None
+        self.field_volume_density = None
         self.field_vlos = None
         self.field_sigv = None
 
         # eagerly populate all fields at construction so they're immediately
         # available as attributes, without requiring an explicit get_* call
         self.field_column_density = self.get_column_density(self.seed)
+        self.field_volume_density = self.get_volume_density(self.seed)
         self.field_sigv = self.get_sigma_v(self.seed)
         self.field_vlos = self.get_velocity_field(self.seed)
 
@@ -411,6 +460,98 @@ class MockComponent(object):
             raise TypeError("The tuple value in column_density_pdf must be a scalar.")
 
         return aliases[key], value
+
+    def set_volume_density_profile(self, volume_density_profile):
+        """
+        Set the profile used for the volume-density proxy map.
+        """
+        kind, params = self._parse_volume_density_profile(volume_density_profile)
+
+        if kind == "plummer":
+            allowed = {"profile_index", "rho0", "r_flat", "modulation_std", "center"}
+            unknown = set(params) - allowed
+            if unknown:
+                raise ValueError(
+                    "Unknown Plummer volume-density parameter(s): "
+                    f"{sorted(unknown)}. Allowed keys are {sorted(allowed)}."
+                )
+            self.volume_density_kw.update(params)
+            self._validate_plummer_volume_density_kw()
+        else:
+            # Store the kind for clearer downstream errors while reserving the
+            # public API shape for future pure power-law profiles.
+            if params:
+                self.volume_density_kw.update(params)
+
+        self.volume_density_profile = kind
+        self.field_volume_density = None
+        self._field_volume_density_kind = None
+        return kind
+
+    @staticmethod
+    def _parse_volume_density_profile(volume_density_profile):
+        if isinstance(volume_density_profile, str):
+            kind = volume_density_profile
+            params = {}
+        elif (
+            isinstance(volume_density_profile, tuple)
+            and len(volume_density_profile) == 2
+            and isinstance(volume_density_profile[0], str)
+        ):
+            kind, params = volume_density_profile
+        else:
+            raise TypeError(
+                "volume_density_profile must be a string or a tuple of "
+                "(name, dict), e.g. 'plummer' or "
+                "('plummer', {'rho0': 1e5, 'r_flat': 0.03})."
+            )
+
+        aliases = {
+            "plummer": "plummer",
+            "plummer-like": "plummer",
+            "plummerlike": "plummer",
+            "powerlaw": "powerlaw",
+            "power-law": "powerlaw",
+            "pl": "powerlaw",
+        }
+        key = kind.lower().replace("_", "-")
+        if key not in aliases:
+            raise ValueError(
+                "volume_density_profile must be one of 'plummer' or "
+                "'powerlaw' ('powerlaw' is reserved for a future profile)."
+            )
+
+        if params is None:
+            params = {}
+        elif not isinstance(params, dict):
+            raise TypeError(
+                "The tuple value in volume_density_profile must be a dict, "
+                "e.g. ('plummer', {'profile_index': 2.0})."
+            )
+
+        return aliases[key], params
+
+    def _validate_plummer_volume_density_kw(self):
+        profile_index = self.volume_density_kw["profile_index"]
+        rho0 = self.volume_density_kw["rho0"]
+        r_flat = self.volume_density_kw["r_flat"]
+        modulation_std = self.volume_density_kw["modulation_std"]
+
+        if profile_index <= 0:
+            raise ValueError("volume_density_kw['profile_index'] must be > 0.")
+        if rho0 <= 0:
+            raise ValueError("volume_density_kw['rho0'] must be > 0.")
+        if r_flat <= 0:
+            raise ValueError("volume_density_kw['r_flat'] must be > 0.")
+        if modulation_std < 0:
+            raise ValueError("volume_density_kw['modulation_std'] must be >= 0.")
+
+        center = self.volume_density_kw.get("center")
+        if center is not None:
+            if len(center) != 2:
+                raise ValueError("volume_density_kw['center'] must contain two values.")
+            if not np.all(np.isfinite(center)):
+                raise ValueError("volume_density_kw['center'] must be finite.")
 
     def get_powerlaw_field(self, seed=None):
         """
@@ -537,6 +678,76 @@ class MockComponent(object):
             return self.get_powerlaw_column_density(seed=seed, invert=invert)
 
         raise RuntimeError(f"Unknown column_density_pdf: {self.column_density_pdf!r}")
+
+    def get_plummer_like_volume_density(self, seed=None):
+        """
+        Generate a Plummer-like 2D volume-density proxy map.
+
+        The map is built by rank-remapping the values of a deterministic
+        Plummer-like radial profile onto the rank order of
+        `field_column_density`. This preserves a Plummer-like one-point
+        distribution while forcing the mock volume-density morphology to be
+        phase-aligned with the column-density field. The result is a density
+        proxy rather than a self-consistent 3D filament model.
+        """
+        if (
+            self.isnewseed(seed)
+            or self.field_volume_density is None
+            or self._field_volume_density_kind != "plummer"
+        ):
+            self._validate_plummer_volume_density_kw()
+            profile = generate_plummer_like_profile_2d(
+                box_size=self.box_size,
+                pixel_size=self.pixel_size,
+                profile_index=self.volume_density_kw["profile_index"],
+                rho0=self.volume_density_kw["rho0"],
+                r_flat=self.volume_density_kw["r_flat"],
+                center=self.volume_density_kw.get("center"),
+            )
+
+            column_template = self.get_column_density(seed=seed).copy()
+            profile_values = np.sort(profile, axis=None)
+            template_order = np.argsort(column_template, axis=None)
+
+            field_volume_density = np.empty_like(column_template, dtype=float)
+            field_volume_density.flat[template_order] = profile_values
+
+            modulation_std = self.volume_density_kw["modulation_std"]
+            if modulation_std > 0:
+                tiny = np.finfo(float).tiny
+                modulation_template = np.log(np.clip(column_template, tiny, None))
+                modulation_template -= np.mean(modulation_template)
+                template_std = np.std(modulation_template)
+                if template_std > 0:
+                    modulation_template /= template_std
+                    modulation = np.exp(
+                        -0.5 * modulation_std ** 2
+                        + modulation_std * modulation_template
+                    )
+                    field_mean = np.mean(field_volume_density)
+                    field_volume_density *= modulation
+                    field_volume_density *= field_mean / np.mean(field_volume_density)
+
+            self.field_volume_density = field_volume_density
+            self._field_volume_density_kind = "plummer"
+
+        return self.field_volume_density
+
+    def get_volume_density(self, seed=None, profile=None):
+        if profile is not None:
+            self.set_volume_density_profile(profile)
+
+        if self.volume_density_profile == "plummer":
+            return self.get_plummer_like_volume_density(seed=seed)
+        if self.volume_density_profile == "powerlaw":
+            raise NotImplementedError(
+                "A pure power-law volume-density profile is reserved for a "
+                "future implementation. Use 'plummer' for now."
+            )
+
+        raise RuntimeError(
+            f"Unknown volume_density_profile: {self.volume_density_profile!r}"
+        )
 
     def get_kinetic_powerlaw_field(self, seed=None, seed2=None):
         """
@@ -680,6 +891,65 @@ class MockComponent(object):
     def get_tex(self):
         # uniform box function like distribution in [4-8] K?
         pass
+
+
+def generate_plummer_like_profile_2d(box_size, pixel_size, profile_index=2.0, rho0=1e5,
+                                     r_flat=0.03, center=None):
+    """
+    Generate a 2D Plummer-like volume-density proxy map.
+
+    The radial envelope follows
+    ``rho(r) = rho0 * (1 + (r / r_flat)**2)**(-profile_index / 2)``,
+    where ``profile_index`` is the asymptotic outer density-profile index.
+    This profile is useful as a simple Plummer-like envelope, but it does
+    not by itself generate a self-consistent filament or 3D cloud structure.
+
+    Parameters
+    ----------
+    box_size : int
+        Size of the grid in pixels.
+    pixel_size : float
+        Physical size of each pixel, in parsecs.
+    profile_index : float, optional
+        Asymptotic outer density-profile index. Default is 2.0.
+    rho0 : float, optional
+        Central density scale, conceptually in cm^-3. Default is 1e5.
+    r_flat : float, optional
+        Flat inner radius, in parsecs. Default is 0.03.
+    center : tuple of float, optional
+        Profile center in pixel coordinates as ``(y, x)``. If None, uses the
+        geometric center of the map.
+
+    Returns
+    -------
+    profile : ndarray
+        2D Plummer-like profile map.
+    """
+    if box_size <= 0:
+        raise ValueError("box_size must be > 0.")
+    if pixel_size <= 0:
+        raise ValueError("pixel_size must be > 0.")
+    if profile_index <= 0:
+        raise ValueError("profile_index must be > 0.")
+    if rho0 <= 0:
+        raise ValueError("rho0 must be > 0.")
+    if r_flat <= 0:
+        raise ValueError("r_flat must be > 0.")
+
+    if center is None:
+        y0 = x0 = (box_size - 1) / 2
+    else:
+        if len(center) != 2:
+            raise ValueError("center must contain two values.")
+        y0, x0 = center
+        if not np.all(np.isfinite([y0, x0])):
+            raise ValueError("center must be finite.")
+
+    y, x = np.indices((box_size, box_size), dtype=float)
+    r = np.hypot(y - y0, x - x0) * pixel_size
+    profile = rho0 * (1 + (r / r_flat) ** 2) ** (-profile_index / 2)
+
+    return profile
 
 
 def generate_powerlaw_field_pixel_based(box_size, pixel_size, beta, random_seed=None, random_seed_2=None,
