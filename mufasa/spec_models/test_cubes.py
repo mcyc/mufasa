@@ -55,13 +55,14 @@ class MockCloud(object):
     """
 
     def __init__(self, box_size=256, largest_scale=2.5, n_components=1, seeds=None, v_offsets=None,
-                 vlos_std=0.5, coherent_scale=0.5):
+                 vlos_std=0.5, coherent_scale=0.5, column_density_pdf="lognormal"):
 
         self.box_size = box_size
         #self.pixel_size = pixel_size
         #self.largest_scale = box_size * pixel_size  # parsecs
         self.largest_scale = largest_scale # parsecs
         self.pixel_size = largest_scale/box_size
+        self.column_density_pdf = column_density_pdf
 
 
         if seeds is None:
@@ -72,7 +73,7 @@ class MockCloud(object):
             )
 
         self.components = [
-            MockComponent(box_size=self.box_size, pixel_size=self.pixel_size, seed=seed, vlos_std=vlos_std, coherent_scale=coherent_scale)
+            MockComponent(box_size=self.box_size, pixel_size=self.pixel_size, seed=seed, vlos_std=vlos_std, coherent_scale=coherent_scale, column_density_pdf=column_density_pdf)
             for seed in seeds
         ]
 
@@ -103,7 +104,11 @@ class MockCloud(object):
         component : MockComponent
             The newly created and appended component.
         """
-        kwargs = dict(box_size=self.box_size, pixel_size=self.pixel_size)
+        kwargs = dict(
+            box_size=self.box_size,
+            pixel_size=self.pixel_size,
+            column_density_pdf=self.column_density_pdf,
+        )
         if seed is not None:
             kwargs['seed'] = seed
         component = MockComponent(**kwargs)
@@ -264,7 +269,7 @@ class MockComponent(object):
     corresponding `get_*` method is called again with a different seed.
     """
 
-    def __init__(self, box_size, pixel_size, seed=42, vlos_std=0.5, coherent_scale=0.5):
+    def __init__(self, box_size, pixel_size, seed=42, vlos_std=0.5, coherent_scale=0.5, column_density_pdf="lognormal"):
 
         self.seed = None
         self.seed2 = None
@@ -279,6 +284,14 @@ class MockComponent(object):
             mean=1.0,  # Mean column density (arbitrary units)
             std=0.3  # Standard deviation of the log-normal distribution
         )
+        self.powerlaw_pdf_kw = dict(
+            alpha=2.0,  # Differential PDF slope, p(N) ∝ N**(-alpha); default based on Sadavoy+ 2014's overall Perseus PDF
+            xmin=0.1,
+            mean=1.0,
+        )
+        self.column_density_pdf = None
+        self._field_column_density_kind = None
+        self.set_column_density_pdf(column_density_pdf)
 
         # Note - for VLOS's beta:
         # empirical beta ~2.8-3.2 (Elmegreen & Scalo 2004)
@@ -305,7 +318,7 @@ class MockComponent(object):
 
         # eagerly populate all fields at construction so they're immediately
         # available as attributes, without requiring an explicit get_* call
-        self.field_column_density = self.get_lognormal_field(self.seed)
+        self.field_column_density = self.get_column_density(self.seed)
         self.field_sigv = self.get_sigma_v(self.seed)
         self.field_vlos = self.get_velocity_field(self.seed)
 
@@ -346,6 +359,58 @@ class MockComponent(object):
             new = seed != self.seed
 
         return new
+
+    def set_column_density_pdf(self, column_density_pdf):
+        """
+        Set the one-point PDF used for the column density proxy map.
+        """
+        kind, value = self._parse_column_density_pdf(column_density_pdf)
+
+        if kind == "lognormal" and value is not None:
+            self.lognorm_kw["std"] = value
+        elif kind == "powerlaw" and value is not None:
+            self.powerlaw_pdf_kw["alpha"] = value
+
+        self.column_density_pdf = kind
+        self.field_column_density = None
+        self._field_column_density_kind = None
+        return kind
+
+    @staticmethod
+    def _parse_column_density_pdf(column_density_pdf):
+        if isinstance(column_density_pdf, str):
+            kind = column_density_pdf
+            value = None
+        elif (
+            isinstance(column_density_pdf, tuple)
+            and len(column_density_pdf) == 2
+            and isinstance(column_density_pdf[0], str)
+        ):
+            kind, value = column_density_pdf
+        else:
+            raise TypeError(
+                "column_density_pdf must be a string or a tuple of "
+                "(name, value), e.g. 'lognormal' or ('powerlaw', 2.5)."
+            )
+
+        aliases = {
+            "lognormal": "lognormal",
+            "log-normal": "lognormal",
+            "ln": "lognormal",
+            "powerlaw": "powerlaw",
+            "power-law": "powerlaw",
+            "pl": "powerlaw",
+        }
+        key = kind.lower().replace("_", "-")
+        if key not in aliases:
+            raise ValueError(
+                "column_density_pdf must be one of 'lognormal' or 'powerlaw'."
+            )
+
+        if value is not None and not np.isscalar(value):
+            raise TypeError("The tuple value in column_density_pdf must be a scalar.")
+
+        return aliases[key], value
 
     def get_powerlaw_field(self, seed=None):
         """
@@ -409,9 +474,13 @@ class MockComponent(object):
         """
         # Generate the power-law field
 
-        if self.isnewseed(seed) or self.field_column_density is None:
+        if (
+            self.isnewseed(seed)
+            or self.field_column_density is None
+            or self._field_column_density_kind != "lognormal"
+        ):
 
-            field = self.get_powerlaw_field(seed)
+            field = self.get_powerlaw_field(seed).copy()
             if invert:
                 field *= -1
             mean = self.lognorm_kw['mean']
@@ -420,8 +489,54 @@ class MockComponent(object):
             # Scale and exponentiate to create log-normal distribution
             field_scaled = np.log(mean) - 0.5 * (std ** 2) + std * field
             self.field_column_density = np.exp(field_scaled)
+            self._field_column_density_kind = "lognormal"
 
         return self.field_column_density
+
+    def get_powerlaw_column_density(self, seed=None, invert=False):
+        """
+        Generate a column density proxy map with a power-law one-point PDF.
+        """
+        if (
+            self.isnewseed(seed)
+            or self.field_column_density is None
+            or self._field_column_density_kind != "powerlaw"
+        ):
+            field = self.get_powerlaw_field(seed).copy()
+            if invert:
+                field *= -1
+
+            alpha = self.powerlaw_pdf_kw["alpha"]
+            xmin = self.powerlaw_pdf_kw["xmin"]
+            mean = self.powerlaw_pdf_kw["mean"]
+            if alpha <= 1:
+                raise ValueError("powerlaw_pdf_kw['alpha'] must be > 1.")
+            if xmin <= 0:
+                raise ValueError("powerlaw_pdf_kw['xmin'] must be > 0.")
+
+            u = norm.cdf(field)
+            eps = np.finfo(float).eps
+            u = np.clip(u, eps, 1 - eps)
+
+            field_column_density = xmin * (1 - u) ** (-1 / (alpha - 1))
+            if mean is not None:
+                field_column_density *= mean / np.mean(field_column_density)
+
+            self.field_column_density = field_column_density
+            self._field_column_density_kind = "powerlaw"
+
+        return self.field_column_density
+
+    def get_column_density(self, seed=None, pdf=None, invert=False):
+        if pdf is not None:
+            self.set_column_density_pdf(pdf)
+
+        if self.column_density_pdf == "lognormal":
+            return self.get_lognormal_field(seed=seed, invert=invert)
+        if self.column_density_pdf == "powerlaw":
+            return self.get_powerlaw_column_density(seed=seed, invert=invert)
+
+        raise RuntimeError(f"Unknown column_density_pdf: {self.column_density_pdf!r}")
 
     def get_kinetic_powerlaw_field(self, seed=None, seed2=None):
         """
@@ -557,9 +672,6 @@ class MockComponent(object):
         self.field_sigv = np.exp(field_scaled)
         return self.field_sigv
 
-
-    def get_column_density(self):
-        pass
 
     def get_tau(self):
         # scales with log-normal power spectrum, normalized tp 0.1 - 8?
