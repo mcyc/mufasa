@@ -73,7 +73,8 @@ class MockCloud(object):
 
     def __init__(self, box_size=256, largest_scale=2.5, n_components=1, seeds=None, v_offsets=None,
                  vlos_std=0.5, coherent_scale=0.5, column_density_pdf="lognormal",
-                 profile_index=2.0, n0=1e5, N0=1.5e22, r_flat=0.03):
+                 profile_index=2.0, n0=1e5, N0=1.5e22, r_flat=0.03,
+                 sigv_lognorm_mean=0.45, sigv_lognorm_std=0.6):
 
         self.box_size = box_size
         #self.pixel_size = pixel_size
@@ -85,6 +86,8 @@ class MockCloud(object):
         self.n0 = n0
         self.N0 = N0
         self.r_flat = r_flat
+        self.sigv_lognorm_mean = sigv_lognorm_mean
+        self.sigv_lognorm_std = sigv_lognorm_std
 
 
         if seeds is None:
@@ -106,6 +109,8 @@ class MockCloud(object):
                 n0=n0,
                 N0=N0,
                 r_flat=r_flat,
+                sigv_lognorm_mean=sigv_lognorm_mean,
+                sigv_lognorm_std=sigv_lognorm_std,
             )
             for seed in seeds
         ]
@@ -145,6 +150,8 @@ class MockCloud(object):
             n0=self.n0,
             N0=self.N0,
             r_flat=self.r_flat,
+            sigv_lognorm_mean=self.sigv_lognorm_mean,
+            sigv_lognorm_std=self.sigv_lognorm_std,
         )
         if seed is not None:
             kwargs['seed'] = seed
@@ -281,6 +288,12 @@ class MockComponent(object):
         following the characteristic value used by Arzoumanian et al. 2011. If
         None, Plummer-profile remapping is disabled and `field_volume_density`
         is set to None.
+    sigv_lognorm_mean : float, optional
+        Mean of the log-normal distribution used for the velocity dispersion
+        field (`sigv_kw['mean_log']`). Default is 0.45.
+    sigv_lognorm_std : float, optional
+        Standard deviation of the log-normal distribution used for the
+        velocity dispersion field (`sigv_kw['std_log']`). Default is 0.6.
 
     Attributes
     ----------
@@ -329,7 +342,7 @@ class MockComponent(object):
 
     def __init__(self, box_size, pixel_size, seed=42, vlos_std=0.5, coherent_scale=0.5,
                  column_density_pdf="lognormal", profile_index=2.0, n0=1e5,
-                 N0=1.5e22, r_flat=0.03):
+                 N0=1.5e22, r_flat=0.03, sigv_lognorm_mean=0.45, sigv_lognorm_std=0.6):
 
         self.seed = None
         self.seed2 = None
@@ -375,8 +388,8 @@ class MockComponent(object):
         # these default values mimic GAS & KEYSTONE NH3 results
         self.sigv_kw = dict(
             field_sign=-1, # (-1 or 1) Default of -1 means linewidth anti-correlates with column density
-            mean_log=0.45,  # Mean of the log-normal (arbitrary units)
-            std_log=0.6  # Standard deviation of the log-normal distribution
+            mean_log=sigv_lognorm_mean,  # Mean of the log-normal (arbitrary units)
+            std_log=sigv_lognorm_std  # Standard deviation of the log-normal distribution
         )
 
         self.field = None
